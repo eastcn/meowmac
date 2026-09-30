@@ -55,6 +55,7 @@ enum SelfTestMain {
         tests += DataTests.tests
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.RenderPreview/三个标签页", SelfTestMain.renderPanel))
+            tests.append(("UI.RenderComponents/基础组件", SelfTestMain.renderComponents))
         }
         let filters = CommandLine.arguments.dropFirst().map { $0.lowercased() }
         if filters.contains("--list") {
@@ -385,6 +386,19 @@ enum SelfTestMain {
         let fixture = #"{"logs":{},"sessions":[{"command":"mo clean","started_at":"2026-01-01T12:00:00Z","size":1024},{"command":"mo clean","started_at":"2026-01-02T12:00:00Z","size":2048}],"deletions":[]}"#
         guard let latest = try? MoHistoryParser.latest(Data(fixture.utf8)), latest.startedAt == ISO8601DateFormatter().date(from: "2026-01-02T12:00:00Z") else { return false }
         return (try? MoHistoryParser.latest(Data(#"{"sessions":[]}"#.utf8))) == nil
+    }
+
+    @MainActor private static func renderComponents() -> Bool {
+        guard let path = ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] else { return false }
+        do {
+            let directory = URL(fileURLWithPath: path, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            for dark in [false, true] {
+                guard let data = PanelPreviewRenderer.componentPNG(dark: dark), !data.isEmpty else { return false }
+                try data.write(to: directory.appendingPathComponent("components-\(dark ? "dark" : "light").png"))
+            }
+            return true
+        } catch { print("组件渲染失败：\(error)"); return false }
     }
 
     @MainActor private static func renderPanel() -> Bool {

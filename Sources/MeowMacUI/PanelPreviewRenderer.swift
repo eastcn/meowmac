@@ -42,6 +42,34 @@ public enum PanelPreviewRenderer {
         return state
     }
 
+    public static func componentPNG(dark: Bool) -> Data? {
+        renderPNG(DesignComponentPreview(), width: Design.panelWidth, height: 460, dark: dark)
+    }
+
+    // ImageRenderer 无法绘制系统玻璃合成层，预览沿用 SPEC 的普通材质退路。
+    // 应用默认 previewMaterial 为 false，仍使用 macOS 26 的原生 glassEffect。
+    static func renderPNG<V: View>(_ view: V, width: CGFloat, height: CGFloat, dark: Bool) -> Data? {
+        let app = NSApplication.shared
+        let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
+        let oldAppearance = app.appearance
+        app.appearance = appearance
+        defer { app.appearance = oldAppearance }
+        var result: Data?
+        appearance.performAsCurrentDrawingAppearance {
+            let background = Color(nsColor: NSColor.windowBackgroundColor.usingColorSpace(.deviceRGB)!)
+            let renderer = ImageRenderer(content: view
+                .environment(\.colorScheme, dark ? .dark : .light)
+                .environment(\.previewMaterial, true)
+                .frame(width: width, height: height, alignment: .top)
+                .background(background))
+            renderer.proposedSize = ProposedViewSize(width: width, height: height)
+            renderer.scale = 2
+            if let image = renderer.nsImage, let tiff = image.tiffRepresentation,
+               let rep = NSBitmapImageRep(data: tiff) { result = rep.representation(using: .png, properties: [:]) }
+        }
+        return result
+    }
+
     public static func png(state: PanelState, dark: Bool) -> Data? {
         _ = NSApplication.shared
         let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
