@@ -57,6 +57,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         panelState.onRefresh = { [weak self] in
             self?.sample(); self?.sampleEnergy(); self?.networkBridge?.recheck(); self?.quotaCoordinator?.manualRefresh()
         }
+        panelState.onShowStorage = { provider in
+            let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".\(provider.rawValue)")
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
         panelState.onClean = { [weak self] in self?.openCleanCommand() }
         panelState.onOpenConfig = { [weak self] in self?.openConfig() }
         panelState.onShowConfigFolder = { [weak self] in self?.showConfigFolder() }

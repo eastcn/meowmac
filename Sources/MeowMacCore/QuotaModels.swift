@@ -70,10 +70,20 @@ public struct QuotaSnapshot: Codable {
     }
 }
 
-public struct DailyCost {
+public struct CostModel: Codable {
+    public let name: String
+    public let tokens: Int
+    public init(name: String, tokens: Int) { self.name = name; self.tokens = tokens }
+}
+
+public struct DailyCost: Codable {
     public let date: String
     public let totalCost: Double
-    public init(date: String, totalCost: Double) { self.date = date; self.totalCost = totalCost }
+    public let totalTokens: Int?
+    public let models: [CostModel]
+    public init(date: String, totalCost: Double, totalTokens: Int? = nil, models: [CostModel] = []) {
+        self.date = date; self.totalCost = totalCost; self.totalTokens = totalTokens; self.models = models
+    }
 }
 
 public struct SessionActivity {
@@ -153,7 +163,11 @@ public enum CodexBarParser {
               let days = object["daily"] as? [[String: Any]] else { throw QuotaParseError.invalidRoot }
         return days.compactMap { day in
             guard let date = day["date"] as? String, let cost = number(day["totalCost"]) else { return nil }
-            return DailyCost(date: date, totalCost: cost)
+            return DailyCost(date: date, totalCost: cost, totalTokens: day["totalTokens"] as? Int,
+                models: (day["modelBreakdowns"] as? [[String: Any]] ?? []).compactMap { model in
+                    guard let name = model["modelName"] as? String, let tokens = model["totalTokens"] as? Int else { return nil }
+                    return CostModel(name: name, tokens: tokens)
+                })
         }
     }
 

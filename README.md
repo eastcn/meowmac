@@ -21,3 +21,5 @@ scripts/install.sh
 - 网络检测通过相邻目录中的 TunCanary 库运行。MeowMac 读取 TunCanary 设置，状态文件保存在自己的应用数据目录。
 
 本项目使用 MIT 许可。
+
+渠道 logo 来自 CodexBar 的 ProviderIcon SVG 资源，分别是 Anthropic、OpenAI、DeepSeek 和 OpenCode 的商标。商标权归各自所有者。

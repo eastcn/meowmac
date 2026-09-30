@@ -5,7 +5,7 @@ import TunCanaryUI
 
 @MainActor
 public enum PanelPreviewRenderer {
-    public static func syntheticState(alert: Bool = false) -> PanelState {
+    public static func syntheticState(alert: Bool = false, quotaAlert: Bool = false) -> PanelState {
         let state = PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil))
         let now = ISO8601DateFormatter().date(from: "2026-09-30T06:35:00Z")!
         state.now = { now }
@@ -33,18 +33,36 @@ public enum PanelPreviewRenderer {
             runawayDurations: alert ? [50: 2100] : [:])
         if alert { state.fairSince = now.addingTimeInterval(-2100) }
         for provider in QuotaProvider.allCases {
-            state.quotas[provider] = QuotaSnapshot(provider: provider, source: "示例", updatedAt: now,
-                windows: [QuotaWindow(usedPercent: provider == .claude ? 28 : 40, windowMinutes: 300,
-                                      resetsAt: now.addingTimeInterval(9900), resetDescription: "1 小时后")],
-                paceSummary: "用量正常", credits: provider == .codex ? 12.5 : nil)
-            state.quotaHistory[provider] = (0..<7).map { index in
-                QuotaHistoryLine(sampledAt: now.addingTimeInterval(Double(index - 6) * 86400),
-                                 provider: provider, windowMinutes: 300,
-                                 usedPercent: Double(20 + index * 8), resetsAt: nil)
+            let short = QuotaWindow(usedPercent: provider == .claude ? 28 : 40, windowMinutes: 300,
+                resetsAt: now.addingTimeInterval(9900), resetDescription: nil)
+            let long = QuotaWindow(usedPercent: provider == .codex && quotaAlert ? 70 : 38, windowMinutes: 10080,
+                resetsAt: now.addingTimeInterval(0.49 * 604800), resetDescription: nil, identifier: "secondary", name: provider == .codex ? "每周" : "7 天")
+            state.quotas[provider] = QuotaSnapshot(provider: provider, source: "oauth", updatedAt: now.addingTimeInterval(-180),
+                windows: [.codex, .claude].contains(provider) ? [short, long] : [short], paceSummary: "示例",
+                credits: nil, accountEmail: [.codex, .claude].contains(provider) ? "demo@example.com" : nil,
+                planName: provider == .codex ? "Plus" : provider == .claude ? "Max" : nil,
+                codexResetCredits: provider == .codex ? QuotaResetCredits(availableCount: 2, expiresAt: [now.addingTimeInterval(864000), now.addingTimeInterval(1728000)]) : nil)
+            var rows = (0..<28).map { index in
+                let sampled = now.addingTimeInterval(Double(index - 27) * 18000)
+                return QuotaHistoryLine(sampledAt: sampled, provider: provider, windowMinutes: 300,
+                    usedPercent: Double(20 + (index * 17) % 76), resetsAt: sampled.addingTimeInterval(9900), windowID: "primary")
             }
+            let start = long.resetsAt!.addingTimeInterval(-604800)
+            rows += (0..<12).map { index in
+                QuotaHistoryLine(sampledAt: start.addingTimeInterval(now.timeIntervalSince(start) * Double(index) / 11), provider: provider,
+                    windowMinutes: 10080, usedPercent: long.usedPercent * pow(Double(index) / 11, 0.8), resetsAt: long.resetsAt, windowID: "secondary")
+            }
+            state.quotaHistory[provider] = rows
         }
-        state.costs[.claude] = (0..<7).map { DailyCost(date: "9-\(20 + $0)", totalCost: Double($0 + 1) * 0.4) }
-        state.costs[.codex] = (0..<7).map { DailyCost(date: "9-\(20 + $0)", totalCost: Double($0 + 1) * 0.2) }
+        for provider in [QuotaProvider.claude, .codex] {
+            state.costs[provider] = (0..<30).map { index in
+                let date = Calendar.current.date(byAdding: .day, value: index - 29, to: now)!
+                let tokens = 160000 + index * 19000
+                return DailyCost(date: DisplayDate.format(date, pattern: "yyyy-MM-dd"), totalCost: Double((index * 7) % 15 + 1) * 0.4,
+                    totalTokens: tokens, models: [CostModel(name: provider == .codex ? "example-coder" : "example-assistant", tokens: tokens)])
+            }
+            state.localStorage[provider] = LocalStorageSnapshot(sampledAt: now, sessionsBytes: 6300000000, cacheBytes: 2100000000, otherBytes: 700000000, sessionFileCount: 1284)
+        }
         state.networkModel = AppModel.preview(.firstLaunch)
         state.networkTone = .green
         state.lastCleaning = CleaningRecord(startedAt: now.addingTimeInterval(-172800), sizeDescription: "8.4 GB")

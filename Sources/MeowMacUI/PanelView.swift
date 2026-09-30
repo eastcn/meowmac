@@ -47,10 +47,12 @@ public final class PanelState: ObservableObject {
     @Published public var lastRefreshedAt: Date?
     @Published public var selectedTab: PanelTab = .system
     @Published public var chartMinutes = 60
+    @Published public var selectedProvider: QuotaProvider = .codex
     @Published public var loginEnabled = false
     @Published public var networkModel: AppModel?
     @Published public var lastCleaning: CleaningRecord?
 
+    public var onShowStorage: (QuotaProvider) -> Void = { _ in }
     public var onRefresh: () -> Void = {}
     public var onClean: () -> Void = {}
     public var onOpenConfig: () -> Void = {}
@@ -157,7 +159,7 @@ public struct PanelView: View {
             case .system:
                 DiagnosisCard(state: state); SystemChartCard(state: state); SectionRule(); EnergyCard(state: state); SectionRule(); DiskCard(state: state)
             case .quota:
-                QuotaProvidersCard(state: state); SectionRule(); CostCard(state: state)
+                QuotaPage(state: state)
             case .network:
                 if let model = state.networkModel { PopoverRootView(model: model, maxScrollHeight: nil) }
                 else { Text("网络检测未启动").font(Design.caption).foregroundStyle(Design.secondary) }

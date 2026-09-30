@@ -53,6 +53,14 @@ enum SelfTestMain {
             ("Core.System/mo 清理历史", SelfTestMain.moHistory),
         ]
         tests += DataTests.tests
+        tests.append(("UI.Quota/花费窗口与模型汇总", { @MainActor in
+            let state = PanelPreviewRenderer.syntheticState()
+            let data = Data(#"[{"daily":[{"date":"2026-09-30","totalCost":2.5,"totalTokens":100,"modelBreakdowns":[{"modelName":"example-a","totalTokens":100}]},{"date":"2026-09-29","totalCost":3,"totalTokens":200,"modelBreakdowns":[{"modelName":"example-b","totalTokens":200}]},{"date":"2026-08-01","totalCost":999,"totalTokens":9999}]}]"#.utf8)
+            guard let days = try? CodexBarParser.cost(data) else { return false }
+            state.costs[.codex] = days
+            guard let value = state.costDisplay(.codex) else { return false }
+            return value.todayCost == 2.5 && value.totalCost == 5.5 && value.todayTokens == 100 && value.totalTokens == 300 && value.mostUsedModel == "example-b" && state.costDisplay(.deepseek) == nil
+        }))
         tests.append(("UI.Settings/原生菜单", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(); state.loginEnabled = true
             let menu = SettingsMenu.make(state: state)
@@ -441,12 +449,21 @@ enum SelfTestMain {
                     try data.write(to: directory.appendingPathComponent(name), options: .atomic)
                 }
             }
+            for provider in [QuotaProvider.claude, .codex] {
+                let state = PanelPreviewRenderer.syntheticState(quotaAlert: provider == .codex)
+                state.selectedTab = .quota; state.selectedProvider = provider
+                for dark in [false, true] {
+                    guard let data = PanelPreviewRenderer.png(state: state, dark: dark) else { return false }
+                    try data.write(to: directory.appendingPathComponent("panel-quota-\(provider.rawValue)-\(dark ? "dark" : "light").png"))
+                }
+            }
             let alert = PanelPreviewRenderer.syntheticState(alert: true)
             for dark in [false, true] {
                 guard let data = PanelPreviewRenderer.png(state: alert, dark: dark) else { return false }
                 try data.write(to: directory.appendingPathComponent("panel-system-alert-\(dark ? "dark" : "light").png"))
             }
             state.selectedTab = .quota
+            state.selectedProvider = .deepseek
             state.quotas.removeValue(forKey: .deepseek)
             state.quotaErrors[.deepseek] = "示例：服务暂时不可用"
             for dark in [false, true] {

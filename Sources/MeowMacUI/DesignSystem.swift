@@ -15,6 +15,7 @@ enum Design {
     static let trendHeight: CGFloat = 26, cycleHeight: CGFloat = 56, columnHeight: CGFloat = 40
     static let tableRow: CGFloat = 21, tableHeader: CGFloat = 16, rankWidth: CGFloat = 18
     static let numericColumn: CGFloat = 56, siteCountColumn: CGFloat = 64, siteLatencyColumn: CGFloat = 88
+    static let providerHeight: CGFloat = 80
     static let providerIcon: CGFloat = 20, networkIcon: CGFloat = 32
     static let catWidth: CGFloat = 26, catHeight: CGFloat = 17
     static let headerTop: CGFloat = 14, footerInset: CGFloat = 10
