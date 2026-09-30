@@ -53,6 +53,14 @@ enum SelfTestMain {
             ("Core.System/mo 清理历史", { SelfTestMain.moHistory() }),
         ]
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }
+        tests.append(("UI.Cat/减少动态与速度线", { @MainActor in
+            let state = PanelPreviewRenderer.syntheticState(alert: true)
+            let cat = state.catDisplay(reducedMotion: true)
+            return cat.frame(3) == 0 && cat.speedLines && abs(cat.frameInterval - (0.5 - 0.45 * cat.load)) < 0.000001
+                && CatRenderer.image(frame: 2, level: .normal).isTemplate
+                && !CatRenderer.image(frame: 2, level: .warn).isTemplate
+                && CatRenderer.png(frame: 0, level: .normal, reducedMotion: true) == CatRenderer.png(frame: 3, level: .normal, reducedMotion: true)
+        }))
         tests.append(("UI.Network/分组与失败状态", { @MainActor in
             let model = PanelPreviewRenderer.networkModel(failure: true, now: Date())
             let value = model.meowMacDisplay
@@ -345,6 +353,10 @@ enum SelfTestMain {
                 let data = CatRenderer.png(frame: frame, level: level)
                 guard !data.isEmpty else { return false }
                 if let directory { try data.write(to: directory.appendingPathComponent("cat-\(name).png"), options: .atomic) }
+            }
+            if let directory {
+                for index in 0..<5 { try CatRenderer.png(frame: index, level: .normal).write(to: directory.appendingPathComponent("cat-frame-\(index + 1).png")) }
+                try CatRenderer.png(frame: 2, level: .normal, load: 0.7).write(to: directory.appendingPathComponent("cat-speed.png"))
             }
             return true
         } catch { print("猫图预览失败：\(error)"); return false }

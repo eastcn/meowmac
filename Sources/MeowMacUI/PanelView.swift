@@ -197,7 +197,7 @@ struct OverviewView: View {
                     if let issue = state.health.worst { state.select(issue.tab) }
                 } label: {
                     HStack(spacing: Design.rowGap) {
-                        Image(nsImage: CatRenderer.image(frame: 0, level: state.health.level)).resizable().frame(width: Design.catWidth, height: Design.catHeight)
+                        Image(nsImage: CatRenderer.image(frame: 0, level: state.health.level, load: state.catDisplay().load)).resizable().frame(width: Design.catWidth, height: Design.catHeight)
                         if let issue = state.health.worst {
                             HStack(spacing: Design.smallGap) {
                                 Text(state.health.level == .severe ? "严重" : "提醒").foregroundStyle(Design.stateText(state.health.level))

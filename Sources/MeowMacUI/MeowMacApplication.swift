@@ -18,7 +18,6 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var energyTracker = EnergyTracker()
     private var snapshot: SystemSnapshot?
     private var hasSystemBaseline = false
-    private var motion = CatMotion()
     private var frame = 0
     private var frameInterval = 0.5
     private var sampleTimer: Timer?
@@ -127,8 +126,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         if latest.thermal == .fair {
             if panelState.fairSince == nil { panelState.fairSince = latest.timestamp }
         } else { panelState.fairSince = nil }
-        frameInterval = motion.update(cpu: latest.cpuUsage ?? 0, pressure: latest.memoryPressure,
-                                      config: configResult.config)
+        frameInterval = panelState.catDisplay().frameInterval
     }
 
     private func sampleEnergy() {
@@ -201,9 +199,9 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if !self.screenSleeping && self.displayLevel != .severe {
-                    self.frame = (self.frame + 1) % 5
+                    self.frame = self.panelState.catDisplay().frame(self.frame + 1)
                 }
-                self.statusItem?.button?.image = CatRenderer.image(frame: self.frame, level: self.displayLevel)
+                self.statusItem?.button?.image = CatRenderer.image(frame: self.frame, level: self.displayLevel, load: self.panelState.catDisplay().load, reducedMotion: self.panelState.catDisplay().reducedMotion)
                 self.scheduleFrame()
             }
         }
