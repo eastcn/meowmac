@@ -76,7 +76,14 @@ enum SelfTestMain {
         tests.append(("UI.Network/分组与失败状态", { @MainActor in
             let model = PanelPreviewRenderer.networkModel(failure: true, now: Date())
             let value = model.meowMacDisplay
-            return value.tone == .red && value.checks.count == 5 && value.passed == 4 && value.groups[1].passed == 2 && value.groups[1].total == 3 && value.groups[1].medianMilliseconds == 184 && value.egress.count == 3
+            guard value.tone == .red && value.checks.count == 5 && value.passed == 4,
+                  value.groups.map(\.name) == ["国内", "海外", "子网目标"],
+                  value.groups.map(\.passed) == [3, 2, 2], value.groups.map(\.total) == [3, 3, 2],
+                  value.groups.map(\.medianMilliseconds) == [25, 184, 35], value.egress.count == 3 else { return false }
+            let normal = PanelPreviewRenderer.networkModel(failure: false, now: Date()).meowMacDisplay
+            guard normal.groups.map(\.passed) == [3, 3, 2], normal.groups.map(\.medianMilliseconds) == [25, 184, 35] else { return false }
+            model.settings.egressTargets = [.claude]
+            return model.meowMacDisplay.egress.count == 1 && model.meowMacDisplay.egress[0].target == model.settings.effectiveEgressTargets[0].displayName
         }))
         tests.append(("UI.Network.Live/CLI同轮对照", { @MainActor in
             let value = await NetworkBridge.collectOnce()
