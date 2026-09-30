@@ -87,8 +87,8 @@ enum SelfTestMain {
             return model.meowMacDisplay.egress.count == 1 && model.meowMacDisplay.egress[0].target == model.settings.effectiveEgressTargets[0].displayName
         }))
         tests.append(("UI.Network.Live/CLI同轮对照", { @MainActor in
-            let value = await NetworkBridge.collectOnce()
             do {
+                let value = try await NetworkBridge.collectOnce()
                 let dir = URL(fileURLWithPath: "build/acceptance")
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
                 try Data(value.raw.utf8).write(to: dir.appendingPathComponent("network-meowmac.json"))
@@ -103,6 +103,17 @@ enum SelfTestMain {
                 let otherChecks = (other?["items"] as? [[String: Any]])?.compactMap { $0["severity"] as? String }
                 return own?["status"] as? String == other?["status"] as? String && ownChecks == otherChecks
             } catch { print("网络对照失败：\(error)"); return false }
+        }))
+        tests.append(("UI.Network/等待总超时与完成", { @MainActor in
+            do {
+                var elapsed = 0.0
+                let timedOut = try await SnapshotWait.waitWhile(uptime: { elapsed }, sleep: { elapsed += $0 }, pending: { true })
+                guard !timedOut, abs(elapsed - 30) < 0.000001 else { return false }
+                elapsed = 0
+                let completed = try await SnapshotWait.waitWhile(uptime: { elapsed }, sleep: { elapsed += $0 }, pending: { elapsed < 0.1 })
+                let immediate = try await SnapshotWait.waitWhile(timeout: 0, pending: { false })
+                return completed && immediate && elapsed <= 0.15
+            } catch { print("等待用例失败：\(error)"); return false }
         }))
         tests.append(("UI.Quota/花费窗口与模型汇总", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState()

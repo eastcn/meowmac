@@ -70,8 +70,9 @@ public enum SnapshotCollector {
             try FileManager.default.copyItem(at: applicationHistory, to: networkHistory)
         }
         // 快照从应用历史副本采集，新的出口记录只写入验收目录。
-        let network = await NetworkBridge.collectOnce(historyFile: networkHistory)
+        let network = try await NetworkBridge.collectOnce(historyFile: networkHistory)
         state.networkModel = network.model; state.networkTone = network.model.meowMacDisplay.tone
+        state.networkCapture = network.capture
         raw.write(Data(network.raw.utf8), name: "tuncanary.json")
         if rawDirectory != nil {
             try await Task.detached {

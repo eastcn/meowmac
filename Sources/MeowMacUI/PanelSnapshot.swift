@@ -52,7 +52,9 @@ public struct PanelSnapshot: Codable {
         system = SystemPanelSnapshot(latest: state.snapshot, diagnosis: state.diagnosisRows, energy: state.energy, trends: state.systemTrends,
             chartMinutes: state.chartMinutes, domain: state.trendDomain, warmPeriods: state.warmPeriods, lastCleaning: state.lastCleaning)
         quota = QuotaProvider.allCases.map { state.channelDisplay($0) }
-        network = state.networkModel?.meowMacDisplay
+        var networkDisplay = state.networkModel?.meowMacDisplay
+        networkDisplay?.capture = state.networkCapture
+        network = networkDisplay
         cat = state.catDisplay()
     }
 }

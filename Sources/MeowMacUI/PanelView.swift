@@ -50,6 +50,7 @@ public final class PanelState: ObservableObject {
     @Published public var selectedProvider: QuotaProvider = .codex
     @Published public var loginEnabled = false
     @Published public var networkModel: AppModel?
+    public var networkCapture: NetworkCaptureInfo?
     @Published public var lastCleaning: CleaningRecord?
 
     public var onShowStorage: (QuotaProvider) -> Void = { _ in }

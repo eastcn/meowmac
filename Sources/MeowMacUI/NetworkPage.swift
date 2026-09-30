@@ -17,6 +17,7 @@ public struct NetworkEgressDisplay: Codable {
     public let target: String, ip: String?, region: String?, stability: String, failure: String?
 }
 public struct NetworkDisplay: Codable {
+    public var capture: NetworkCaptureInfo? = nil
     public let tone: NetworkTone
     public let conclusion: String, detail: String
     public let checkedAt: Date?
