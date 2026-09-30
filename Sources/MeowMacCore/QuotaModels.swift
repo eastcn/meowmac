@@ -28,6 +28,9 @@ public extension QuotaProvider {
 public extension QuotaWindow {
     var effectiveWindowMinutes: Int? {
         if let minutes = windowMinutes { return minutes }
+        return Self.inferredWindowMinutes(name: name)
+    }
+    static func inferredWindowMinutes(name: String?) -> Int? {
         guard let name else { return nil }
         if name.contains("5 小时") { return 300 }
         if name.contains("7 天") || name.contains("每周") { return 10080 }
@@ -110,9 +113,12 @@ public enum CodexBarParser {
             }
             let windows = windowRows.prefix(3).compactMap { window -> QuotaWindow? in
                 guard let used = number(window["usedPercent"]) else { return nil }
-                return QuotaWindow(usedPercent: used, windowMinutes: window["windowMinutes"] as? Int,
+                let kind = window["kind"] as? String ?? "primary"
+                let minutes = window["windowMinutes"] as? Int
+                    ?? (kind == "session" ? 300 : kind == "weekly" ? 10080 : QuotaWindow.inferredWindowMinutes(name: window["label"] as? String))
+                return QuotaWindow(usedPercent: used, windowMinutes: minutes,
                     resetsAt: (window["resetAt"] as? String).flatMap(parseDate),
-                    resetDescription: nil, identifier: window["kind"] as? String ?? "primary", name: window["label"] as? String)
+                    resetDescription: nil, identifier: kind, name: window["label"] as? String)
             }
             guard !windows.isEmpty else { errors[provider] = "窗口数据无效"; continue }
             let pace = (row["display"] as? [String: Any])?["paceSummary"] as? String

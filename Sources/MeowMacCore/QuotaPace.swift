@@ -28,19 +28,28 @@ public struct QuotaPeak: Codable {
 }
 
 public enum QuotaHistorySeries {
+    public static let resetTolerance: TimeInterval = 10 * 60
+
     public static func peaks(_ history: [QuotaHistoryLine], now: Date) -> [QuotaPeak] {
-        let samples = history.filter { $0.windowMinutes == 300 && $0.sampledAt >= now.addingTimeInterval(-7 * 86400) && $0.sampledAt <= now && $0.resetsAt != nil }
-        return Dictionary(grouping: samples, by: { $0.resetsAt! }).map { reset, rows in
-            QuotaPeak(resetsAt: reset, usedPercent: rows.map(\.usedPercent).max() ?? 0, isCurrent: reset > now)
-        }.sorted { $0.resetsAt < $1.resetsAt }
+        let samples = history.filter { $0.effectiveWindowMinutes == 300 && $0.sampledAt >= now.addingTimeInterval(-7 * 86400) && $0.sampledAt <= now && $0.resetsAt != nil }
+            .sorted { $0.resetsAt! < $1.resetsAt! }
+        var groups: [(reset: Date, peak: Double)] = []
+        for sample in samples {
+            let reset = sample.resetsAt!
+            if let last = groups.last, reset.timeIntervalSince(last.reset) <= resetTolerance {
+                groups[groups.count - 1].peak = max(last.peak, sample.usedPercent)
+            } else { groups.append((reset, sample.usedPercent)) }
+        }
+        return groups.map { QuotaPeak(resetsAt: $0.reset, usedPercent: $0.peak, isCurrent: $0.reset > now) }
     }
 
     public static func currentCycle(_ history: [QuotaHistoryLine], window: QuotaWindow, now: Date) -> [QuotaHistoryLine] {
         guard let minutes = window.effectiveWindowMinutes, let reset = window.resetsAt else { return [] }
         let start = reset.addingTimeInterval(Double(-minutes * 60))
         return history.filter {
-            $0.windowMinutes == minutes && ($0.windowID == nil || $0.windowID == window.identifier)
-                && $0.resetsAt == reset && $0.sampledAt >= start && $0.sampledAt <= min(reset, now)
+            $0.effectiveWindowMinutes == minutes
+                && $0.resetsAt.map { abs($0.timeIntervalSince(reset)) <= resetTolerance } == true
+                && $0.sampledAt >= start && $0.sampledAt <= min(reset, now)
         }.sorted { $0.sampledAt < $1.sampledAt }
     }
 }
