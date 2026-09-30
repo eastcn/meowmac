@@ -62,7 +62,15 @@ public enum SnapshotCollector {
         }
         do { state.lastCleaning = try MoHistoryReader.latest(executable: config.moPath) }
         catch { logger.error("快照清理历史失败：\(error.localizedDescription, privacy: .private)") }
-        let network = await NetworkBridge.collectOnce()
+        let networkHistoryDirectory = rawDirectory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/acceptance", isDirectory: true)
+        try FileManager.default.createDirectory(at: networkHistoryDirectory, withIntermediateDirectories: true)
+        let networkHistory = networkHistoryDirectory.appendingPathComponent("snapshot-egress-\(UUID().uuidString).json")
+        let applicationHistory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/MeowMac/tuncanary/egress-history.json")
+        if FileManager.default.fileExists(atPath: applicationHistory.path) {
+            try FileManager.default.copyItem(at: applicationHistory, to: networkHistory)
+        }
+        // 快照从应用历史副本采集，新的出口记录只写入验收目录。
+        let network = await NetworkBridge.collectOnce(historyFile: networkHistory)
         state.networkModel = network.model; state.networkTone = network.model.meowMacDisplay.tone
         raw.write(Data(network.raw.utf8), name: "tuncanary.json")
         if rawDirectory != nil {

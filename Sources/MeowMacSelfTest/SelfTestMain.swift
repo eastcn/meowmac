@@ -264,7 +264,9 @@ enum SelfTestMain {
                 print("额度采集：成功 \(result.snapshots.count) 个，错误 \(result.errors.count) 个")
                 return false
             }
-            let history = QuotaHistoryStore()
+            let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent("build/acceptance/quota-live-history/\(UUID().uuidString)", isDirectory: true)
+            let history = QuotaHistoryStore(directory: directory)
             for snapshot in result.snapshots.values { try history.append(snapshot) }
             let counts = try QuotaProvider.allCases.map { try history.read($0).count }
             print("额度采集：4 个渠道，历史新增；各渠道行数 \(counts)")

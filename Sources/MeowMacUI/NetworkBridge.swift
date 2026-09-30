@@ -59,7 +59,7 @@ public final class NetworkBridge {
 
 public extension NetworkBridge {
     /// 无窗口的一轮检测，使用 TunCanary CLI 的同一个 CheckRunner。
-    static func collectOnce() async -> (model: AppModel, raw: String) {
+    static func collectOnce(historyFile: URL? = nil) async -> (model: AppModel, raw: String) {
         let settings = SettingsStore().load()
         let paths = KnownPaths.currentUser()
         let adapters = VPNAdapterRegistry(store: VPNAdapterStore(paths: paths)).current
@@ -70,9 +70,8 @@ public extension NetworkBridge {
         let local = LocalAssessment(severity: Severity.worst(verdict.cards.map(\.severity)), cards: verdict.cards, faults: [], primaryReason: verdict.primaryReason,
             tunState: .unknown, vpnState: .unconfirmed, isInGracePeriod: false, intranetProbeEnabled: verdict.intranet.site != nil,
             tailnetDecision: verdict.tailnet, primaryServiceName: nil, mihomoDNSPort: nil, diagnosticNotes: [], evaluatedAt: verdict.checkedAt)
-        let support = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/MeowMac/tuncanary")
         let model = AppModel(settings: settings, local: local, lastCheckedAt: verdict.checkedAt, egressChecker: EgressIPChecker(), egressGeoClient: EgressGeoClient(),
-            egressHistoryStore: EgressHistoryStore(fileURL: support.appendingPathComponent("egress-history.json")))
+            egressHistoryStore: historyFile.map { EgressHistoryStore(fileURL: $0) })
         var overall = OverallAssessment(local: local, connectivityFaults: [])
         overall.severity = verdict.severity; overall.reasons = verdict.reasons; overall.faults = verdict.faults
         model.overall = overall
