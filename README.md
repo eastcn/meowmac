@@ -4,7 +4,7 @@ MeowMac 是一个 macOS 菜单栏应用，用猫的速度和形态显示整机�
 
 ## 构建与安装
 
-需要 macOS 14 或更新版本，以及 Swift 5.10 Command Line Tools。将 TunCanary 仓库放在本仓库的相邻目录 `../tuncanary`。
+运行需要 macOS 14 或更新版本。构建需要带 macOS 26 SDK 的 Command Line Tools；SwiftPM 的 tools-version 保持 5.10。将 TunCanary 仓库放在本仓库的相邻目录 `../tuncanary`。
 
 ```sh
 scripts/check.sh

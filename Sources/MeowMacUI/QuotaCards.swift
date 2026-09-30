@@ -48,8 +48,13 @@ public extension PanelState {
 }
 struct ProviderLogo: View {
     let provider: QuotaProvider
+    private var resourceBundle: Bundle {
+        if let url = Bundle.main.resourceURL?.appendingPathComponent("MeowMac_MeowMacUI.bundle"),
+           let bundle = Bundle(url: url) { return bundle }
+        return .module
+    }
     var body: some View {
-        if let url = Bundle.module.url(forResource: "ProviderIcon-\(provider.rawValue)", withExtension: "svg", subdirectory: "Resources"), let image = NSImage(contentsOf: url) {
+        if let url = resourceBundle.url(forResource: "ProviderIcon-\(provider.rawValue)", withExtension: "svg", subdirectory: "Resources"), let image = NSImage(contentsOf: url) {
             Image(nsImage: image).renderingMode(.template).resizable().scaledToFit().frame(width: Design.providerIcon, height: Design.providerIcon)
         }
     }

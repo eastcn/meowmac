@@ -32,6 +32,9 @@ stage="$work_dir/MeowMac.app"
 iconset="$work_dir/MeowMac.iconset"
 mkdir -p "$stage/Contents/MacOS" "$stage/Contents/Resources" "$iconset"
 cp "$binary" "$stage/Contents/MacOS/MeowMac"
+resource_bundle="$(dirname "$binary")/MeowMac_MeowMacUI.bundle"
+[[ -d "$resource_bundle" ]] || { printf '未找到渠道图标资源包\n' >&2; exit 1; }
+cp -R "$resource_bundle" "$stage/Contents/Resources/"
 cat > "$stage/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
