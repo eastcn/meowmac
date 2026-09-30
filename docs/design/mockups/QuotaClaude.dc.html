@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>MeowMac 额度页 Claude</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,"SF Pro Text","PingFang SC",system-ui,sans-serif;color:#1D1D1F;-webkit-font-smoothing:antialiased}
+a{color:#0A6CFF}a:hover{color:#0050C8}
+</style>
+</helmet>
+<div style="width: 360px; height: 1160px; box-sizing: border-box; background: linear-gradient(rgba(250,250,252,0.8), rgba(250,250,252,0.8)), linear-gradient(135deg, #9DB4F0 0%, #D3B5EC 55%, #F5C3CF 100%); display: flex; flex-direction: column; font-variant-numeric: tabular-nums; color: #1D1D1F;">
+
+  <!-- 总览：状态 -->
+  <div style="display: flex; align-items: center; gap: 8px; padding: 14px 16px 12px 16px;">
+    <svg width="26" height="17" viewBox="0 0 40 26" aria-hidden="true" style="color: #FF9500; flex-shrink: 0;">
+      <g fill="currentColor" stroke="currentColor" stroke-linecap="round">
+        <path d="M9 13 C9 8.5 14 7 20 7.5 C25 8 28 8.5 29.5 10 L30 15 C28 17.5 23 18 18 17.8 C12.5 17.6 9 16.5 9 13 Z" stroke="none"></path>
+        <circle cx="31.5" cy="9.5" r="4.6" stroke="none"></circle>
+        <path d="M28.4 6.6 L29.2 2 L32 5.2 Z M32.2 5 L35 1.8 L35.6 6.8 Z" stroke="none"></path>
+        <path d="M9.5 11.5 C6 10.5 3.8 8.2 4.4 4.2" fill="none" stroke-width="2.2"></path>
+        <path d="M27 16 L32 21 M25 16.5 L29 22 M13 16.5 L7 20 M15.5 17 L10 21.5" fill="none" stroke-width="2.4"></path>
+      </g>
+    </svg>
+    <a href="#" style="flex-grow: 1; display: flex; align-items: center; gap: 4px; text-decoration: none; color: #1D1D1F; font-size: 15px; font-weight: 600; white-space: nowrap;"><span style="color: #B25000;">提醒</span><span style="color: #5F5F66; font-weight: 400;">·</span><span>Codex 每周额度偏快</span><svg width="8" height="12" viewBox="0 0 8 12" fill="none" stroke="#5F5F66" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 2 L6 6 L2 10"></path></svg></a>
+    <div style="font-size: 11px; color: #5F5F66;">1 分钟前</div>
+  </div>
+
+  <!-- 总览：4 个指标 -->
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 0 16px 14px 16px;">
+    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+      <div style="font-size: 11px; color: #5F5F66;">CPU</div>
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px; white-space: nowrap;">24%</div>
+      <div style="font-size: 10px; color: #5F5F66; white-space: nowrap;">整机负载</div>
+      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16); margin-top: 4px;"><div style="width: 24%; height: 3px; border-radius: 2px; background: #0A84FF;"></div></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+      <div style="font-size: 11px; color: #5F5F66;">内存</div>
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px; white-space: nowrap;">69%</div>
+      <div style="font-size: 10px; color: #5F5F66; white-space: nowrap;">11 / 16 GB</div>
+      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16); margin-top: 4px;"><div style="width: 69%; height: 3px; border-radius: 2px; background: #34C759;"></div></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+      <div style="font-size: 11px; color: #5F5F66;">Claude</div>
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px; white-space: nowrap;">72%</div>
+      <div style="font-size: 10px; color: #5F5F66; white-space: nowrap;">5 小时 · 剩余</div>
+      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16); margin-top: 4px;"><div style="width: 72%; height: 3px; border-radius: 2px; background: #34C759;"></div></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+      <div style="font-size: 11px; color: #5F5F66;">网络</div>
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px; white-space: nowrap;">↓2.4M</div>
+      <div style="font-size: 10px; color: #5F5F66; white-space: nowrap;">↑128K</div>
+      <div style="height: 3px; border-radius: 2px; background: #34C759; margin-top: 4px;"></div>
+    </div>
+  </div>
+
+  <!-- 标签页 -->
+  <div style="padding: 0 16px 12px 16px;">
+    <div style="display: flex; gap: 2px; background: rgba(120,120,160,0.12); border-radius: 999px; padding: 3px;">
+      <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: transparent; font: inherit; font-size: 13px; color: #3A3A3F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #34C759;"></span>系统</button>
+      <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: rgba(255,255,255,0.88); box-shadow: 0 1px 3px rgba(20,20,60,0.12), inset 0 1px 0 rgba(255,255,255,0.9); font: inherit; font-size: 13px; font-weight: 600; color: #1D1D1F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #FF9500;"></span>额度</button>
+      <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: transparent; font: inherit; font-size: 13px; color: #3A3A3F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #34C759;"></span>网络</button>
+    </div>
+  </div>
+
+  <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
+
+  <!-- 内容区（完整长度，面板里超出部分滚动） -->
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; overflow: hidden;">
+
+    <!-- 渠道切换 -->
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;">
+      <sc-for list="{{providers}}" as="pv" hint-placeholder-count="4">
+        <button type="button" style="border: {{pv.border}}; background: {{pv.bg}}; box-shadow: {{pv.shadow}}; border-radius: 12px; font: inherit; color: #1D1D1F; padding: 7px 6px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0;">
+          <span style="width: 20px; height: 20px; border-radius: 10px; background: {{pv.tint}}; color: #FFFFFF; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;">{{pv.mark}}</span>
+          <span style="font-size: 11px; font-weight: {{pv.weight}}; white-space: nowrap;">{{pv.name}}</span>
+          <span style="align-self: stretch; height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16); margin: 1px 4px 0 4px;"><span style="display: block; width: {{pv.left}}; height: 3px; border-radius: 2px; background: {{pv.color}};"></span></span>
+          <span style="font-size: 11px; font-weight: 600; color: {{pv.textColor}};">{{pv.left}}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <!-- 账号 -->
+    <div style="display: flex; flex-direction: column; gap: 3px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="font-size: 15px; font-weight: 600;">Claude</div>
+        <span style="font-size: 11px; color: #3A3A3F; background: rgba(120,120,160,0.14); border-radius: 999px; padding: 1px 8px;">Pro</span>
+        <div style="flex-grow: 1;"></div>
+        <div style="font-size: 11px; color: #5F5F66;">14:32 更新</div>
+      </div>
+      <div style="display: flex; font-size: 11px; color: #5F5F66;">
+        <div style="flex-grow: 1;">you@example.com</div>
+        <div>来源 oauth</div>
+      </div>
+    </div>
+
+    <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
+
+    <!-- 5 小时窗口 -->
+    <div style="display: flex; flex-direction: column; gap: 5px;">
+      <div style="display: flex; align-items: baseline; gap: 4px;">
+        <div style="font-size: 13px; font-weight: 600; flex-grow: 1;">5 小时窗口</div>
+        <div style="font-size: 11px; color: #5F5F66;">剩余</div>
+        <div style="font-size: 15px; font-weight: 600;">72%</div>
+      </div>
+      <div style="position: relative; height: 6px; border-radius: 3px; background: rgba(120,120,160,0.16);">
+        <div style="width: 72%; height: 6px; border-radius: 3px; background: #34C759;"></div>
+        <div style="position: absolute; left: 55%; top: -3px; width: 2px; height: 12px; border-radius: 1px; background: #FF3B30;"></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 5px; font-size: 11px; color: #5F5F66;">
+        <span style="width: 2px; height: 9px; border-radius: 1px; background: #FF3B30;"></span>
+        <div style="flex-grow: 1;">按节奏应剩 55%</div>
+        <div>17:20 重置</div>
+      </div>
+      <div style="font-size: 11px; color: #5F5F66;">节奏正常，可以撑到重置</div>
+    </div>
+
+    <!-- 7 天窗口 -->
+    <div style="display: flex; flex-direction: column; gap: 5px;">
+      <div style="display: flex; align-items: baseline; gap: 4px;">
+        <div style="font-size: 13px; font-weight: 600; flex-grow: 1;">7 天窗口</div>
+        <div style="font-size: 11px; color: #5F5F66;">剩余</div>
+        <div style="font-size: 15px; font-weight: 600; color: #B25000;">43%</div>
+      </div>
+      <div style="position: relative; height: 6px; border-radius: 3px; background: rgba(120,120,160,0.16);">
+        <div style="width: 43%; height: 6px; border-radius: 3px; background: #FF9500;"></div>
+        <div style="position: absolute; left: 62%; top: -3px; width: 2px; height: 12px; border-radius: 1px; background: #FF3B30;"></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 5px; font-size: 11px; color: #5F5F66;">
+        <span style="width: 2px; height: 9px; border-radius: 1px; background: #FF3B30;"></span>
+        <div style="flex-grow: 1;">按节奏应剩 62%</div>
+        <div>10/4 22:40 重置</div>
+      </div>
+      <div style="font-size: 11px; color: #B25000;">比节奏快 19 个百分点，约 2 天后用完</div>
+    </div>
+
+    <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
+
+    <!-- 用量趋势 -->
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: flex; align-items: baseline;">
+        <div style="font-size: 13px; font-weight: 600; flex-grow: 1;">用量趋势</div>
+        <div style="font-size: 11px; color: #5F5F66;">本周期 + 最近 7 天</div>
+      </div>
+      <div style="display: flex; font-size: 11px; color: #5F5F66;">
+        <div style="flex-grow: 1;">7 天窗口 · 从重置到重置，累计已用</div>
+        <div style="font-weight: 600; color: #1D1D1F;">已用 57%</div>
+      </div>
+      <svg width="328" height="56" viewBox="0 0 328 56" aria-label="7 天窗口本周期累计已用">
+        <line x1="0" y1="0.5" x2="328" y2="0.5" stroke="rgba(60,60,90,0.18)" stroke-dasharray="3 3"></line>
+        <line x1="0" y1="55.5" x2="328" y2="55.5" stroke="rgba(60,60,90,0.14)"></line>
+        <line x1="0" y1="56" x2="328" y2="0" stroke="rgba(255,59,48,0.55)" stroke-width="1" stroke-dasharray="3 3"></line>
+        <line x1="125" y1="0" x2="125" y2="56" stroke="rgba(60,60,90,0.3)" stroke-width="1"></line>
+        <polygon fill="rgba(10,132,255,0.12)" points="0,56 23,50.4 47,43.7 70,37.5 94,31.4 125,24.1 125,56"></polygon>
+        <polyline fill="none" stroke="#0A84FF" stroke-width="1.8" stroke-linejoin="round" points="0,56 23,50.4 47,43.7 70,37.5 94,31.4 125,24.1"></polyline>
+        <circle cx="125" cy="24.1" r="2.6" fill="#0A84FF"></circle>
+      </svg>
+      <div style="position: relative; height: 13px; font-size: 10px; color: #5F5F66;">
+        <div style="position: absolute; left: 0; top: 0;">9/27 重置</div>
+        <div style="position: absolute; left: 38%; top: 0; transform: translateX(-50%);">现在</div>
+        <div style="position: absolute; right: 0; top: 0;">10/4 重置</div>
+      </div>
+
+      <div style="display: flex; font-size: 11px; color: #5F5F66; margin-top: 6px;">
+        <div style="flex-grow: 1;">5 小时窗口 · 每个窗口的最高已用</div>
+        <div>一柱一窗口</div>
+      </div>
+      <div style="display: flex; align-items: flex-end; gap: 2px; height: 40px; border-bottom: 1px solid rgba(60,60,90,0.14);">
+        <sc-for list="{{peaks}}" as="k" hint-placeholder-count="36">
+          <div style="flex-grow: 1; height: {{k.h}}; background: {{k.color}}; border-radius: 2px 2px 0 0;"></div>
+        </sc-for>
+      </div>
+      <div style="display: flex; font-size: 10px; color: #5F5F66;">
+        <div style="flex-grow: 1;">9/24</div>
+        <div style="flex-grow: 1; text-align: center;">9/27</div>
+        <div style="flex-grow: 1; text-align: right;">今天</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 10px; color: #5F5F66; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 4px;"><svg width="14" height="4" viewBox="0 0 14 4" aria-hidden="true"><line x1="0" y1="2" x2="14" y2="2" stroke="#FF3B30" stroke-width="1.2" stroke-dasharray="3 2"></line></svg>匀速用完的节奏</div>
+        <div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #FF9500;"></span>超过 80%</div>
+        <div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(10,132,255,0.28);"></span>进行中</div>
+      </div>
+    </div>
+
+    <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
+
+    <!-- 花费 -->
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: baseline;">
+        <div style="font-size: 13px; font-weight: 600; flex-grow: 1;">花费</div>
+        <div style="font-size: 11px; color: #5F5F66;">按 token 估算，不是账单</div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+        <div>
+          <div style="font-size: 11px; color: #5F5F66;">今天</div>
+          <div style="font-size: 22px; font-weight: 600; line-height: 28px;">$6.82</div>
+          <div style="font-size: 11px; color: #5F5F66;">1.2M tokens</div>
+        </div>
+        <div>
+          <div style="font-size: 11px; color: #5F5F66;">近 30 天</div>
+          <div style="font-size: 22px; font-weight: 600; line-height: 28px;">$148.20</div>
+          <div style="font-size: 11px; color: #5F5F66;">28.4M tokens</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: flex-end; gap: 3px; height: 40px;">
+        <sc-for list="{{costs}}" as="c" hint-placeholder-count="30">
+          <div style="flex-grow: 1; height: {{c.h}}; background: {{c.color}}; border-radius: 2px 2px 0 0;"></div>
+        </sc-for>
+      </div>
+      <div style="display: flex; font-size: 10px; color: #5F5F66;">
+        <div style="flex-grow: 1;">9/1</div>
+        <div>今天</div>
+      </div>
+      <div style="display: flex; font-size: 11px;">
+        <div style="flex-grow: 1; color: #5F5F66;">最常用模型</div>
+        <div style="font-weight: 600;">示例模型 B</div>
+      </div>
+    </div>
+
+    <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
+
+    <!-- 本地存储 -->
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: flex; align-items: baseline; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">本地存储</div>
+        <div style="font-size: 11px; color: #5F5F66; flex-grow: 1;">~/.claude</div>
+        <div style="font-size: 13px; font-weight: 600;">4.2 GB</div>
+      </div>
+      <div style="display: flex; gap: 2px; height: 6px; border-radius: 3px; overflow: hidden; background: rgba(120,120,160,0.16);">
+        <div style="width: 64%; background: #0A84FF;"></div>
+        <div style="width: 26%; background: #30B0C7;"></div>
+        <div style="width: 10%; background: #AF52DE;"></div>
+      </div>
+      <div style="display: flex; gap: 12px; font-size: 11px; color: #5F5F66;">
+        <div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #0A84FF;"></span>会话 2.7 GB</div>
+        <div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #30B0C7;"></span>缓存 1.1 GB</div>
+        <div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #AF52DE;"></span>其他 0.4 GB</div>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <div style="font-size: 11px; color: #5F5F66; flex-grow: 1;">426 个会话文件</div>
+        <a href="#" style="font-size: 12px; text-decoration: none;">在访达中显示 ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部操作栏 -->
+  <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
+  <div style="display: flex; align-items: center; gap: 8px; padding: 10px 16px;">
+    <button type="button" style="border: 1px solid rgba(255,255,255,0.8); background: rgba(255,255,255,0.62); box-shadow: 0 1px 2px rgba(20,20,60,0.08); border-radius: 999px; font: inherit; font-size: 12px; color: #1D1D1F; display: flex; align-items: center; gap: 5px; padding: 4px 11px;">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M13 8 A5 5 0 1 1 11.5 4.5"></path><path d="M13 2.5 V5 H10.5"></path></svg>刷新
+    </button>
+    <div style="font-size: 11px; color: #5F5F66; flex-grow: 1; text-align: center;">额度更新于 14:32</div>
+    <button type="button" style="border: 1px solid rgba(255,255,255,0.8); background: rgba(255,255,255,0.62); box-shadow: 0 1px 2px rgba(20,20,60,0.08); border-radius: 999px; font: inherit; font-size: 12px; color: #1D1D1F; display: flex; align-items: center; gap: 5px; padding: 4px 9px 4px 11px;">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5 V3.2 M8 12.8 V14.5 M1.5 8 H3.2 M12.8 8 H14.5 M3.4 3.4 L4.6 4.6 M11.4 11.4 L12.6 12.6 M3.4 12.6 L4.6 11.4 M11.4 4.6 L12.6 3.4" stroke-linecap="round"></path></svg>设置
+      <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="#5F5F66" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 3 L4 5.5 L6.5 3"></path></svg>
+    </button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":1160}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const heights = [12, 20, 16, 28, 35, 10, 8, 22, 30, 44, 26, 18, 24, 36, 40, 31, 14, 9, 33, 47, 38, 25, 21, 29, 42, 34, 23, 17, 27, 20];
+    const costs = heights.map((h, i) => ({ h: Math.round(h * 0.8) + 'px', color: i === heights.length - 1 ? '#0A84FF' : 'rgba(10,132,255,0.35)' }));
+    const values = [34, 52, 61, 28, 45, 88, 72, 40, 55, 63, 91, 47, 38, 66, 70, 58, 84, 49, 30, 57, 62, 76, 44, 68, 93, 51, 39, 60, 73, 48, 56, 81, 64, 42, 59, 28];
+    const peaks = values.map((v, i) => ({
+      h: Math.round(v * 0.4) + 'px',
+      color: i === values.length - 1 ? 'rgba(10,132,255,0.28)' : (v > 80 ? '#FF9500' : 'rgba(10,132,255,0.6)')
+    }));
+    const selected = { bg: 'rgba(255,255,255,0.88)', border: '1px solid rgba(255,255,255,0.95)', shadow: '0 1px 3px rgba(20,20,60,0.14), inset 0 1px 0 rgba(255,255,255,0.9)', weight: '600' };
+    const idle = { bg: 'rgba(255,255,255,0.32)', border: '1px solid rgba(255,255,255,0.5)', shadow: 'none', weight: '400' };
+    const ok = { color: '#34C759', textColor: '#1E8E3E' };
+    const warn = { color: '#FF9500', textColor: '#B25000' };
+    return {
+      costs,
+      peaks,
+      providers: [
+        { name: 'Claude', mark: 'C', tint: '#B5694A', left: '43%', ...warn, ...selected },
+        { name: 'Codex', mark: 'X', tint: '#3A3A3F', left: '30%', ...warn, ...idle },
+        { name: 'DeepSeek', mark: 'D', tint: '#4A6CD4', left: '84%', ...ok, ...idle },
+        { name: 'OpenCode Go', mark: 'O', tint: '#5E8F6B', left: '46%', ...warn, ...idle }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

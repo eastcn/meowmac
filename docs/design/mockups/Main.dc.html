@@ -13,54 +13,55 @@ body{margin:0;font-family:-apple-system,"SF Pro Text","PingFang SC",system-ui,sa
 a{color:#0A6CFF}a:hover{color:#0050C8}
 </style>
 </helmet>
-<div style="width: 360px; height: 720px; box-sizing: border-box; background: linear-gradient(rgba(250,250,252,0.74), rgba(250,250,252,0.74)), linear-gradient(135deg, #9DB4F0 0%, #D3B5EC 55%, #F5C3CF 100%); display: flex; flex-direction: column; font-variant-numeric: tabular-nums;">
+<div style="width: 360px; height: 820px; box-sizing: border-box; background: linear-gradient(rgba(250,250,252,0.8), rgba(250,250,252,0.8)), linear-gradient(135deg, #9DB4F0 0%, #D3B5EC 55%, #F5C3CF 100%); display: flex; flex-direction: column; font-variant-numeric: tabular-nums; color: #1D1D1F;">
 
-  <!-- 总览条第 1 行：状态 -->
-  <div style="display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px 16px;">
+  <!-- 总览：状态 -->
+  <div style="display: flex; align-items: center; gap: 8px; padding: 14px 16px 12px 16px;">
     <svg width="26" height="17" viewBox="0 0 40 26" aria-hidden="true" style="color: #1D1D1F; flex-shrink: 0;">
       <g fill="currentColor" stroke="currentColor" stroke-linecap="round">
         <path d="M9 13 C9 8.5 14 7 20 7.5 C25 8 28 8.5 29.5 10 L30 15 C28 17.5 23 18 18 17.8 C12.5 17.6 9 16.5 9 13 Z" stroke="none"></path>
         <circle cx="31.5" cy="9.5" r="4.6" stroke="none"></circle>
         <path d="M28.4 6.6 L29.2 2 L32 5.2 Z M32.2 5 L35 1.8 L35.6 6.8 Z" stroke="none"></path>
         <path d="M9.5 11.5 C6 10.5 3.8 8.2 4.4 4.2" fill="none" stroke-width="2.2"></path>
-        <path d="M27 16 L32 21" fill="none" stroke-width="2.4"></path>
-        <path d="M25 16.5 L29 22" fill="none" stroke-width="2.4"></path>
-        <path d="M13 16.5 L7 20" fill="none" stroke-width="2.4"></path>
-        <path d="M15.5 17 L10 21.5" fill="none" stroke-width="2.4"></path>
+        <path d="M27 16 L32 21 M25 16.5 L29 22 M13 16.5 L7 20 M15.5 17 L10 21.5" fill="none" stroke-width="2.4"></path>
       </g>
     </svg>
     <div style="font-size: 15px; font-weight: 600; flex-grow: 1;">一切正常</div>
-    <div style="font-size: 11px; color: #55555C;">刚刚更新</div>
+    <div style="font-size: 11px; color: #5F5F66;">1 分钟前</div>
   </div>
 
-  <!-- 总览条第 2 行：4 个指标 -->
-  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0 16px 12px 16px;">
-    <div style="background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 2px rgba(20,20,60,0.06); border-radius: 12px; padding: 8px 8px; display: flex; flex-direction: column; gap: 4px;">
-      <div style="font-size: 11px; color: #55555C;">CPU</div>
-      <div style="font-size: 15px; font-weight: 600;">42%</div>
-      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16);"><div style="width: 42%; height: 3px; border-radius: 2px; background: #0A84FF;"></div></div>
+  <!-- 总览：4 个指标 -->
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 0 16px 14px 16px;">
+    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+      <div style="font-size: 11px; color: #5F5F66;">CPU</div>
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px; white-space: nowrap;">24%</div>
+      <div style="font-size: 10px; color: #5F5F66; white-space: nowrap;">整机负载</div>
+      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16); margin-top: 4px;"><div style="width: 24%; height: 3px; border-radius: 2px; background: #0A84FF;"></div></div>
     </div>
-    <div style="background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 2px rgba(20,20,60,0.06); border-radius: 12px; padding: 8px 8px; display: flex; flex-direction: column; gap: 4px;">
-      <div style="font-size: 11px; color: #55555C; display: flex; align-items: baseline; white-space: nowrap;"><span style="flex-grow: 1;">内存</span><span style="font-size: 10px;">11/16G</span></div>
-      <div style="font-size: 15px; font-weight: 600;">70%</div>
-      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16);"><div style="width: 70%; height: 3px; border-radius: 2px; background: #34C759;"></div></div>
+    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+      <div style="font-size: 11px; color: #5F5F66;">内存</div>
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px; white-space: nowrap;">69%</div>
+      <div style="font-size: 10px; color: #5F5F66; white-space: nowrap;">11 / 16 GB</div>
+      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16); margin-top: 4px;"><div style="width: 69%; height: 3px; border-radius: 2px; background: #34C759;"></div></div>
     </div>
-    <div style="background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 2px rgba(20,20,60,0.06); border-radius: 12px; padding: 8px 8px; display: flex; flex-direction: column; gap: 4px;">
-      <div style="font-size: 11px; color: #55555C;">Claude 5h</div>
-      <div style="font-size: 15px; font-weight: 600;">剩 62%</div>
-      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16);"><div style="width: 62%; height: 3px; border-radius: 2px; background: #34C759;"></div></div>
+    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+      <div style="font-size: 11px; color: #5F5F66;">Claude</div>
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px; white-space: nowrap;">72%</div>
+      <div style="font-size: 10px; color: #5F5F66; white-space: nowrap;">5 小时 · 剩余</div>
+      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16); margin-top: 4px;"><div style="width: 72%; height: 3px; border-radius: 2px; background: #34C759;"></div></div>
     </div>
-    <div style="background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 2px rgba(20,20,60,0.06); border-radius: 12px; padding: 8px 8px; display: flex; flex-direction: column; gap: 4px;">
-      <div style="font-size: 11px; color: #55555C; display: flex; align-items: baseline; white-space: nowrap;"><span style="flex-grow: 1;">网络</span><span style="font-size: 10px;">↑320K</span></div>
-      <div style="font-size: 15px; font-weight: 600; white-space: nowrap;">↓2.4M</div>
-      <div style="height: 3px; border-radius: 2px; background: #34C759;"></div>
+    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+      <div style="font-size: 11px; color: #5F5F66;">网络</div>
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px; white-space: nowrap;">↓2.4M</div>
+      <div style="font-size: 10px; color: #5F5F66; white-space: nowrap;">↑128K</div>
+      <div style="height: 3px; border-radius: 2px; background: #34C759; margin-top: 4px;"></div>
     </div>
   </div>
 
   <!-- 标签页 -->
   <div style="padding: 0 16px 12px 16px;">
     <div style="display: flex; gap: 2px; background: rgba(120,120,160,0.12); border-radius: 999px; padding: 3px;">
-      <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: rgba(255,255,255,0.85); box-shadow: 0 1px 3px rgba(20,20,60,0.12), inset 0 1px 0 rgba(255,255,255,0.9); font: inherit; font-size: 13px; font-weight: 600; color: #1D1D1F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #34C759;"></span>系统</button>
+      <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: rgba(255,255,255,0.88); box-shadow: 0 1px 3px rgba(20,20,60,0.12), inset 0 1px 0 rgba(255,255,255,0.9); font: inherit; font-size: 13px; font-weight: 600; color: #1D1D1F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #34C759;"></span>系统</button>
       <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: transparent; font: inherit; font-size: 13px; color: #3A3A3F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #34C759;"></span>额度</button>
       <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: transparent; font: inherit; font-size: 13px; color: #3A3A3F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #34C759;"></span>网络</button>
     </div>
@@ -69,138 +70,155 @@ a{color:#0A6CFF}a:hover{color:#0050C8}
   <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
 
   <!-- 内容区 -->
-  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 12px 16px; overflow: hidden;">
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; overflow: hidden;">
 
-    <!-- 联动图 -->
-    <div style="display: flex; flex-direction: column; gap: 8px;">
+    <!-- 系统趋势 -->
+    <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; align-items: center;">
-        <div style="font-size: 13px; font-weight: 600; flex-grow: 1;">负载、内存、功耗与温度</div>
+        <div style="font-size: 13px; font-weight: 600; flex-grow: 1;">系统趋势</div>
         <div style="display: flex; background: rgba(120,120,160,0.12); border-radius: 999px; padding: 2px; gap: 2px;">
-          <button type="button" style="border: none; background: transparent; font: inherit; font-size: 11px; color: #3A3A3F; padding: 2px 10px; border-radius: 999px;">15 分钟</button>
-          <button type="button" style="border: none; background: rgba(255,255,255,0.85); font: inherit; font-size: 11px; font-weight: 600; color: #1D1D1F; padding: 2px 10px; border-radius: 999px; box-shadow: 0 1px 2px rgba(20,20,60,0.12);">1 小时</button>
+          <button type="button" style="border: none; background: rgba(255,255,255,0.88); font: inherit; font-size: 11px; font-weight: 600; color: #1D1D1F; padding: 2px 10px; border-radius: 999px; box-shadow: 0 1px 2px rgba(20,20,60,0.12);">15 分钟</button>
+          <button type="button" style="border: none; background: transparent; font: inherit; font-size: 11px; color: #3A3A3F; padding: 2px 10px; border-radius: 999px;">1 小时</button>
         </div>
       </div>
 
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <div style="width: 72px; flex-shrink: 0;">
-          <div style="font-size: 11px; color: #55555C;">CPU</div>
-          <div style="font-size: 13px; font-weight: 600; color: #0A6CFF;">42%</div>
+      <div style="display: flex; flex-direction: column; gap: 1px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 6px; height: 6px; border-radius: 3px; background: #0A84FF;"></span>
+          <span style="font-size: 11px;">CPU</span>
+          <span style="font-size: 10px; color: #5F5F66; flex-grow: 1;">0–100%</span>
+          <span style="font-size: 13px; font-weight: 600;">24%</span>
         </div>
-        <svg width="240" height="30" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="CPU 最近 1 小时">
-          <rect x="80" y="0" width="50" height="36" fill="rgba(255,149,0,0.12)"></rect>
-          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)"></line>
+        <svg width="328" height="26" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="CPU 最近 15 分钟">
+          <rect x="80" y="0" width="50" height="36" fill="rgba(255,149,0,0.16)"></rect>
+          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)" vector-effect="non-scaling-stroke"></line>
           <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#0A84FF" stroke-width="1.6" stroke-linejoin="round" points="0,28.2 10,27 20,27.6 30,26 40,24.1 50,25 60,22.8 70,20.6 80,16.4 90,13.8 100,15.4 110,19 120,21.2 130,21.8 140,19.9 150,17.4 160,18.3 170,20.9 180,22.5 190,23.4 200,24.4 210,23.1 220,21.5 230,20.6 240,20.6"></polyline>
         </svg>
       </div>
 
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <div style="width: 72px; flex-shrink: 0;">
-          <div style="font-size: 11px; color: #55555C;">内存已用</div>
-          <div style="font-size: 13px; font-weight: 600; color: #0E7C8C;">70%</div>
+      <div style="display: flex; flex-direction: column; gap: 1px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 6px; height: 6px; border-radius: 3px; background: #AF52DE;"></span>
+          <span style="font-size: 11px;">内存已用</span>
+          <span style="font-size: 10px; color: #5F5F66; flex-grow: 1;">0–16 GB</span>
+          <span style="font-size: 13px; font-weight: 600;">11 GB</span>
         </div>
-        <svg width="240" height="30" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="内存已用最近 1 小时">
-          <rect x="80" y="0" width="50" height="36" fill="rgba(255,149,0,0.12)"></rect>
-          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)"></line>
-          <polygon fill="rgba(26,154,174,0.12)" points="0,36 0,13.5 10,13.5 20,13.2 30,13.2 40,12.9 50,12.9 60,12.6 70,12.2 80,11.6 90,11.3 100,11.3 110,11.6 120,11.9 130,11.9 140,11.6 150,11.3 160,11.3 170,11.6 180,11.6 190,11.9 200,11.9 210,11.6 220,11.6 230,11.6 240,11.6 240,36"></polygon>
-          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#1A9AAE" stroke-width="1.6" stroke-linejoin="round" points="0,13.5 10,13.5 20,13.2 30,13.2 40,12.9 50,12.9 60,12.6 70,12.2 80,11.6 90,11.3 100,11.3 110,11.6 120,11.9 130,11.9 140,11.6 150,11.3 160,11.3 170,11.6 180,11.6 190,11.9 200,11.9 210,11.6 220,11.6 230,11.6 240,11.6"></polyline>
+        <svg width="328" height="26" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="内存已用最近 15 分钟">
+          <rect x="80" y="0" width="50" height="36" fill="rgba(255,149,0,0.16)"></rect>
+          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)" vector-effect="non-scaling-stroke"></line>
+          <polygon fill="rgba(175,82,222,0.12)" points="0,36 0,13.5 10,13.5 20,13.2 30,13.2 40,12.9 50,12.9 60,12.6 70,12.2 80,11.6 90,11.3 100,11.3 110,11.6 120,11.9 130,11.9 140,11.6 150,11.3 160,11.3 170,11.6 180,11.6 190,11.9 200,11.9 210,11.6 220,11.6 230,11.6 240,11.6 240,36"></polygon>
+          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#AF52DE" stroke-width="1.6" stroke-linejoin="round" points="0,13.5 10,13.5 20,13.2 30,13.2 40,12.9 50,12.9 60,12.6 70,12.2 80,11.6 90,11.3 100,11.3 110,11.6 120,11.9 130,11.9 140,11.6 150,11.3 160,11.3 170,11.6 180,11.6 190,11.9 200,11.9 210,11.6 220,11.6 230,11.6 240,11.6"></polyline>
         </svg>
       </div>
 
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <div style="width: 72px; flex-shrink: 0;">
-          <div style="font-size: 11px; color: #55555C;">整机功耗</div>
-          <div style="font-size: 13px; font-weight: 600; color: #B25000;">18 W</div>
+      <div style="display: flex; flex-direction: column; gap: 1px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 6px; height: 6px; border-radius: 3px; background: #30B0C7;"></span>
+          <span style="font-size: 11px;">整机功耗</span>
+          <span style="font-size: 10px; color: #5F5F66; flex-grow: 1;">0–40 W</span>
+          <span style="font-size: 13px; font-weight: 600;">14.6 W</span>
         </div>
-        <svg width="240" height="30" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="整机功耗最近 1 小时">
-          <rect x="80" y="0" width="50" height="36" fill="rgba(255,149,0,0.12)"></rect>
-          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)"></line>
-          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#FF9500" stroke-width="1.6" stroke-linejoin="round" points="0,26.8 10,26 20,26.4 30,25.2 40,23.6 50,24.4 60,22 70,19.6 80,14.8 90,11.6 100,13.2 110,17.2 120,20.4 130,21.2 140,18.8 150,15.6 160,16.4 170,19.6 180,22 190,22.8 200,23.6 210,22 220,20.4 230,19.6 240,19.6"></polyline>
+        <svg width="328" height="26" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="整机功耗最近 15 分钟">
+          <rect x="80" y="0" width="50" height="36" fill="rgba(255,149,0,0.16)"></rect>
+          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)" vector-effect="non-scaling-stroke"></line>
+          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#30B0C7" stroke-width="1.6" stroke-linejoin="round" points="0,26.8 10,26 20,26.4 30,25.2 40,23.6 50,24.4 60,22 70,19.6 80,14.8 90,11.6 100,13.2 110,17.2 120,20.4 130,21.2 140,18.8 150,15.6 160,16.4 170,19.6 180,22 190,22.8 200,23.6 210,22 220,20.4 230,19.6 240,19.6"></polyline>
         </svg>
       </div>
 
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <div style="width: 72px; flex-shrink: 0;">
-          <div style="font-size: 11px; color: #55555C;">电池温度</div>
-          <div style="font-size: 13px; font-weight: 600; color: #8A3FC7;">35.8°C</div>
+      <div style="display: flex; flex-direction: column; gap: 1px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 6px; height: 6px; border-radius: 3px; background: #FF2D55;"></span>
+          <span style="font-size: 11px;">电池温度</span>
+          <span style="font-size: 10px; color: #5F5F66; flex-grow: 1;">28–42 °C</span>
+          <span style="font-size: 13px; font-weight: 600;">32.4 °C</span>
         </div>
-        <svg width="240" height="30" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="电池温度最近 1 小时">
-          <rect x="80" y="0" width="50" height="36" fill="rgba(255,149,0,0.12)"></rect>
-          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)"></line>
-          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#A05EDB" stroke-width="1.6" stroke-linejoin="round" points="0,24.4 10,24.1 20,23.9 30,23.6 40,23 50,22.5 60,21.8 70,20.6 80,18.6 90,16.6 100,15.1 110,14.5 120,14.6 130,15.1 140,15.3 150,15 160,14.6 170,15 180,15.6 190,16.2 200,16.7 210,17 220,17 230,16.9 240,16.7"></polyline>
+        <svg width="328" height="26" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="电池温度最近 15 分钟">
+          <rect x="80" y="0" width="50" height="36" fill="rgba(255,149,0,0.16)"></rect>
+          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)" vector-effect="non-scaling-stroke"></line>
+          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#FF2D55" stroke-width="1.6" stroke-linejoin="round" points="0,24.4 10,24.1 20,23.9 30,23.6 40,23 50,22.5 60,21.8 70,20.6 80,18.6 90,16.6 100,15.1 110,14.5 120,14.6 130,15.1 140,15.3 150,15 160,14.6 170,15 180,15.6 190,16.2 200,16.7 210,17 220,17 230,16.9 240,16.7"></polyline>
         </svg>
       </div>
 
-      <div style="display: flex; padding-left: 88px; font-size: 10px; color: #55555C;">
-        <div style="flex-grow: 1;">60 分钟前</div>
-        <div style="flex-grow: 1; text-align: center;">30 分钟前</div>
-        <div style="flex-grow: 1; text-align: right;">现在</div>
+      <div style="display: flex; font-size: 10px; color: #5F5F66;">
+        <div style="flex-grow: 1;">14:20</div>
+        <div style="flex-grow: 1; text-align: center;">14:28</div>
+        <div style="flex-grow: 1; text-align: right;">14:35</div>
       </div>
-      <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #55555C;">
-        <span style="width: 10px; height: 10px; border-radius: 2px; background: rgba(255,149,0,0.25);"></span>热状态 fair 的时段
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #5F5F66;">
+        <span style="width: 10px; height: 10px; border-radius: 2px; background: rgba(255,149,0,0.3);"></span>
+        <span style="flex-grow: 1;">热状态 fair 及以上的时段</span>
+        <span>同一时间轴 · 各自纵轴</span>
       </div>
     </div>
 
     <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
 
     <!-- 能耗排行 -->
-    <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div style="display: flex; align-items: baseline;">
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <div style="display: flex; align-items: baseline; margin-bottom: 4px;">
         <div style="font-size: 13px; font-weight: 600; flex-grow: 1;">能耗排行</div>
-        <div style="font-size: 11px; color: #55555C; width: 48px; text-align: right;">CPU</div>
-        <div style="font-size: 11px; color: #55555C; width: 72px; text-align: right;">能耗影响</div>
+        <div style="font-size: 11px; color: #5F5F66;">前 5 名</div>
+      </div>
+      <div style="display: flex; font-size: 10px; color: #5F5F66; height: 16px; align-items: center;">
+        <div style="flex-grow: 1; padding-left: 18px;">进程</div>
+        <div style="width: 56px; text-align: right;">CPU</div>
+        <div style="width: 56px; text-align: right;">影响分</div>
       </div>
       <sc-for list="{{processes}}" as="p" hint-placeholder-count="5">
-        <div style="display: flex; align-items: center; height: 21px;">
-          <div style="font-size: 13px; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{p.name}}</div>
-          <div style="font-size: 12px; color: #3A3A3F; width: 48px; text-align: right;">{{p.cpu}}</div>
-          <div style="width: 72px; display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
-            <div style="width: 30px; height: 4px; border-radius: 2px; background: rgba(120,120,160,0.16);"><div style="width: {{p.bar}}; height: 4px; border-radius: 2px; background: #8E8E93;"></div></div>
-            <div style="font-size: 12px; color: #3A3A3F; width: 30px; text-align: right;">{{p.power}}</div>
-          </div>
+        <div style="display: flex; align-items: center; height: 21px; font-size: 13px;">
+          <div style="width: 18px; font-size: 11px; color: #5F5F66;">{{p.rank}}</div>
+          <div style="flex-grow: 1; white-space: nowrap;">{{p.name}}</div>
+          <div style="width: 56px; text-align: right;">{{p.cpu}}</div>
+          <div style="width: 56px; text-align: right;">{{p.impact}}</div>
         </div>
       </sc-for>
     </div>
 
     <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
 
-    <!-- 磁盘与清理 -->
-    <div style="display: flex; flex-direction: column; gap: 8px;">
-      <div style="display: flex; align-items: center;">
-        <div style="font-size: 13px; font-weight: 600; flex-grow: 1;">磁盘</div>
-        <div style="font-size: 12px; color: #3A3A3F;">剩余 186 GB · 38%</div>
+    <!-- 磁盘 -->
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">磁盘</div>
+        <div style="flex-grow: 1; display: flex; align-items: baseline; gap: 3px;">
+          <span style="font-size: 20px; font-weight: 600;">186</span>
+          <span style="font-size: 11px; color: #5F5F66;">GB 可用</span>
+        </div>
+        <button type="button" style="border: 1px solid rgba(255,255,255,0.8); background: rgba(255,255,255,0.62); box-shadow: 0 1px 2px rgba(20,20,60,0.08); border-radius: 999px; font: inherit; font-size: 12px; padding: 4px 12px; color: #1D1D1F;">清理…</button>
       </div>
-      <div style="height: 6px; border-radius: 3px; background: rgba(120,120,160,0.16);"><div style="width: 62%; height: 6px; border-radius: 3px; background: #8E8E93;"></div></div>
-      <div style="display: flex; align-items: center;">
-        <div style="font-size: 11px; color: #55555C; flex-grow: 1;">上次清理 9 月 21 日，释放 4.2 GB</div>
-        <button type="button" style="border: 1px solid rgba(255,255,255,0.8); background: rgba(255,255,255,0.6); box-shadow: 0 1px 2px rgba(20,20,60,0.08); border-radius: 999px; font: inherit; font-size: 12px; padding: 3px 10px; color: #1D1D1F;">清理…</button>
+      <div style="height: 6px; border-radius: 3px; background: rgba(120,120,160,0.16);"><div style="width: 64%; height: 6px; border-radius: 3px; background: #8E8E93;"></div></div>
+      <div style="display: flex; font-size: 11px; color: #5F5F66;">
+        <div style="flex-grow: 1;">已用 326 GB</div>
+        <div>共 512 GB</div>
       </div>
+      <div style="font-size: 11px; color: #5F5F66;">上次清理：9 月 28 日 · 释放 8.4 GB</div>
     </div>
   </div>
 
-  <!-- 底部操作 -->
+  <!-- 底部操作栏 -->
   <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
-  <div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px;">
-    <button type="button" style="border: none; background: transparent; font: inherit; font-size: 13px; color: #1D1D1F; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 999px;">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M13 8 A5 5 0 1 1 11.5 4.5"></path><path d="M13 2.5 V5 H10.5"></path></svg>刷新
+  <div style="display: flex; align-items: center; gap: 8px; padding: 10px 16px;">
+    <button type="button" style="border: 1px solid rgba(255,255,255,0.8); background: rgba(255,255,255,0.62); box-shadow: 0 1px 2px rgba(20,20,60,0.08); border-radius: 999px; font: inherit; font-size: 12px; color: #1D1D1F; display: flex; align-items: center; gap: 5px; padding: 4px 11px;">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M13 8 A5 5 0 1 1 11.5 4.5"></path><path d="M13 2.5 V5 H10.5"></path></svg>刷新
     </button>
-    <div style="font-size: 11px; color: #55555C; flex-grow: 1;">额度 12 分钟前</div>
-    <button type="button" style="border: none; background: transparent; font: inherit; font-size: 13px; color: #1D1D1F; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 999px;">
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5 V3.2 M8 12.8 V14.5 M1.5 8 H3.2 M12.8 8 H14.5 M3.4 3.4 L4.6 4.6 M11.4 11.4 L12.6 12.6 M3.4 12.6 L4.6 11.4 M11.4 4.6 L12.6 3.4" stroke-linecap="round"></path></svg>设置
-      <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="#55555C" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 3 L4 5.5 L6.5 3"></path></svg>
+    <div style="font-size: 11px; color: #5F5F66; flex-grow: 1; text-align: center;">额度更新于 14:32</div>
+    <button type="button" style="border: 1px solid rgba(255,255,255,0.8); background: rgba(255,255,255,0.62); box-shadow: 0 1px 2px rgba(20,20,60,0.08); border-radius: 999px; font: inherit; font-size: 12px; color: #1D1D1F; display: flex; align-items: center; gap: 5px; padding: 4px 9px 4px 11px;">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5 V3.2 M8 12.8 V14.5 M1.5 8 H3.2 M12.8 8 H14.5 M3.4 3.4 L4.6 4.6 M11.4 11.4 L12.6 12.6 M3.4 12.6 L4.6 11.4 M11.4 4.6 L12.6 3.4" stroke-linecap="round"></path></svg>设置
+      <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="#5F5F66" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 3 L4 5.5 L6.5 3"></path></svg>
     </button>
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":720}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":820}}'>
 class Component extends DCLogic {
   renderVals() {
     return {
       processes: [
-        { name: 'WindowServer', cpu: '18%', power: '21.4', bar: '100%' },
-        { name: 'Google Chrome Helper', cpu: '12%', power: '13.3', bar: '62%' },
-        { name: 'Claude Helper', cpu: '9%', power: '12.2', bar: '57%' },
-        { name: 'Terminal', cpu: '6%', power: '7.9', bar: '37%' },
-        { name: 'kernel_task', cpu: '5%', power: '6.0', bar: '28%' }
+        { rank: '1', name: 'WindowServer', cpu: '12.4%', impact: '18.2' },
+        { rank: '2', name: 'ExampleSync', cpu: '5.8%', impact: '9.1' },
+        { rank: '3', name: 'Finder', cpu: '2.1%', impact: '3.4' },
+        { rank: '4', name: 'kernel_task', cpu: '1.4%', impact: '2.8' },
+        { rank: '5', name: 'BTLEServer', cpu: '0.2%', impact: '0.4' }
       ]
     };
   }

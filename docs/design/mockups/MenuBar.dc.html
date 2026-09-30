@@ -105,7 +105,7 @@ class Component extends DCLogic {
       { ...lying, color: red, badge: 0, title: '严重', desc: '趴下不动，红色，单帧', label: '严重状态' }
     ];
     const bars = [
-      { ...f1, catColor: ink, badge: 0, title: '正常', desc: '模板图，跟随菜单栏深浅色。负载越高帧间隔越短：0.5 秒到 0.05 秒。', label: '正常状态' },
+      { ...f1, catColor: ink, badge: 0, title: '正常', desc: '模板图，跟随菜单栏深浅色。帧间隔 = 0.5 − 0.45 × 负载（秒）。开启“减少动态效果”时定格在第 1 帧。', label: '正常状态' },
       { ...f3, speed: lines, catColor: orange, badge: 0, title: '提醒', desc: '整只猫变成橙色。颜色表示有提醒，速度仍表示负载：此例负载高，所以跑得很快，身后有速度线。', label: '提醒状态' },
       { ...lying, catColor: red, badge: 0, title: '严重', desc: '彩色图，停止动画。只在 DNS 泄漏这类严重问题时出现。', label: '严重状态' }
     ];
