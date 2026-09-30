@@ -448,6 +448,13 @@ enum SelfTestMain {
     private static func moHistory() -> Bool {
         let fixture = #"{"logs":{},"sessions":[{"command":"mo clean","started_at":"2026-01-01T12:00:00Z","size":1024},{"command":"mo clean","started_at":"2026-01-02T12:00:00Z","size":2048}],"deletions":[]}"#
         guard let latest = try? MoHistoryParser.latest(Data(fixture.utf8)), latest.startedAt == ISO8601DateFormatter().date(from: "2026-01-02T12:00:00Z") else { return false }
+        let local = #"{"sessions":[{"command":"mo clean","started_at":"2026-01-01T12:00:00Z","size":1024},{"command":"mo clean","started_at":"2026-01-02 12:00:00","size":"2KB"}]}"#
+        let zone = TimeZone(secondsFromGMT: 8 * 3600)!
+        guard let localLatest = try? MoHistoryParser.latest(Data(local.utf8), timeZone: zone),
+              localLatest.startedAt == ISO8601DateFormatter().date(from: "2026-01-02T04:00:00Z"), localLatest.sizeDescription == "2KB" else { return false }
+        let localT = #"{"sessions":[{"command":"mo clean","started_at":"2026-01-03T12:00:00","size":"3KB"},{"command":"mo clean","started_at":"invalid-date","size":"4KB"},{"command":"mo status","started_at":"2026-01-04 12:00:00","size":"5KB"}]}"#
+        guard let localTLatest = try? MoHistoryParser.latest(Data(localT.utf8), timeZone: zone),
+              localTLatest.startedAt == ISO8601DateFormatter().date(from: "2026-01-03T04:00:00Z") else { return false }
         return (try? MoHistoryParser.latest(Data(#"{"sessions":[]}"#.utf8))) == nil
     }
 
