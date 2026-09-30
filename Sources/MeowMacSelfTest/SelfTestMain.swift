@@ -131,7 +131,9 @@ enum SelfTestMain {
                 && menu.items[2].isSeparatorItem && menu.items[5].isSeparatorItem && menu.items[7].keyEquivalent == "q"
                 && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
+        tests.append(("UI.Panel/真实容器的自然高度与切换", { await PanelLayoutTests.heights() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
+            tests.append(("UI.RenderNative/真实容器与原生材质", { await PanelLayoutTests.renderNative() }))
             tests.append(("UI.RenderPreview/三个标签页", { await SelfTestMain.renderPanel() }))
             tests.append(("UI.RenderComponents/基础组件", { SelfTestMain.renderComponents() }))
             tests.append(("UI.RenderOverview/总览与设置", { SelfTestMain.renderOverview() }))

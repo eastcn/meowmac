@@ -44,7 +44,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         statusItem = item
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: PanelView(state: panelState))
+        popover.contentViewController = PanelHosting.make(state: panelState).controller
         self.popover = popover
         let bridge = NetworkBridge { [weak panelState] tone in panelState?.networkTone = tone }
         networkBridge = bridge

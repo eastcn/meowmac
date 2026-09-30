@@ -4,7 +4,7 @@ import MeowMacCore
 
 /// 数值来自 SPEC 和终稿画板。页面只组合这些语义组件。
 enum Design {
-    static let panelWidth: CGFloat = 360, panelHeight: CGFloat = 820, fixedChromeHeight: CGFloat = 190
+    static let panelWidth: CGFloat = 360, panelHeight: CGFloat = 820
     static let inset: CGFloat = 16, sectionGap: CGFloat = 12, metricGap: CGFloat = 14
     static let gap: CGFloat = 6, smallGap: CGFloat = 3, rowGap: CGFloat = 8, tightGap: CGFloat = 2
     static let cardRadius: CGFloat = 12, cardInset: CGFloat = 12, cardVertical: CGFloat = 10
@@ -38,6 +38,7 @@ enum Design {
     static let teal = Color(nsColor: .systemTeal), pink = Color(nsColor: .systemPink)
     static let orange = Color(nsColor: .systemOrange), red = Color(nsColor: .systemRed)
     static let gray = Color(nsColor: .systemGray)
+    static let selection = Color(nsColor: .controlBackgroundColor)
     static func state(_ level: HealthLevel) -> Color {
         switch level { case .normal: return Color(nsColor: .systemGreen); case .warn: return orange; case .severe: return red }
     }
@@ -124,17 +125,11 @@ struct LinkAction: View {
 }
 
 private struct CapsuleSurface: ViewModifier {
-    @Environment(\.previewMaterial) private var previewMaterial
     var selected: Bool
     func body(content: Content) -> some View {
-        if previewMaterial {
-            content.background(selected ? Design.track : .clear, in: Capsule()).overlay(Capsule().stroke(selected ? Design.separator : .clear, lineWidth: Design.rule))
-        } else if #available(macOS 26, *) {
-            if selected { content.glassEffect(.regular, in: Capsule()) } else { content }
-        } else {
-            content.background(selected ? Color(nsColor: .controlBackgroundColor) : .clear, in: Capsule())
-                .shadow(color: .black.opacity(selected ? Design.mutedFill : 0), radius: Design.smallGap, y: Design.rule)
-        }
+        content.background(selected ? Design.label.opacity(Design.mutedFill) : .clear, in: Capsule())
+            .background(selected ? Design.selection : .clear, in: Capsule())
+            .shadow(color: .black.opacity(selected ? Design.mutedFill : 0), radius: Design.smallGap, y: Design.rule)
     }
 }
 

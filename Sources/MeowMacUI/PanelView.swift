@@ -151,8 +151,12 @@ enum DisplayDate {
 
 public struct PanelView: View {
     @ObservedObject private var state: PanelState
+    @StateObject private var measurements: PanelMeasurements
     private let expanded: Bool
-    public init(state: PanelState, expanded: Bool = false) { self.state = state; self.expanded = expanded }
+    public init(state: PanelState, expanded: Bool = false, measurements: PanelMeasurements? = nil) {
+        self.state = state; self.expanded = expanded
+        _measurements = StateObject(wrappedValue: measurements ?? PanelMeasurements())
+    }
 
     private var tabContent: some View {
         VStack(alignment: .leading, spacing: Design.sectionGap) {
@@ -170,22 +174,73 @@ public struct PanelView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            OverviewView(state: state)
-            CapsuleSelector(titles: ["系统", "额度", "网络"], selected: PanelTab.allCases.firstIndex(of: state.selectedTab) ?? 0, levels: state.tabLevels) { state.select(PanelTab.allCases[$0]) }
-                .padding(.horizontal, Design.inset).padding(.bottom, Design.sectionGap)
-            SectionRule()
-            if expanded { tabContent }
-            else { ScrollView { tabContent }.frame(maxHeight: Design.panelHeight - Design.fixedChromeHeight) }
-            SectionRule()
-            HStack(spacing: Design.rowGap) {
-                CapsuleAction(title: "刷新", symbol: "arrow.clockwise", action: state.onRefresh)
-                Spacer(minLength: 0)
-                Text(state.quotaUpdatedAt.map { "额度更新于 " + DisplayDate.format($0, pattern: "HH:mm") } ?? "等待额度采集")
-                    .font(Design.caption).foregroundStyle(Design.secondary)
-                Spacer(minLength: 0)
-                CapsuleAction(title: "设置⌄", symbol: "gearshape") { SettingsMenu.present(state: state) }
-            }.padding(.horizontal, Design.inset).padding(.vertical, Design.footerInset)
-        }.frame(width: Design.panelWidth).frame(maxHeight: expanded ? nil : Design.panelHeight).foregroundStyle(Design.label)
+            VStack(spacing: 0) {
+                OverviewView(state: state)
+                CapsuleSelector(titles: ["系统", "额度", "网络"], selected: PanelTab.allCases.firstIndex(of: state.selectedTab) ?? 0, levels: state.tabLevels) { state.select(PanelTab.allCases[$0]) }
+                    .padding(.horizontal, Design.inset).padding(.bottom, Design.sectionGap)
+                SectionRule()
+            }.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.header)
+            if expanded { measuredContent }
+            else { ScrollView { measuredContent }.frame(height: measurements.viewportHeight) }
+            VStack(spacing: 0) {
+                SectionRule()
+                HStack(spacing: Design.rowGap) {
+                    CapsuleAction(title: "刷新", symbol: "arrow.clockwise", action: state.onRefresh)
+                    Spacer(minLength: 0)
+                    Text(state.quotaUpdatedAt.map { "额度更新于 " + DisplayDate.format($0, pattern: "HH:mm") } ?? "等待额度采集")
+                        .font(Design.caption).foregroundStyle(Design.secondary)
+                    Spacer(minLength: 0)
+                    CapsuleAction(title: "设置⌄", symbol: "gearshape") { SettingsMenu.present(state: state) }
+                }.padding(.horizontal, Design.inset).padding(.vertical, Design.footerInset)
+            }.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.footer)
+        }.frame(width: Design.panelWidth)
+            .frame(height: expanded ? nil : measurements.panelHeight, alignment: .top)
+            .foregroundStyle(Design.label).focusEffectDisabled()
+            .onPreferenceChange(PanelHeightKey.self) { measurements.update($0) }
+    }
+
+    private var measuredContent: some View {
+        tabContent.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.content)
+    }
+}
+
+private enum PanelPart: Hashable { case header, footer, content }
+private struct PanelHeightKey: PreferenceKey {
+    static let defaultValue: [PanelPart: CGFloat] = [:]
+    static func reduce(value: inout [PanelPart: CGFloat], nextValue: () -> [PanelPart: CGFloat]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+private extension View {
+    func measurePanelHeight(_ part: PanelPart) -> some View {
+        background(GeometryReader { proxy in Color.clear.preference(key: PanelHeightKey.self, value: [part: proxy.size.height]) })
+    }
+}
+
+@MainActor
+public final class PanelMeasurements: ObservableObject {
+    @Published public private(set) var headerHeight: CGFloat = 0
+    @Published public private(set) var footerHeight: CGFloat = 0
+    @Published public private(set) var contentHeight: CGFloat = 0
+    public init() {}
+    public var fixedHeight: CGFloat { headerHeight + footerHeight }
+    public var viewportHeight: CGFloat { min(contentHeight, max(0, Design.panelHeight - fixedHeight)) }
+    public var panelHeight: CGFloat { fixedHeight + viewportHeight }
+
+    fileprivate func update(_ values: [PanelPart: CGFloat]) {
+        if let height = values[.header], abs(height - headerHeight) > 0.01 { headerHeight = height }
+        if let height = values[.footer], abs(height - footerHeight) > 0.01 { footerHeight = height }
+        if let height = values[.content], abs(height - contentHeight) > 0.01 { contentHeight = height }
+    }
+}
+
+public enum PanelHosting {
+    @MainActor public static func make(state: PanelState) -> (controller: NSHostingController<PanelView>, measurements: PanelMeasurements) {
+        let measurements = PanelMeasurements()
+        let controller = NSHostingController(rootView: PanelView(state: state, measurements: measurements))
+        controller.sizingOptions = [.preferredContentSize]
+        controller.view.focusRingType = .none
+        return (controller, measurements)
     }
 }
 
