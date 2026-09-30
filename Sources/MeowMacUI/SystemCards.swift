@@ -93,7 +93,7 @@ struct DiagnosisCard: View {
 }
 struct SystemChartCard: View {
     @ObservedObject var state: PanelState
-    private let colors = [Design.blue, Design.teal, Design.orange, Design.purple]
+    private let colors = [Design.blue, Design.purple, Design.teal, Design.pink]
     var body: some View {
         VStack(alignment: .leading, spacing: Design.rowGap) {
             HStack {
@@ -107,7 +107,7 @@ struct SystemChartCard: View {
                         Circle().fill(colors[index]).frame(width: Design.dot, height: Design.dot)
                         Text(trend.name).font(Design.body)
                         Text(trend.rangeLabel).font(Design.tiny).foregroundStyle(Design.secondary)
-                        Spacer(); Text(trend.current).font(Design.body).monospacedDigit()
+                        Spacer(); Text(trend.current).font(Design.title).monospacedDigit()
                     }
                     MiniLineGraph(points: trend.points.map { GraphValue(date: $0.date, value: $0.value) }, domain: state.trendDomain,
                         range: trend.lower...trend.upper, color: colors[index], fill: index == 1, warmPeriods: state.warmPeriods)
@@ -129,7 +129,7 @@ struct SystemChartCard: View {
 struct EnergyCard: View {
     @ObservedObject var state: PanelState
     var body: some View {
-        VStack(alignment: .leading, spacing: Design.gap) {
+        VStack(alignment: .leading, spacing: Design.tightGap) {
             SectionHeading(title: "能耗排行", detail: "前 5 名")
             HStack {
                 Text("进程"); Spacer(); Text("CPU").frame(width: Design.numericColumn, alignment: .trailing)
@@ -142,7 +142,7 @@ struct EnergyCard: View {
                     Text(process.name).lineLimit(1).truncationMode(.middle); Spacer(minLength: 0)
                     Text(String(format: "%.1f%%", process.cpuPercent)).monospacedDigit().frame(width: Design.numericColumn, alignment: .trailing)
                     Text(String(format: "%.1f", process.impact)).monospacedDigit().frame(width: Design.numericColumn, alignment: .trailing)
-                }.font(Design.caption).fontWeight(affected ? .semibold : .regular).foregroundStyle(affected ? Design.stateText(.warn) : Design.label).frame(height: Design.tableRow)
+                }.font(Design.body).fontWeight(affected ? .semibold : .regular).foregroundStyle(affected ? Design.stateText(.warn) : Design.label).frame(height: Design.tableRow)
             }
         }
     }
@@ -160,7 +160,7 @@ struct DiskCard: View {
                 Spacer(); CapsuleAction(title: "清理…", action: state.onClean)
             }
             if let available = state.snapshot?.diskAvailableBytes, let total = state.snapshot?.diskTotalBytes, total > 0 {
-                LineBar(fraction: 1 - Double(available) / Double(total), color: Design.blue)
+                LineBar(fraction: 1 - Double(available) / Double(total), color: Double(available) / Double(total) < 0.1 ? Design.orange : Design.gray)
                 HStack {
                     Text(String(format: "已用 %.0f GB", Double(total - available) / 1_000_000_000)); Spacer()
                     Text(String(format: "共 %.0f GB", Double(total) / 1_000_000_000))

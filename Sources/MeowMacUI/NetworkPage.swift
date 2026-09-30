@@ -66,8 +66,11 @@ struct NetworkPage: View {
         let value = model.meowMacDisplay
         VStack(alignment: .leading, spacing: Design.sectionGap) {
             HStack(alignment: .top, spacing: Design.rowGap) {
-                Image(systemName: value.tone == .green ? "checkmark.circle.fill" : value.tone == .red ? "xmark.circle.fill" : "exclamationmark.circle.fill")
-                    .font(.system(size: Design.networkIcon)).foregroundStyle(Design.networkColor(value.tone))
+                ZStack {
+                    Circle().fill(Design.networkColor(value.tone))
+                    Image(systemName: value.tone == .green ? "checkmark" : value.tone == .red ? "xmark" : "exclamationmark")
+                        .font(.system(size: Design.networkIcon * 0.55, weight: .semibold)).foregroundStyle(Design.iconInk)
+                }.frame(width: Design.networkIcon, height: Design.networkIcon)
                 VStack(alignment: .leading, spacing: Design.smallGap) {
                     Text(value.conclusion).font(Design.status)
                     Text(value.detail).font(Design.caption).foregroundStyle(Design.secondary).fixedSize(horizontal: false, vertical: true)
@@ -103,7 +106,7 @@ struct NetworkPage: View {
                         Text(row.name); Spacer()
                         Text("\(row.passed) / \(row.total)").foregroundStyle(row.total == 0 ? Design.secondary : Design.stateText(row.passed == row.total ? .normal : .warn)).frame(width: Design.siteCountColumn, alignment: .trailing)
                         HStack(spacing: Design.smallGap) { Text(row.medianMilliseconds.map { String(format: "%.0f", $0) } ?? "—"); Text("ms").foregroundStyle(Design.secondary) }.frame(width: Design.siteLatencyColumn, alignment: .trailing)
-                    }.font(Design.caption).frame(height: Design.tableRow)
+                    }.font(Design.body).frame(height: Design.tableRow)
                 }
             }
             SectionRule()

@@ -16,7 +16,7 @@ public enum PanelPreviewRenderer {
             let snapshot = SystemSnapshot(timestamp: pointTime, cpuUsage: cpu, memoryPressure: .normal,
                                           swapUsedBytes: 1024 * 1024 * 1024,
                                           diskAvailableBytes: 120_000_000_000, diskTotalBytes: 500_000_000_000,
-                                          networkReceivedBytesPerSecond: 10_000, networkSentBytesPerSecond: 5_000,
+                                          networkReceivedBytesPerSecond: 2.4 * 1024 * 1024, networkSentBytesPerSecond: 128 * 1024,
                                           battery: BatteryMetrics(temperatureCelsius: 34 + cpu * 5,
                                                                   systemPowerWatts: 7 + cpu * 12),
                                           thermal: alert && index >= 25 || (25...30).contains(index) ? .fair : .nominal,
@@ -78,13 +78,16 @@ public enum PanelPreviewRenderer {
         return renderPNG(SettingsMenuPreview(state: state), width: Design.menuWidth, height: 210, dark: dark)
     }
 
+    public static func catPreviewPNG(frame: Int, level: HealthLevel, load: Double = 0) -> Data? {
+        renderPNG(Image(nsImage: CatRenderer.image(frame: frame, level: level, load: load, size: CGSize(width: 112, height: 72))).renderingMode(.original), width: 112, height: 72, dark: false, scale: 1)
+    }
     public static func componentPNG(dark: Bool) -> Data? {
         renderPNG(DesignComponentPreview(), width: Design.panelWidth, height: 460, dark: dark)
     }
 
     // ImageRenderer 无法绘制系统玻璃合成层，预览沿用 SPEC 的普通材质退路。
     // 应用默认 previewMaterial 为 false，仍使用 macOS 26 的原生 glassEffect。
-    static func renderPNG<V: View>(_ view: V, width: CGFloat, height: CGFloat, dark: Bool) -> Data? {
+    static func renderPNG<V: View>(_ view: V, width: CGFloat, height: CGFloat, dark: Bool, scale: CGFloat = 2) -> Data? {
         let app = NSApplication.shared
         let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
         let oldAppearance = app.appearance
@@ -99,7 +102,7 @@ public enum PanelPreviewRenderer {
                 .frame(width: width, height: height, alignment: .top)
                 .background(background))
             renderer.proposedSize = ProposedViewSize(width: width, height: height)
-            renderer.scale = 2
+            renderer.scale = scale
             if let image = renderer.nsImage, let tiff = image.tiffRepresentation,
                let rep = NSBitmapImageRep(data: tiff) { result = rep.representation(using: .png, properties: [:]) }
         }

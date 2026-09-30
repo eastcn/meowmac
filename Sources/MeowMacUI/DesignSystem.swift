@@ -15,7 +15,7 @@ enum Design {
     static let trendHeight: CGFloat = 26, cycleHeight: CGFloat = 56, columnHeight: CGFloat = 40
     static let tableRow: CGFloat = 21, tableHeader: CGFloat = 16, rankWidth: CGFloat = 18
     static let numericColumn: CGFloat = 56, siteCountColumn: CGFloat = 64, siteLatencyColumn: CGFloat = 88
-    static let providerHeight: CGFloat = 80
+    static let providerHeight: CGFloat = 72
     static let providerIcon: CGFloat = 20, networkIcon: CGFloat = 32
     static let catWidth: CGFloat = 26, catHeight: CGFloat = 17
     static let headerTop: CGFloat = 14, footerInset: CGFloat = 10
@@ -31,6 +31,7 @@ enum Design {
     static let button = Font.system(size: 12)
     static let caption = Font.system(size: 11)
     static let tiny = Font.system(size: 10)
+    static let iconInk = Color(nsColor: .white)
     static let label = Color(nsColor: .labelColor), secondary = Color(nsColor: .secondaryLabelColor)
     static let separator = Color(nsColor: .separatorColor), track = Color(nsColor: .quaternarySystemFill)
     static let blue = Color(nsColor: .systemBlue), purple = Color(nsColor: .systemPurple)
@@ -89,7 +90,7 @@ struct GlassCard<Content: View>: View {
     var warning = false
     @ViewBuilder var content: () -> Content
     var body: some View {
-        content().padding(.horizontal, Design.cardInset).padding(.vertical, Design.cardVertical)
+        content().frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, Design.cardInset).padding(.vertical, Design.cardVertical)
             .modifier(GlassSurface(warning: warning))
     }
 }
@@ -137,6 +138,15 @@ private struct CapsuleSurface: ViewModifier {
     }
 }
 
+private struct CapsuleTrack: ViewModifier {
+    @Environment(\.previewMaterial) private var previewMaterial
+    func body(content: Content) -> some View {
+        if previewMaterial { content.background(Design.track, in: Capsule()) }
+        else if #available(macOS 26, *) { content.glassEffect(.regular, in: Capsule()) }
+        else { content.background(Design.track, in: Capsule()) }
+    }
+}
+
 struct CapsuleSelector: View {
     let titles: [String]
     let selected: Int
@@ -157,7 +167,7 @@ struct CapsuleSelector: View {
                     .modifier(CapsuleSurface(selected: selected == index))
                 }.buttonStyle(.plain)
             }
-        }.padding(Design.tabPadding).background(Design.track, in: Capsule())
+        }.padding(Design.tabPadding).modifier(CapsuleTrack())
     }
 }
 

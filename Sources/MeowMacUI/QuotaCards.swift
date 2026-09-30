@@ -66,7 +66,7 @@ struct QuotaPage: View {
                             LineBar(fraction: (window?.remainingPercent ?? 0) / 100, color: Design.state(Design.quotaLevel(window?.remainingPercent ?? 0)), height: Design.miniBar)
                             Text(window.map { "\(Int($0.remainingPercent.rounded()))%" } ?? (state.quotaErrors[item] == nil ? "—" : "出错"))
                                 .font(Design.caption).fontWeight(.semibold).foregroundStyle(window.map { Design.stateText(Design.quotaLevel($0.remainingPercent)) } ?? Design.secondary)
-                        }.padding(Design.rowGap).frame(maxWidth: .infinity).frame(height: Design.providerHeight)
+                        }.padding(Design.gap).frame(maxWidth: .infinity).frame(height: Design.providerHeight)
                             .modifier(GlassSurface()).overlay(RoundedRectangle(cornerRadius: Design.cardRadius).stroke(provider == item ? Design.blue.opacity(Design.peakFill) : .clear, lineWidth: Design.rule))
                     }.buttonStyle(.plain)
                 }
@@ -134,7 +134,7 @@ struct QuotaTrendView: View {
                 if let minutes = window.effectiveWindowMinutes, let reset = window.resetsAt {
                     let start = reset.addingTimeInterval(Double(-minutes * 60))
                     let history = QuotaHistorySeries.currentCycle(state.quotaHistory[provider] ?? [], window: window, now: state.now())
-                    SectionHeading(title: "\(window.displayName) · 从重置到重置，累计已用", detail: "已用 \(Int(window.usedPercent.rounded()))%")
+                    HStack { Text("\(window.displayName) · 从重置到重置，累计已用"); Spacer(minLength: 0); Text("已用 \(Int(window.usedPercent.rounded()))%") }.font(Design.caption).foregroundStyle(Design.secondary)
                     MiniLineGraph(points: history.map { GraphValue(date: $0.sampledAt, value: $0.usedPercent) }, domain: start...reset, range: 0...100, color: Design.blue, fill: true, pace: true, now: state.now(), height: Design.cycleHeight)
                     HStack { Text(DisplayDate.format(start, pattern: "M/d") + " 重置"); Spacer(); Text("现在"); Spacer(); Text(DisplayDate.format(reset, pattern: "M/d") + " 重置") }.font(Design.tiny).foregroundStyle(Design.secondary)
                     Text("匀速用完的节奏：曲线在虚线上方就是用得偏快").font(Design.tiny).foregroundStyle(Design.secondary)

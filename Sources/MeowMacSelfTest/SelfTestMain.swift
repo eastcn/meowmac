@@ -79,7 +79,9 @@ enum SelfTestMain {
                 try data.write(to: dir.appendingPathComponent("network-cli.json"))
                 let own = try JSONSerialization.jsonObject(with: Data(value.raw.utf8)) as? [String: Any]
                 let other = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                return own?["status"] as? String == other?["status"] as? String
+                let ownChecks = (own?["items"] as? [[String: Any]])?.compactMap { $0["severity"] as? String }
+                let otherChecks = (other?["items"] as? [[String: Any]])?.compactMap { $0["severity"] as? String }
+                return own?["status"] as? String == other?["status"] as? String && ownChecks == otherChecks
             } catch { print("网络对照失败：\(error)"); return false }
         }))
         tests.append(("UI.Quota/花费窗口与模型汇总", { @MainActor in
@@ -345,18 +347,18 @@ enum SelfTestMain {
         return first < 0.5 && second < first && second > 0.05
     }
 
-    private static func renderCat() -> Bool {
+    @MainActor private static func renderCat() -> Bool {
         let directory = ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
         do {
             if let directory { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
             for (name, level, frame) in [("normal", HealthLevel.normal, 0), ("warn", .warn, 2), ("severe", .severe, 0)] {
-                let data = CatRenderer.png(frame: frame, level: level)
+                let data = directory != nil ? PanelPreviewRenderer.catPreviewPNG(frame: frame, level: level)! : CatRenderer.png(frame: frame, level: level)
                 guard !data.isEmpty else { return false }
                 if let directory { try data.write(to: directory.appendingPathComponent("cat-\(name).png"), options: .atomic) }
             }
             if let directory {
-                for index in 0..<5 { try CatRenderer.png(frame: index, level: .normal).write(to: directory.appendingPathComponent("cat-frame-\(index + 1).png")) }
-                try CatRenderer.png(frame: 2, level: .normal, load: 0.7).write(to: directory.appendingPathComponent("cat-speed.png"))
+                for index in 0..<5 { try PanelPreviewRenderer.catPreviewPNG(frame: index, level: .normal)!.write(to: directory.appendingPathComponent("cat-frame-\(index + 1).png")) }
+                try PanelPreviewRenderer.catPreviewPNG(frame: 2, level: .normal, load: 0.7)!.write(to: directory.appendingPathComponent("cat-speed.png"))
             }
             return true
         } catch { print("猫图预览失败：\(error)"); return false }
