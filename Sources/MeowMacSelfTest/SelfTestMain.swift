@@ -53,6 +53,7 @@ enum SelfTestMain {
             ("Core.System/mo 清理历史", { SelfTestMain.moHistory() }),
         ]
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }
+        tests.append(("UI.System/三类诊断与持续时间", { DiagnosisTests.rows() }))
         tests.append(("UI.Snapshot/六部分与关键字段编码", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(quotaAlert: true)
             do {
