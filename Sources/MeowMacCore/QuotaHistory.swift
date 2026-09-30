@@ -6,10 +6,11 @@ public struct QuotaHistoryLine: Codable {
     public let windowMinutes: Int?
     public let usedPercent: Double
     public let resetsAt: Date?
+    public let windowID: String?
 
-    public init(sampledAt: Date, provider: QuotaProvider, windowMinutes: Int?, usedPercent: Double, resetsAt: Date?) {
+    public init(sampledAt: Date, provider: QuotaProvider, windowMinutes: Int?, usedPercent: Double, resetsAt: Date?, windowID: String? = nil) {
         self.sampledAt = sampledAt; self.provider = provider; self.windowMinutes = windowMinutes
-        self.usedPercent = usedPercent; self.resetsAt = resetsAt
+        self.usedPercent = usedPercent; self.resetsAt = resetsAt; self.windowID = windowID
     }
 }
 
@@ -37,8 +38,8 @@ public struct QuotaHistoryStore {
         encoder.dateEncodingStrategy = .iso8601
         for window in snapshot.windows {
             let line = QuotaHistoryLine(sampledAt: snapshot.updatedAt, provider: snapshot.provider,
-                                        windowMinutes: window.windowMinutes, usedPercent: window.usedPercent,
-                                        resetsAt: window.resetsAt)
+                                        windowMinutes: window.effectiveWindowMinutes, usedPercent: window.usedPercent,
+                                        resetsAt: window.resetsAt, windowID: window.identifier)
             var data = try encoder.encode(line)
             data.append(0x0A)
             try handle.write(contentsOf: data)

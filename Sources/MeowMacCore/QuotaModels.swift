@@ -9,24 +9,64 @@ public struct QuotaWindow: Codable {
     public let windowMinutes: Int?
     public let resetsAt: Date?
     public let resetDescription: String?
+    public let identifier: String
+    public let name: String?
 
-    public init(usedPercent: Double, windowMinutes: Int?, resetsAt: Date?, resetDescription: String?) {
+    public init(usedPercent: Double, windowMinutes: Int?, resetsAt: Date?, resetDescription: String?, identifier: String = "primary", name: String? = nil) {
         self.usedPercent = usedPercent; self.windowMinutes = windowMinutes
         self.resetsAt = resetsAt; self.resetDescription = resetDescription
+        self.identifier = identifier; self.name = name
     }
 }
 
-public struct QuotaSnapshot {
+public extension QuotaProvider {
+    var displayName: String {
+        switch self { case .claude: return "Claude"; case .codex: return "Codex"; case .deepseek: return "DeepSeek"; case .opencodego: return "OpenCode Go" }
+    }
+}
+
+public extension QuotaWindow {
+    var effectiveWindowMinutes: Int? {
+        if let minutes = windowMinutes { return minutes }
+        guard let name else { return nil }
+        if name.contains("5 小时") { return 300 }
+        if name.contains("7 天") || name.contains("每周") { return 10080 }
+        return nil
+    }
+    var displayName: String {
+        if let name, !name.isEmpty { return name.contains("窗口") ? name : name + "窗口" }
+        switch effectiveWindowMinutes {
+        case 300: return "5 小时窗口"
+        case 10080: return "7 天窗口"
+        case 43200: return "每月窗口"
+        case .some(let minutes): return "\(minutes / 60) 小时窗口"
+        case nil: return "额度窗口"
+        }
+    }
+    var remainingPercent: Double { min(100, max(0, 100 - usedPercent)) }
+}
+
+public struct QuotaResetCredits: Codable {
+    public let availableCount: Int
+    public let expiresAt: [Date]
+    public init(availableCount: Int, expiresAt: [Date]) { self.availableCount = availableCount; self.expiresAt = expiresAt }
+}
+
+public struct QuotaSnapshot: Codable {
     public let provider: QuotaProvider
     public let source: String
     public let updatedAt: Date
     public let windows: [QuotaWindow]
     public let paceSummary: String?
     public let credits: Double?
+    public let accountEmail: String?
+    public let planName: String?
+    public let codexResetCredits: QuotaResetCredits?
 
-    public init(provider: QuotaProvider, source: String, updatedAt: Date, windows: [QuotaWindow], paceSummary: String?, credits: Double?) {
+    public init(provider: QuotaProvider, source: String, updatedAt: Date, windows: [QuotaWindow], paceSummary: String?, credits: Double?, accountEmail: String? = nil, planName: String? = nil, codexResetCredits: QuotaResetCredits? = nil) {
         self.provider = provider; self.source = source; self.updatedAt = updatedAt
         self.windows = windows; self.paceSummary = paceSummary; self.credits = credits
+        self.accountEmail = accountEmail; self.planName = planName; self.codexResetCredits = codexResetCredits
     }
 }
 
@@ -62,7 +102,7 @@ public enum CodexBarParser {
                 guard let used = number(window["usedPercent"]) else { return nil }
                 return QuotaWindow(usedPercent: used, windowMinutes: window["windowMinutes"] as? Int,
                     resetsAt: (window["resetAt"] as? String).flatMap(parseDate),
-                    resetDescription: window["label"] as? String)
+                    resetDescription: nil, identifier: window["kind"] as? String ?? "primary", name: window["label"] as? String)
             }
             guard !windows.isEmpty else { errors[provider] = "窗口数据无效"; continue }
             let pace = (row["display"] as? [String: Any])?["paceSummary"] as? String
@@ -86,14 +126,25 @@ public enum CodexBarParser {
             guard let item = usage[key] as? [String: Any], let percent = number(item["usedPercent"]) else { return nil }
             let date = (item["resetsAt"] as? String).flatMap(parseDate)
             return QuotaWindow(usedPercent: percent, windowMinutes: item["windowMinutes"] as? Int,
-                               resetsAt: date, resetDescription: item["resetDescription"] as? String)
+                               resetsAt: date, resetDescription: item["resetDescription"] as? String, identifier: key,
+                               name: provider == .codex && key == "secondary" ? "每周" : nil)
         }
         guard !windows.isEmpty else { throw QuotaParseError.missingWindow }
-        let pace = (usage["pace"] as? [String: Any])?["summary"] as? String
-        let creditsObject = usage["credits"] as? [String: Any]
-        let credits = number(creditsObject?["balance"] ?? usage["credits"])
-        return QuotaSnapshot(provider: provider, source: row["source"] as? String ?? "未知", updatedAt: now,
-                             windows: windows, paceSummary: pace, credits: credits)
+        let pace = ((row["pace"] as? [String: Any])?["secondary"] as? [String: Any])?["summary"] as? String
+            ?? (usage["pace"] as? [String: Any])?["summary"] as? String
+        let creditsObject = row["credits"] as? [String: Any] ?? usage["credits"] as? [String: Any]
+        let credits = number(creditsObject?["remaining"] ?? creditsObject?["balance"] ?? usage["credits"])
+        let identity = usage["identity"] as? [String: Any] ?? [:]
+        let resetObject = usage["codexResetCredits"] as? [String: Any]
+        let resetCredits = resetObject.map { object in
+            QuotaResetCredits(availableCount: object["availableCount"] as? Int ?? 0,
+                expiresAt: (object["credits"] as? [[String: Any]] ?? []).compactMap { ($0["expires_at"] as? String).flatMap(parseDate) })
+        }
+        return QuotaSnapshot(provider: provider, source: row["source"] as? String ?? "未知", updatedAt: (usage["updatedAt"] as? String).flatMap(parseDate) ?? now,
+                             windows: windows, paceSummary: pace, credits: credits,
+                             accountEmail: usage["accountEmail"] as? String ?? identity["accountEmail"] as? String,
+                             planName: usage["planName"] as? String ?? usage["plan"] as? String,
+                             codexResetCredits: resetCredits)
     }
 
     public static func cost(_ data: Data) throws -> [DailyCost] {
@@ -122,6 +173,9 @@ public enum CodexBarParser {
     }
 
     private static func parseDate(_ string: String) -> Date? {
-        ISO8601DateFormatter().date(from: string)
+        let formatter = ISO8601DateFormatter()
+        if let date = formatter.date(from: string) { return date }
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: string)
     }
 }

@@ -23,11 +23,12 @@ public final class SystemCollector {
         if let counters { previousNetwork = (counters, now) }
 
         let disk = Self.diskCapacity()
+        let memory = Self.memoryUsage()
         return SystemSnapshot(timestamp: now, cpuUsage: cpu, memoryPressure: Self.memoryPressure(),
                               swapUsedBytes: Self.swapUsedBytes(), diskAvailableBytes: disk.available,
                               diskTotalBytes: disk.total, networkReceivedBytesPerSecond: rates?.received,
                               networkSentBytesPerSecond: rates?.sent, battery: Self.batteryMetrics(),
-                              thermal: Self.thermalLevel())
+                              thermal: Self.thermalLevel(), memoryUsedBytes: memory.used, memoryTotalBytes: memory.total)
     }
 
     public static func cpuTicks() -> CPUTicks? {
@@ -46,6 +47,21 @@ public final class SystemCollector {
             nice += UInt64(UInt32(bitPattern: cpuInfo[offset + Int(CPU_STATE_NICE)]))
         }
         return CPUTicks(user: user, system: system, idle: idle, nice: nice)
+    }
+
+    public static func memoryUsage() -> (used: UInt64?, total: UInt64) {
+        var statistics = vm_statistics64()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
+        let status = withUnsafeMutablePointer(to: &statistics) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
+        }
+        let total = ProcessInfo.processInfo.physicalMemory
+        guard status == KERN_SUCCESS else { return (nil, total) }
+        let pages = UInt64(statistics.active_count) + UInt64(statistics.inactive_count)
+            + UInt64(statistics.wire_count) + UInt64(statistics.compressor_page_count)
+        return (min(total, pages * UInt64(vm_kernel_page_size)), total)
     }
 
     public static func memoryPressure() -> MemoryPressure {

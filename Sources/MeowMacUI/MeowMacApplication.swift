@@ -75,6 +75,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         energyTimer = Timer.scheduledTimer(withTimeInterval: configResult.config.processSampleSeconds, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.sampleEnergy() }
         }
+        observers.append(NotificationCenter.default.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification,
+                                                               object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.sample(thermalChanged: true) }
+        })
         sample()
         updateCleaningHistory()
         sampleEnergy()
@@ -98,7 +102,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func sample() {
+    private func sample(thermalChanged: Bool = false) {
         let latest = collector.sample()
         snapshot = latest
         panelState.snapshot = latest
@@ -114,7 +118,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             }
         }
         hasSystemBaseline = true
-        panelState.chartHistory.append(latest)
+        panelState.chartHistory.append(latest, force: thermalChanged)
         panelState.lastRefreshedAt = latest.timestamp
         if latest.thermal == .fair {
             if panelState.fairSince == nil { panelState.fairSince = latest.timestamp }
@@ -207,6 +211,9 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         networkBridge?.stop()
         quotaCoordinator?.stop()
         frameTimer?.invalidate()
-        observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        observers.forEach {
+            NSWorkspace.shared.notificationCenter.removeObserver($0)
+            NotificationCenter.default.removeObserver($0)
+        }
     }
 }

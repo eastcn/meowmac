@@ -41,11 +41,13 @@ public struct HealthInputs {
     public let failedSources: [String: Int]
     public let fairSince: Date?
     public let now: Date
+    public let quotaSnapshots: [QuotaSnapshot]
 
     public init(system: SystemSnapshot?, energy: EnergyDiagnosis?, quotaUsedPercent: [Double], network: NetworkTone,
-                failedSources: [String: Int], fairSince: Date?, now: Date) {
+                failedSources: [String: Int], fairSince: Date?, now: Date, quotaSnapshots: [QuotaSnapshot] = []) {
         self.system = system; self.energy = energy; self.quotaUsedPercent = quotaUsedPercent
         self.network = network; self.failedSources = failedSources; self.fairSince = fairSince; self.now = now
+        self.quotaSnapshots = quotaSnapshots
     }
 }
 
@@ -62,6 +64,11 @@ public enum HealthEvaluator {
         }
         if input.quotaUsedPercent.contains(where: { 1 - $0 / 100 < config.quotaRemainingWarn }) {
             add(.warn, .quota, "额度剩余不足")
+        }
+        for snapshot in input.quotaSnapshots.sorted(by: { $0.provider.rawValue < $1.provider.rawValue }) {
+            for window in snapshot.windows where QuotaPace.calculate(window: window, now: input.now)?.exhaustsBeforeReset == true {
+                add(.warn, .quota, "\(snapshot.provider.displayName) \(window.displayName.replacingOccurrences(of: "窗口", with: ""))额度偏快")
+            }
         }
         if let remaining = input.system?.diskRemainingFraction, remaining < config.diskRemainingWarn {
             add(.warn, .system, "磁盘剩余不足")

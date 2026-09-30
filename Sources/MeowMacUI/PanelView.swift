@@ -2,6 +2,8 @@ import AppKit
 import Charts
 import SwiftUI
 import MeowMacCore
+import MeowMacSystem
+import os
 import TunCanaryUI
 
 public protocol Card {
@@ -34,6 +36,9 @@ public final class PanelState: ObservableObject {
     @Published public var quotas: [QuotaProvider: QuotaSnapshot] = [:]
     @Published public var quotaHistory: [QuotaProvider: [QuotaHistoryLine]] = [:]
     @Published public var quotaErrors: [QuotaProvider: String] = [:]
+    @Published public var localStorage: [QuotaProvider: LocalStorageSnapshot] = [:]
+    private var storageLoading: Set<QuotaProvider> = []
+    public var now: () -> Date = Date.init
     @Published public var costs: [QuotaProvider: [DailyCost]] = [:]
     @Published public var networkTone: NetworkTone = .gray
     @Published public var failures: [String: Int] = [:]
@@ -61,15 +66,34 @@ public final class PanelState: ObservableObject {
         HealthEvaluator.evaluate(HealthInputs(system: snapshot, energy: energy,
                                                quotaUsedPercent: quotas.values.flatMap { $0.windows.map(\.usedPercent) },
                                                network: networkTone, failedSources: failures,
-                                               fairSince: fairSince, now: Date()), config: configResult.config)
+                                               fairSince: fairSince, now: now(), quotaSnapshots: Array(quotas.values)), config: configResult.config)
     }
 
     public func open() {
         let last = UserDefaults.standard.string(forKey: "lastPanelTab").flatMap(PanelTab.init(rawValue:)) ?? .system
         selectedTab = DefaultPanelLayout.openingTab(summary: health, lastViewed: last)
+        if selectedTab == .quota { refreshStorageIfNeeded() }
+    }
+
+    public func refreshStorageIfNeeded() {
+        for provider in [QuotaProvider.codex, .claude] {
+            guard !storageLoading.contains(provider), localStorage[provider].map({ now().timeIntervalSince($0.sampledAt) >= 600 }) ?? true else { continue }
+            storageLoading.insert(provider)
+            let directory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".\(provider.rawValue)")
+            Task.detached { [weak self] in
+                do {
+                    let value = try LocalStorageCollector.scan(directory: directory, provider: provider)
+                    await MainActor.run { [weak self] in self?.localStorage[provider] = value; self?.storageLoading.remove(provider) }
+                } catch {
+                    Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "storage").error("存储统计失败：\(error.localizedDescription, privacy: .private)")
+                    await MainActor.run { [weak self] in self?.storageLoading.remove(provider) }
+                }
+            }
+        }
     }
 
     public func select(_ tab: PanelTab) {
+        if tab == .quota { refreshStorageIfNeeded() }
         selectedTab = tab
         UserDefaults.standard.set(tab.rawValue, forKey: "lastPanelTab")
     }

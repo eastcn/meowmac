@@ -52,6 +52,7 @@ enum SelfTestMain {
             ("Core.Quota/历史保留", SelfTestMain.quotaHistory),
             ("Core.System/mo 清理历史", SelfTestMain.moHistory),
         ]
+        tests += DataTests.tests
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.RenderPreview/三个标签页", SelfTestMain.renderPanel))
         }
@@ -298,13 +299,13 @@ enum SelfTestMain {
     }
 
     private static func renderCat() -> Bool {
-        let directory = URL(fileURLWithPath: "docs/plans/2026-09-29-meowmac-v0-1/previews", isDirectory: true)
+        let directory = ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            if let directory { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
             for (name, level, frame) in [("normal", HealthLevel.normal, 0), ("warn", .warn, 2), ("severe", .severe, 0)] {
                 let data = CatRenderer.png(frame: frame, level: level)
                 guard !data.isEmpty else { return false }
-                try data.write(to: directory.appendingPathComponent("cat-\(name).png"), options: .atomic)
+                if let directory { try data.write(to: directory.appendingPathComponent("cat-\(name).png"), options: .atomic) }
             }
             return true
         } catch { print("猫图预览失败：\(error)"); return false }

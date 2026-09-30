@@ -14,9 +14,7 @@ public final class QuotaCoordinator {
     private var schedule = QuotaSchedule()
     private var refreshTimer: Timer?
     private var sessionTimer: Timer?
-    private var lastClaudeCall: Date?
     private var lastPrunedAt: Date?
-    private var pendingManual = false
     private var refreshing = false
     private var sleeping = false
     private var observers: [NSObjectProtocol] = []
@@ -74,7 +72,6 @@ public final class QuotaCoordinator {
                 lastPrunedAt = Date()
             } catch { logger.error("额度历史每日清理失败：\(error.localizedDescription, privacy: .private)") }
         }
-        if pendingManual { refreshAll() }
         if schedule.dueFullRefresh(at: Date(), config: config) { refreshAll() }
         for provider in schedule.dueFinishRefresh(at: Date()) { refresh(provider) }
     }
@@ -82,19 +79,21 @@ public final class QuotaCoordinator {
     private func refreshAll() {
         guard !sleeping, !refreshing else { return }
         let now = Date()
-        if let lastClaudeCall, now.timeIntervalSince(lastClaudeCall) < 300 {
-            logger.notice("Claude 调用间隔不足 5 分钟，本次全量刷新合并")
-            pendingManual = true
-            return
-        }
         refreshing = true
-        pendingManual = false
-        lastClaudeCall = now
         schedule.markFullRefresh(at: now)
         let client = self.client
         Task.detached { [weak self] in
             do {
-                let result = try client.dashboard()
+                var snapshots: [QuotaProvider: QuotaSnapshot] = [:]
+                var errors: [QuotaProvider: String] = [:]
+                for provider in QuotaProvider.allCases {
+                    do { snapshots[provider] = try client.usage(provider) }
+                    catch {
+                        errors[provider] = error.localizedDescription
+                        await MainActor.run { [weak self] in self?.logger.error("额度采集失败：\(provider.rawValue, privacy: .public) \(error.localizedDescription, privacy: .private)") }
+                    }
+                }
+                let result = (snapshots: snapshots, errors: errors)
                 var costs: [QuotaProvider: [DailyCost]] = [:]
                 for provider in [QuotaProvider.claude, .codex] {
                     do { costs[provider] = try client.cost(provider) }
@@ -133,13 +132,6 @@ public final class QuotaCoordinator {
     }
 
     private func refresh(_ provider: QuotaProvider) {
-        if provider == .claude {
-            if let lastClaudeCall, Date().timeIntervalSince(lastClaudeCall) < 300 {
-                schedule.deferFinishRefresh(.claude, until: lastClaudeCall.addingTimeInterval(300))
-                return
-            }
-            lastClaudeCall = Date()
-        }
         let client = self.client
         Task.detached { [weak self] in
             do {

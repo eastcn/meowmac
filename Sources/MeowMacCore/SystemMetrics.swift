@@ -80,14 +80,23 @@ public struct SystemSnapshot {
     public let networkSentBytesPerSecond: Double?
     public let battery: BatteryMetrics
     public let thermal: ThermalLevel
+    public let memoryUsedBytes: UInt64?
+    public let memoryTotalBytes: UInt64?
+
+    public var memoryUsedFraction: Double? {
+        guard let used = memoryUsedBytes, let total = memoryTotalBytes, total > 0 else { return nil }
+        return Double(used) / Double(total)
+    }
 
     public init(timestamp: Date, cpuUsage: Double?, memoryPressure: MemoryPressure, swapUsedBytes: UInt64?,
                 diskAvailableBytes: Int64?, diskTotalBytes: Int64?, networkReceivedBytesPerSecond: Double?,
-                networkSentBytesPerSecond: Double?, battery: BatteryMetrics, thermal: ThermalLevel) {
+                networkSentBytesPerSecond: Double?, battery: BatteryMetrics, thermal: ThermalLevel,
+                memoryUsedBytes: UInt64? = nil, memoryTotalBytes: UInt64? = nil) {
         self.timestamp = timestamp; self.cpuUsage = cpuUsage; self.memoryPressure = memoryPressure
         self.swapUsedBytes = swapUsedBytes; self.diskAvailableBytes = diskAvailableBytes
         self.diskTotalBytes = diskTotalBytes; self.networkReceivedBytesPerSecond = networkReceivedBytesPerSecond
         self.networkSentBytesPerSecond = networkSentBytesPerSecond; self.battery = battery; self.thermal = thermal
+        self.memoryUsedBytes = memoryUsedBytes; self.memoryTotalBytes = memoryTotalBytes
     }
 
     public var diskRemainingFraction: Double? {
@@ -100,12 +109,13 @@ public struct ChartPoint: Identifiable {
     public var id: Date { timestamp }
     public let timestamp: Date
     public let cpuUsage: Double?
+    public let memoryUsedBytes: UInt64?
     public let systemPowerWatts: Double?
     public let batteryTemperatureCelsius: Double?
     public let thermal: ThermalLevel
 
     public init(snapshot: SystemSnapshot) {
-        timestamp = snapshot.timestamp; cpuUsage = snapshot.cpuUsage
+        timestamp = snapshot.timestamp; cpuUsage = snapshot.cpuUsage; memoryUsedBytes = snapshot.memoryUsedBytes
         systemPowerWatts = snapshot.battery.systemPowerWatts
         batteryTemperatureCelsius = snapshot.battery.temperatureCelsius
         thermal = snapshot.thermal
@@ -123,10 +133,10 @@ public struct ChartHistory {
 
     public var all: [ChartPoint] { points }
 
-    public mutating func append(_ snapshot: SystemSnapshot) {
+    public mutating func append(_ snapshot: SystemSnapshot, force: Bool = false) {
         let cutoff = snapshot.timestamp.addingTimeInterval(-retentionSeconds)
         points.removeAll { $0.timestamp < cutoff }
-        if let last = points.last, snapshot.timestamp.timeIntervalSince(last.timestamp) < sampleSeconds { return }
+        if !force, let last = points.last, snapshot.timestamp.timeIntervalSince(last.timestamp) < sampleSeconds { return }
         points.append(ChartPoint(snapshot: snapshot))
     }
 }
