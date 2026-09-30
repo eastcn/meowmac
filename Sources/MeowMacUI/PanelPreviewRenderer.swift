@@ -63,7 +63,7 @@ public enum PanelPreviewRenderer {
             }
             state.localStorage[provider] = LocalStorageSnapshot(sampledAt: now, sessionsBytes: 6300000000, cacheBytes: 2100000000, otherBytes: 700000000, sessionFileCount: 1284)
         }
-        state.networkModel = AppModel.preview(.firstLaunch)
+        state.networkModel = networkModel(failure: false, now: now)
         state.networkTone = .green
         state.lastCleaning = CleaningRecord(startedAt: now.addingTimeInterval(-172800), sizeDescription: "8.4 GB")
         state.lastRefreshedAt = now.addingTimeInterval(-60)

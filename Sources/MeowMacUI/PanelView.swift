@@ -161,7 +161,7 @@ public struct PanelView: View {
             case .quota:
                 QuotaPage(state: state)
             case .network:
-                if let model = state.networkModel { PopoverRootView(model: model, maxScrollHeight: nil) }
+                if let model = state.networkModel { NetworkPage(model: model) }
                 else { Text("网络检测未启动").font(Design.caption).foregroundStyle(Design.secondary) }
             }
         }.padding(.horizontal, Design.inset).padding(.vertical, Design.sectionGap)

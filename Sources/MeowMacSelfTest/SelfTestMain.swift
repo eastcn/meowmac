@@ -8,13 +8,13 @@ import AppKit
 
 @main
 enum SelfTestMain {
-    @MainActor static func main() {
-        var tests: [(String, @MainActor () -> Bool)] = [
+    @MainActor static func main() async {
+        var tests: [(String, @MainActor () async -> Bool)] = [
             ("Core.Smoke/版本号", { AppIdentity.version == "0.1.0" }),
-            ("Core.Config/文件不存在", SelfTestMain.missingConfig),
-            ("Core.Config/部分字段", SelfTestMain.partialConfig),
-            ("Core.Config/JSON 无效", SelfTestMain.invalidConfig),
-            ("Core.Config/完整文件", SelfTestMain.completeConfig),
+            ("Core.Config/文件不存在", { SelfTestMain.missingConfig() }),
+            ("Core.Config/部分字段", { SelfTestMain.partialConfig() }),
+            ("Core.Config/JSON 无效", { SelfTestMain.invalidConfig() }),
+            ("Core.Config/完整文件", { SelfTestMain.completeConfig() }),
             ("System.Metrics/CPU 差分", { CPUTicks.usage(previous: CPUTicks(user: 10, system: 10, idle: 10, nice: 0), current: CPUTicks(user: 20, system: 20, idle: 40, nice: 0)) == 0.4 }),
             ("System.Metrics/网络速率", {
                 let old = ByteCounters(received: 100, sent: 200)
@@ -29,30 +29,51 @@ enum SelfTestMain {
             ("System.Metrics/电池换算", {
                 BatteryMetrics.parse(temperature: 3051, systemLoad: 7082) == BatteryMetrics(temperatureCelsius: 30.51, systemPowerWatts: 7.082)
             }),
-            ("System.Live/系统采样", SelfTestMain.liveSystem),
-            ("Core.Energy/top 第二次采样", SelfTestMain.topParser),
-            ("Core.Energy/失控进程时间线", SelfTestMain.runawayTimeline),
-            ("Core.Energy/休眠断言", SelfTestMain.assertionParser),
-            ("System.Live.Energy/进程与断言", SelfTestMain.liveEnergy),
-            ("System.Live.Energy.Rusage/跨用户读取", SelfTestMain.liveRusage),
-            ("Quota.Live/四渠道刷新", SelfTestMain.liveQuota),
-            ("Quota.Live.Cost/Codex 花费", SelfTestMain.liveCodexCost),
-            ("Quota.Live.Cost/Claude 花费", SelfTestMain.liveClaudeCost),
-            ("Core.Health/信号与排序", SelfTestMain.healthSignals),
-            ("Core.Health/降温与诊断文案", SelfTestMain.healthMessages),
-            ("Core.Health/系统与能耗信号", SelfTestMain.healthSystemSignals),
-            ("Core.Panel/默认标签页", SelfTestMain.openingTab),
-            ("Core.Cat/速度映射", SelfTestMain.catMotion),
-            ("UI.RenderCat/三档帧图", SelfTestMain.renderCat),
-            ("UI.Cat/帧图透明区域", SelfTestMain.catPixels),
-            ("Core.Quota/四渠道解析", SelfTestMain.quotaParsing),
-            ("Core.Quota/dashboard 解析", SelfTestMain.dashboardParsing),
-            ("Core.Quota/花费与会话", SelfTestMain.costAndSessions),
-            ("Core.Quota/调度", SelfTestMain.quotaSchedule),
-            ("Core.Quota/历史保留", SelfTestMain.quotaHistory),
-            ("Core.System/mo 清理历史", SelfTestMain.moHistory),
+            ("System.Live/系统采样", { SelfTestMain.liveSystem() }),
+            ("Core.Energy/top 第二次采样", { SelfTestMain.topParser() }),
+            ("Core.Energy/失控进程时间线", { SelfTestMain.runawayTimeline() }),
+            ("Core.Energy/休眠断言", { SelfTestMain.assertionParser() }),
+            ("System.Live.Energy/进程与断言", { SelfTestMain.liveEnergy() }),
+            ("System.Live.Energy.Rusage/跨用户读取", { SelfTestMain.liveRusage() }),
+            ("Quota.Live/四渠道刷新", { SelfTestMain.liveQuota() }),
+            ("Quota.Live.Cost/Codex 花费", { SelfTestMain.liveCodexCost() }),
+            ("Quota.Live.Cost/Claude 花费", { SelfTestMain.liveClaudeCost() }),
+            ("Core.Health/信号与排序", { SelfTestMain.healthSignals() }),
+            ("Core.Health/降温与诊断文案", { SelfTestMain.healthMessages() }),
+            ("Core.Health/系统与能耗信号", { SelfTestMain.healthSystemSignals() }),
+            ("Core.Panel/默认标签页", { SelfTestMain.openingTab() }),
+            ("Core.Cat/速度映射", { SelfTestMain.catMotion() }),
+            ("UI.RenderCat/三档帧图", { SelfTestMain.renderCat() }),
+            ("UI.Cat/帧图透明区域", { SelfTestMain.catPixels() }),
+            ("Core.Quota/四渠道解析", { SelfTestMain.quotaParsing() }),
+            ("Core.Quota/dashboard 解析", { SelfTestMain.dashboardParsing() }),
+            ("Core.Quota/花费与会话", { SelfTestMain.costAndSessions() }),
+            ("Core.Quota/调度", { SelfTestMain.quotaSchedule() }),
+            ("Core.Quota/历史保留", { SelfTestMain.quotaHistory() }),
+            ("Core.System/mo 清理历史", { SelfTestMain.moHistory() }),
         ]
-        tests += DataTests.tests
+        for test in DataTests.tests { tests.append((test.0, { test.1() })) }
+        tests.append(("UI.Network/分组与失败状态", { @MainActor in
+            let model = PanelPreviewRenderer.networkModel(failure: true, now: Date())
+            let value = model.meowMacDisplay
+            return value.tone == .red && value.checks.count == 5 && value.passed == 4 && value.groups[1].passed == 2 && value.groups[1].total == 3 && value.groups[1].medianMilliseconds == 184 && value.egress.count == 3
+        }))
+        tests.append(("UI.Network.Live/CLI同轮对照", { @MainActor in
+            let value = await NetworkBridge.collectOnce()
+            do {
+                let dir = URL(fileURLWithPath: "build/acceptance")
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try Data(value.raw.utf8).write(to: dir.appendingPathComponent("network-meowmac.json"))
+                try JSONEncoder().encode(value.model.meowMacDisplay).write(to: dir.appendingPathComponent("network-display.json"))
+                let p = Process(); p.executableURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/tuncanary")
+                p.arguments = ["--check", "--json"]; let pipe = Pipe(); p.standardOutput = pipe; p.standardError = Pipe(); try p.run()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+                try data.write(to: dir.appendingPathComponent("network-cli.json"))
+                let own = try JSONSerialization.jsonObject(with: Data(value.raw.utf8)) as? [String: Any]
+                let other = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                return own?["status"] as? String == other?["status"] as? String
+            } catch { print("网络对照失败：\(error)"); return false }
+        }))
         tests.append(("UI.Quota/花费窗口与模型汇总", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState()
             let data = Data(#"[{"daily":[{"date":"2026-09-30","totalCost":2.5,"totalTokens":100,"modelBreakdowns":[{"modelName":"example-a","totalTokens":100}]},{"date":"2026-09-29","totalCost":3,"totalTokens":200,"modelBreakdowns":[{"modelName":"example-b","totalTokens":200}]},{"date":"2026-08-01","totalCost":999,"totalTokens":9999}]}]"#.utf8)
@@ -70,9 +91,9 @@ enum SelfTestMain {
                 && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
-            tests.append(("UI.RenderPreview/三个标签页", SelfTestMain.renderPanel))
-            tests.append(("UI.RenderComponents/基础组件", SelfTestMain.renderComponents))
-            tests.append(("UI.RenderOverview/总览与设置", SelfTestMain.renderOverview))
+            tests.append(("UI.RenderPreview/三个标签页", { await SelfTestMain.renderPanel() }))
+            tests.append(("UI.RenderComponents/基础组件", { SelfTestMain.renderComponents() }))
+            tests.append(("UI.RenderOverview/总览与设置", { SelfTestMain.renderOverview() }))
         }
         let filters = CommandLine.arguments.dropFirst().map { $0.lowercased() }
         if filters.contains("--list") {
@@ -81,7 +102,7 @@ enum SelfTestMain {
         }
         var failed = 0
         for (name, run) in tests where (filters.isEmpty || filters.contains(where: { name.lowercased().contains($0) })) && (!name.contains(".Live") || ProcessInfo.processInfo.environment["MEOWMAC_LIVE"] == "1") {
-            if run() { print("PASS \(name)") }
+            if await run() { print("PASS \(name)") }
             else { print("FAIL \(name)"); failed += 1 }
         }
         if failed > 0 { exit(1) }
@@ -435,10 +456,12 @@ enum SelfTestMain {
         } catch { print("总览渲染失败：\(error)"); return false }
     }
 
-    @MainActor private static func renderPanel() -> Bool {
+    @MainActor private static func renderPanel() async -> Bool {
         guard let path = ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] else { return false }
         let directory = URL(fileURLWithPath: path, isDirectory: true)
         let state = PanelPreviewRenderer.syntheticState()
+        state.networkModel?.checkEgressIP()
+        while state.networkModel?.isCheckingEgress == true { await Task.yield() }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             for tab in PanelTab.allCases {
@@ -456,6 +479,16 @@ enum SelfTestMain {
                     guard let data = PanelPreviewRenderer.png(state: state, dark: dark) else { return false }
                     try data.write(to: directory.appendingPathComponent("panel-quota-\(provider.rawValue)-\(dark ? "dark" : "light").png"))
                 }
+            }
+            let networkFailure = PanelPreviewRenderer.syntheticState()
+            networkFailure.selectedTab = .network
+            networkFailure.networkModel = PanelPreviewRenderer.networkModel(failure: true, now: networkFailure.now())
+            networkFailure.networkTone = .red
+            networkFailure.networkModel?.checkEgressIP()
+            while networkFailure.networkModel?.isCheckingEgress == true { await Task.yield() }
+            for dark in [false, true] {
+                guard let data = PanelPreviewRenderer.png(state: networkFailure, dark: dark) else { return false }
+                try data.write(to: directory.appendingPathComponent("panel-network-failure-\(dark ? "dark" : "light").png"))
             }
             let alert = PanelPreviewRenderer.syntheticState(alert: true)
             for dark in [false, true] {
