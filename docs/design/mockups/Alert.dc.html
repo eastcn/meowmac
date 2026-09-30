@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>MeowMac 提醒状态</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,"SF Pro Text","PingFang SC",system-ui,sans-serif;color:#1D1D1F;-webkit-font-smoothing:antialiased}
+a{color:#0A6CFF}a:hover{color:#0050C8}
+</style>
+</helmet>
+<div style="width: 360px; height: 720px; box-sizing: border-box; background: linear-gradient(rgba(250,250,252,0.74), rgba(250,250,252,0.74)), linear-gradient(135deg, #9DB4F0 0%, #D3B5EC 55%, #F5C3CF 100%); display: flex; flex-direction: column; font-variant-numeric: tabular-nums;">
+
+  <!-- 总览条第 1 行：提醒 -->
+  <div style="display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px 16px;">
+    <svg width="30" height="19" viewBox="0 0 44 28" aria-hidden="true" style="flex-shrink: 0;">
+      <g fill="#FF9500" stroke="#FF9500" stroke-linecap="round">
+        <path d="M9 15 C9 10.5 14 9 20 9.5 C25 10 28 10.5 29.5 12 L30 17 C28 19.5 23 20 18 19.8 C12.5 19.6 9 18.5 9 15 Z" stroke="none"></path>
+        <circle cx="31.5" cy="11.5" r="4.6" stroke="none"></circle>
+        <path d="M28.4 8.6 L29.2 4 L32 7.2 Z M32.2 7 L35 3.8 L35.6 8.8 Z" stroke="none"></path>
+        <path d="M9.5 13.5 C6 12.5 3.8 10.2 4.4 6.2" fill="none" stroke-width="2.2"></path>
+        <path d="M27 18 L32 23" fill="none" stroke-width="2.4"></path>
+        <path d="M25 18.5 L29 24" fill="none" stroke-width="2.4"></path>
+        <path d="M13 18.5 L7 22" fill="none" stroke-width="2.4"></path>
+        <path d="M15.5 19 L10 23.5" fill="none" stroke-width="2.4"></path>
+      </g>
+      <path d="M0.6 16 H3.2 M0 19.5 H2.6 M0.6 23 H3.2" fill="none" stroke="#FF9500" stroke-width="1.3" stroke-linecap="round"></path>
+    </svg>
+    <div style="font-size: 15px; font-weight: 600; color: #B25000;">提醒</div>
+    <div style="flex-grow: 1;"></div>
+    <span style="font-size: 11px; font-weight: 600; color: #B25000; border: 1px solid rgba(178,80,0,0.35); border-radius: 10px; padding: 1px 8px;">建议降温</span>
+  </div>
+
+  <!-- 提醒说明 -->
+  <div style="margin: 0 16px 12px 16px; background: rgba(255,149,0,0.14); border: 1px solid rgba(255,149,0,0.25); border-radius: 14px; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start;">
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><circle cx="9" cy="9" r="8.5" fill="#FF9500"></circle><path d="M9 4.5 V10" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path><circle cx="9" cy="13" r="1.2" fill="#FFFFFF"></circle></svg>
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 13px; font-weight: 600;">BTLEServer 持续占满 1 个核心，已 35 分钟</div>
+      <div style="font-size: 12px; color: #5C3A10;">建议用 AI 诊断。另有 1 项问题，见下方。</div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0 16px 12px 16px;">
+    <div style="background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 2px rgba(20,20,60,0.06); border-radius: 12px; padding: 8px 8px; display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 11px; color: #55555C;">CPU</div>
+      <div style="font-size: 15px; font-weight: 600;">71%</div>
+      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16);"><div style="width: 71%; height: 3px; border-radius: 2px; background: #0A84FF;"></div></div>
+    </div>
+    <div style="background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 2px rgba(20,20,60,0.06); border-radius: 12px; padding: 8px 8px; display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 11px; color: #55555C; display: flex; align-items: baseline; white-space: nowrap;"><span style="flex-grow: 1;">内存</span><span style="font-size: 10px;">12/16G</span></div>
+      <div style="font-size: 15px; font-weight: 600;">73%</div>
+      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16);"><div style="width: 73%; height: 3px; border-radius: 2px; background: #34C759;"></div></div>
+    </div>
+    <div style="background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 2px rgba(20,20,60,0.06); border-radius: 12px; padding: 8px 8px; display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 11px; color: #55555C;">Claude 5h</div>
+      <div style="font-size: 15px; font-weight: 600;">剩 62%</div>
+      <div style="height: 3px; border-radius: 2px; background: rgba(120,120,160,0.16);"><div style="width: 62%; height: 3px; border-radius: 2px; background: #34C759;"></div></div>
+    </div>
+    <div style="background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 2px rgba(20,20,60,0.06); border-radius: 12px; padding: 8px 8px; display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 11px; color: #55555C; display: flex; align-items: baseline; white-space: nowrap;"><span style="flex-grow: 1;">网络</span><span style="font-size: 10px;">↑320K</span></div>
+      <div style="font-size: 15px; font-weight: 600; white-space: nowrap;">↓2.4M</div>
+      <div style="height: 3px; border-radius: 2px; background: #34C759;"></div>
+    </div>
+  </div>
+
+  <div style="padding: 0 16px 12px 16px;">
+    <div style="display: flex; gap: 2px; background: rgba(120,120,160,0.12); border-radius: 999px; padding: 3px;">
+      <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: rgba(255,255,255,0.85); box-shadow: 0 1px 3px rgba(20,20,60,0.12), inset 0 1px 0 rgba(255,255,255,0.9); font: inherit; font-size: 13px; font-weight: 600; color: #1D1D1F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #FF9500;"></span>系统</button>
+      <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: transparent; font: inherit; font-size: 13px; color: #3A3A3F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #34C759;"></span>额度</button>
+      <button type="button" style="flex-grow: 1; height: 28px; border: none; border-radius: 999px; background: transparent; font: inherit; font-size: 13px; color: #3A3A3F; display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #34C759;"></span>网络</button>
+    </div>
+  </div>
+
+  <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 16px; padding: 14px 16px; overflow: hidden;">
+
+    <!-- 能耗诊断：有问题时置顶 -->
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="font-size: 13px; font-weight: 600;">能耗诊断</div>
+      <div style="background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 2px rgba(20,20,60,0.06); border-radius: 14px; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px;">
+          <span style="width: 8px; height: 8px; border-radius: 4px; background: #FF9500; flex-shrink: 0;"></span>
+          <div style="flex-grow: 1;">
+            <div style="font-size: 13px;">BTLEServer</div>
+            <div style="font-size: 11px; color: #55555C;">失控进程 · 系统服务</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 13px; font-weight: 600; color: #B25000;">100%</div>
+            <div style="font-size: 11px; color: #55555C;">35 分钟</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid rgba(0,0,0,0.06);">
+          <span style="width: 8px; height: 8px; border-radius: 4px; background: #FF9500; flex-shrink: 0;"></span>
+          <div style="flex-grow: 1;">
+            <div style="font-size: 13px;">ExampleSync</div>
+            <div style="font-size: 11px; color: #55555C;">阻止系统休眠</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 13px; font-weight: 600; color: #B25000;">3 小时 12 分</div>
+            <div style="font-size: 11px; color: #55555C;">超过 2 小时</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
+
+    <!-- 联动图：fair 时段更长 -->
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: center;">
+        <div style="font-size: 13px; font-weight: 600; flex-grow: 1;">负载、内存、功耗与温度</div>
+        <div style="display: flex; background: rgba(120,120,160,0.12); border-radius: 999px; padding: 2px; gap: 2px;">
+          <button type="button" style="border: none; background: transparent; font: inherit; font-size: 11px; color: #3A3A3F; padding: 2px 10px; border-radius: 999px;">15 分钟</button>
+          <button type="button" style="border: none; background: rgba(255,255,255,0.85); font: inherit; font-size: 11px; font-weight: 600; color: #1D1D1F; padding: 2px 10px; border-radius: 999px; box-shadow: 0 1px 2px rgba(20,20,60,0.12);">1 小时</button>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="width: 72px; flex-shrink: 0;">
+          <div style="font-size: 11px; color: #55555C;">CPU</div>
+          <div style="font-size: 13px; font-weight: 600; color: #0A6CFF;">71%</div>
+        </div>
+        <svg width="240" height="30" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="CPU 最近 1 小时">
+          <rect x="100" y="0" width="140" height="36" fill="rgba(255,149,0,0.12)"></rect>
+          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)"></line>
+          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#0A84FF" stroke-width="1.6" stroke-linejoin="round" points="0,27 10,27.6 20,26.8 30,27.2 40,26.5 50,27 60,26.4 70,20 80,13 90,12.4 100,12 110,11.6 120,12.2 130,11.4 140,12 150,11.2 160,11.8 170,12.4 180,11.6 190,12 200,11.4 210,12 220,11.8 230,11.3 240,11.3"></polyline>
+        </svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="width: 72px; flex-shrink: 0;">
+          <div style="font-size: 11px; color: #55555C;">内存已用</div>
+          <div style="font-size: 13px; font-weight: 600; color: #0E7C8C;">73%</div>
+        </div>
+        <svg width="240" height="30" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="内存已用最近 1 小时">
+          <rect x="100" y="0" width="140" height="36" fill="rgba(255,149,0,0.12)"></rect>
+          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)"></line>
+          <polygon fill="rgba(26,154,174,0.12)" points="0,36 0,12.6 20,12.6 40,12.2 60,12.2 80,11.9 100,11.6 120,11.3 140,11 160,11 180,10.6 200,10.6 220,10.6 240,10.6 240,36"></polygon>
+          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#1A9AAE" stroke-width="1.6" stroke-linejoin="round" points="0,12.6 20,12.6 40,12.2 60,12.2 80,11.9 100,11.6 120,11.3 140,11 160,11 180,10.6 200,10.6 220,10.6 240,10.6"></polyline>
+        </svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="width: 72px; flex-shrink: 0;">
+          <div style="font-size: 11px; color: #55555C;">整机功耗</div>
+          <div style="font-size: 13px; font-weight: 600; color: #B25000;">27 W</div>
+        </div>
+        <svg width="240" height="30" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="整机功耗最近 1 小时">
+          <rect x="100" y="0" width="140" height="36" fill="rgba(255,149,0,0.12)"></rect>
+          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)"></line>
+          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#FF9500" stroke-width="1.6" stroke-linejoin="round" points="0,26.4 10,26.8 20,26 30,26.6 40,26.2 50,26.8 60,25.8 70,19 80,13.4 90,12.8 100,12.6 110,12 120,12.8 130,12.2 140,12.6 150,11.8 160,12.4 170,12.8 180,12 190,12.6 200,12.2 210,12.4 220,12 230,12.4 240,12.4"></polyline>
+        </svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="width: 72px; flex-shrink: 0;">
+          <div style="font-size: 11px; color: #55555C;">电池温度</div>
+          <div style="font-size: 13px; font-weight: 600; color: #8A3FC7;">39.6°C</div>
+        </div>
+        <svg width="240" height="30" viewBox="0 0 240 36" preserveAspectRatio="none" aria-label="电池温度最近 1 小时">
+          <rect x="100" y="0" width="140" height="36" fill="rgba(255,149,0,0.12)"></rect>
+          <line x1="0" y1="35.5" x2="240" y2="35.5" stroke="rgba(0,0,0,0.08)"></line>
+          <polyline fill="none" vector-effect="non-scaling-stroke" stroke="#A05EDB" stroke-width="1.6" stroke-linejoin="round" points="0,24 10,24 20,23.9 30,24 40,23.8 50,23.9 60,23.6 70,22.4 80,20.6 90,18.8 100,17.2 110,15.8 120,14.6 130,13.6 140,12.8 150,12.2 160,11.8 170,11.4 180,11.2 190,11 200,10.8 210,10.7 220,10.6 230,10.6 240,10.6"></polyline>
+        </svg>
+      </div>
+      <div style="display: flex; padding-left: 88px; font-size: 10px; color: #55555C;">
+        <div style="flex-grow: 1;">60 分钟前</div>
+        <div style="flex-grow: 1; text-align: center;">30 分钟前</div>
+        <div style="flex-grow: 1; text-align: right;">现在</div>
+      </div>
+      <div style="font-size: 11px; color: #55555C;">热状态 fair 已持续 31 分钟，达到“建议降温”条件。</div>
+    </div>
+  </div>
+
+  <div style="height: 1px; background: rgba(60,60,90,0.1);"></div>
+  <div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px;">
+    <button type="button" style="border: none; background: transparent; font: inherit; font-size: 13px; color: #1D1D1F; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 999px;">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M13 8 A5 5 0 1 1 11.5 4.5"></path><path d="M13 2.5 V5 H10.5"></path></svg>刷新
+    </button>
+    <div style="font-size: 11px; color: #55555C; flex-grow: 1;">额度 12 分钟前</div>
+    <button type="button" style="border: none; background: transparent; font: inherit; font-size: 13px; color: #1D1D1F; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 999px;">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5 V3.2 M8 12.8 V14.5 M1.5 8 H3.2 M12.8 8 H14.5 M3.4 3.4 L4.6 4.6 M11.4 11.4 L12.6 12.6 M3.4 12.6 L4.6 11.4 M11.4 4.6 L12.6 3.4" stroke-linecap="round"></path></svg>设置
+      <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="#55555C" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 3 L4 5.5 L6.5 3"></path></svg>
+    </button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

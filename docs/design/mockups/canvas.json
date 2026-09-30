@@ -1,0 +1,23 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Alert.dc.html": {"h": 720, "radius": 12, "title": "提醒状态：失控进程", "w": 360, "x": 1320, "y": 0},
+    "Main.dc.html": {"h": 720, "radius": 12, "title": "系统页（默认）", "w": 360, "x": 0, "y": 0},
+    "MenuBar.dc.html": {"h": 460, "title": "菜单栏猫", "w": 1680, "x": 0, "y": 1080},
+    "Network.dc.html": {"h": 720, "radius": 12, "title": "网络页", "w": 360, "x": 880, "y": 0},
+    "Quota.dc.html": {"h": 900, "radius": 12, "title": "额度页（完整长度，面板里超出部分滚动）", "w": 360, "x": 440, "y": 0},
+    "Settings.dc.html": {"h": 200, "radius": 10, "title": "设置菜单（点开后）", "w": 260, "x": 1760, "y": 420}
+  },
+  "createdOnFiles": {"at": "2026-09-30T10:00:00Z", "v": 1},
+  "designSystems": [],
+  "launch": {"view": "canvas"},
+  "notes": {
+    "dataNote": {"text": "画板里的数字、进程名和 IP 都是示例。IP 用 203.0.113.0/24 文档网段。", "w": 280, "x": 1760, "y": 0},
+    "rowCat": {"text": "菜单栏猫：18pt 高的模板图。正常 5 帧循环，帧间隔随负载在 0.5 秒到 0.05 秒之间变化；提醒是整只猫变橙色，速度仍随负载变化；严重换成红色趴姿单帧，停止动画。颜色表示状态，速度表示负载。", "w": 280, "x": 1760, "y": 1080},
+    "rowPanels": {"kind": "title1", "maxW": 1680, "text": "面板：总览条 + 标签页 + 底部操作", "w": 240, "x": 0, "y": -300}
+  },
+  "order": ["Main.dc.html", "Quota.dc.html", "Network.dc.html", "Alert.dc.html", "MenuBar.dc.html", "Settings.dc.html"],
+  "pages": [],
+  "title": "MeowMac 设计稿"
+}

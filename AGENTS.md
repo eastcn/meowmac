@@ -11,7 +11,8 @@ MeowMac 是一个 macOS 菜单栏应用。菜单栏里有一只猫：跑得快�
 1. 本文件。
 2. `docs/DECISIONS.md`：已定的产品和技术决策。实现必须符合它。
 3. `docs/ROADMAP.md`：阶段划分。
-4. 当前阶段的 relay 目录：`docs/plans/<YYYY-MM-DD>-<slug>/plan.md` 和同目录的 `result.md`。`plan.md` 是当前任务的唯一状态源。
+4. 做界面相关的条目时：`docs/design/SPEC.md` 和 `docs/design/mockups/` 里的设计稿。
+5. 当前阶段的 relay 目录：`docs/plans/<YYYY-MM-DD>-<slug>/plan.md` 和同目录的 `result.md`。`plan.md` 是当前任务的唯一状态源。
 
 relay 目录固定为 `docs/plans/<YYYY-MM-DD>-<slug>/`。
 
@@ -23,7 +24,7 @@ relay 目录固定为 `docs/plans/<YYYY-MM-DD>-<slug>/`。
 
 ## 技术栈与目录
 
-- SwiftPM + Command Line Tools，不使用 Xcode 工程。本机 CLT 是 Swift 5.10、macOS SDK 14.4，不要用更新版本才有的语言特性和 API。
+- SwiftPM + Command Line Tools，不使用 Xcode 工程。CLT 要带 macOS 26 SDK（D33），版本以 `swift --version` 和 `xcrun --show-sdk-version` 的实测结果为准。macOS 26 才有的 API 必须用 `#available(macOS 26, *)` 包裹，并给 macOS 14～15 留退路。`Package.swift` 的 `swift-tools-version` 保持 5.10，不切换到 Swift 6 语言模式。
 - 最低系统 macOS 14。
 - 不引入第三方依赖。唯一的外部包是本地的 TunCanary：`.package(path: "../tuncanary")`，即 `~/projects/eastcn/tuncanary`。
 - 测试用自带的测试运行器 `MeowMacSelfTest`，写法参照 TunCanary 的 `TunCanarySelfTest`。CLT 没有 XCTest。

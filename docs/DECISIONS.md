@@ -14,7 +14,7 @@
 - 以 MacTools 为宿主写插件：它的功能覆盖面广，但每项都做得比较浅；编译需要 Xcode；第三方插件只能由同一 Team ID 签名的宿主加载；插件 ABI 从 v2 变到 v7。
 - 合并 Mole 的代码：Mole 是 GPL-3.0，而且它在 M5 上读不到 CPU 温度和风扇转速。
 
-**D2　技术栈。** SwiftPM + Command Line Tools，不安装 Xcode。最低 macOS 14。ad-hoc 签名，安装到 `~/Applications/MeowMac.app`。
+**D2　技术栈。** SwiftPM + Command Line Tools，不安装 Xcode。最低 macOS 14。ad-hoc 签名，安装到 `~/Applications/MeowMac.app`。2026-09-30 补充：Command Line Tools 升级到带 macOS 26 SDK 的版本，以便使用液态玻璃（D33）。升级由用户执行。
 
 **D3　仓库与标识。** 仓库在 `~/projects/eastcn/meowmac`，bundle id 为 `io.github.eastcn.meowmac`。先只建本地仓库，推送到 GitHub 的 `eastcn/meowmac` 需要用户单独授权。TunCanary 先移到 `~/projects/eastcn/tuncanary`，MeowMac 用 `.package(path: "../tuncanary")` 依赖它。
 
@@ -24,7 +24,7 @@
 
 ## 数据源
 
-**D5　网络。** 通过 SwiftPM 依赖 TunCanary 的库。v0.1 直接嵌入它的 `MonitorController` 和 `PopoverRootView`。TunCanary 保持公开，进入维护模式，今后作为网络检测引擎，新的网络检测能力写进 TunCanary。
+**D5　网络。** 通过 SwiftPM 依赖 TunCanary 的库。v0.1 直接嵌入它的 `MonitorController` 和 `PopoverRootView`。2026-09-30 修改：网络页改由 MeowMac 自己画，读取 `AppModel` 的公开数据，不再嵌入 `PopoverRootView`，见 D35。TunCanary 保持公开，进入维护模式，今后作为网络检测引擎，新的网络检测能力写进 TunCanary。
 
 **D6　额度。** 调用 CodexBarCLI，只用 DeepSeek、Codex、Claude 和 OpenCodeGo 这 4 个渠道。CodexBar.app 不再常驻。计费数据来自 `cost --breakdown --json`，只有 Claude 和 Codex 有。
 
@@ -51,7 +51,7 @@
 | 档位 | 形态 |
 | --- | --- |
 | 正常 | 奔跑，速度随负载变化 |
-| 提醒 | 照常奔跑，换配色或加一个小标记 |
+| 提醒 | 照常奔跑，整只猫变成橙色（2026-09-30 确定） |
 | 严重 | 停下来，不再按负载调速 |
 
 同一时间只显示最严重的一档。v0.1 用代码画的剪影，三档靠颜色区分；正式美术放到 v0.2。
@@ -94,7 +94,7 @@
 **D18　总览条。**
 
 - 第 1 行：当前档位、最严重的问题、降温标记。点击问题跳到对应标签页。一切正常时显示“一切正常”和最近刷新时间。
-- 第 2 行：CPU、内存压力、一个可选的额度窗口、网络状态灯。额度窗口默认是 Claude 的 5 小时窗口，默认显示剩余，也可以改成已用。
+- 第 2 行：CPU、内存压力、一个可选的额度窗口、网络状态灯。额度窗口默认是 Claude 的 5 小时窗口，默认显示剩余，也可以改成已用。2026-09-30 修改：4 块都显示数字。内存显示已用百分比和已用/总量，压力只用横线颜色表示；网络显示实时下行和上行速率，结论只用横线颜色表示。细则见 `docs/design/SPEC.md`。
 
 **D19　布局以卡片为单位。** 卡片用代码实现，遵守同一个 `Card` 协议。标签页只是卡片的分组，由配置文件决定。卡片内部显示什么，由卡片自己的设置决定。
 
@@ -123,6 +123,26 @@
 
 **D31　AI 模块。** 以后有其他用户时，再考虑内置 AI 诊断模块。
 
+## 设计（2026-09-30 确定）
+
+v0.1 第一轮交付的界面不合格，原因是规划里没有视觉要求。这一节补上。
+
+**D32　设计稿是实现依据。** 设计稿源文件在 `docs/design/mockups/`，规范在 `docs/design/SPEC.md`。界面实现以这两份为准，和设计稿不一致的地方视为缺陷。风格参照 CodexBar：分节平铺，细进度条，次要信息靠右，用灰色。
+
+**D33　液态玻璃。** 用 macOS 26 SDK 编译，使用系统的液态玻璃材质；macOS 14～15 退回普通材质。代码用 `#available(macOS 26, *)` 区分。否决的方案：保持 SDK 14.4，用 `NSVisualEffectView` 模拟，因为效果和系统里的其他软件不一致。
+
+**D34　额度页的内容。** 在窗口和花费之外，增加账号和套餐、节奏预估（进度条上的刻度和文字）、可重置次数、用量趋势（长周期折线，5 小时窗口画成每个窗口的峰值柱状图）和本地存储。本地存储只显示大小和“在访达中显示”，不提供删除，理由同 D10。
+
+**D35　网络页自己画。** 读取 TunCanary `AppModel` 的公开数据，用 MeowMac 的视觉重新呈现，不修改 TunCanary。
+
+**D36　菜单栏猫。** v0.1 用设计稿里的矢量版；v0.2 做猫配置时再细致打磨，或者换成 AI 绘制的素材。负载不低于 0.7 时加三道速度线。
+
+**D37　渠道 logo。** 用 CodexBar 仓库里的 `ProviderIcon-*.svg`。logo 是各公司的商标，公开发布时在 README 里注明。
+
+**D38　设置入口。** 底部“设置”按钮弹出菜单，v0.1 不做设置窗口，阈值等配置通过“打开配置文件…”修改。
+
+**D39　两个实现对比。** v0.1 视觉返工用同一份 plan 和同一份提示词，由 GPT 和 Opus 在各自的分支上分别实现，用户比较后选一版合入 `main`。
+
 ## 附录：已验证的事实
 
 以下事实在 2026-09-29 于作者的 MacBook Pro（Apple M5，16 GB，macOS 26.6.2）上验证。
@@ -148,4 +168,5 @@
 **TunCanary。**
 
 - `MonitorController` 和 `AppModel` 是 `public` 的。界面层只公开了整个弹窗 `PopoverRootView`，7 个卡片视图是 `internal`。
+- `AppModel` 的 `overall`、`local`、`siteHistory`、`egressResults`、`egressState`、`lastCheckedAt` 是 `public` 的（2026-09-30 核实）。这些类型内部的字段能否在 TunCanary 外面读到，实现时再逐个核对。
 - `SettingsStore()` 在当前 bundle id 不是 TunCanary 时，使用 `UserDefaults(suiteName: "io.github.eastcn.tuncanary")`，所以嵌入后读到的是用户现有的 TunCanary 设置。
