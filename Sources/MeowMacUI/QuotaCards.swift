@@ -4,6 +4,9 @@ import MeowMacCore
 
 public struct QuotaWindowDisplay: Codable {
     public let window: QuotaWindow
+    public let remainingPercent: Double
+    public let windowMinutes: Int?
+    public let name: String
     public let pace: QuotaPace?
     public let level: HealthLevel
     public let resetText: String?
@@ -19,7 +22,7 @@ public extension PanelState {
     func displayedWindows(_ provider: QuotaProvider) -> [QuotaWindowDisplay] {
         (quotas[provider]?.windows ?? []).map { window in
             let pace = QuotaPace.calculate(window: window, now: now())
-            return QuotaWindowDisplay(window: window, pace: pace, level: Design.quotaLevel(window.remainingPercent),
+            return QuotaWindowDisplay(window: window, remainingPercent: window.remainingPercent, windowMinutes: window.effectiveWindowMinutes, name: window.displayName, pace: pace, level: Design.quotaLevel(window.remainingPercent),
                 resetText: window.resetsAt.map { DisplayDate.format($0, pattern: "M/d HH:mm") + " 重置" },
                 paceText: pace.map { value in
                     if value.exhaustsBeforeReset, let seconds = value.secondsUntilExhaustion {
@@ -130,18 +133,16 @@ struct QuotaTrendView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Design.rowGap) {
             SectionHeading(title: "用量趋势", detail: "MeowMac 采样")
-            ForEach((state.quotas[provider]?.windows ?? []).filter { ($0.effectiveWindowMinutes ?? 0) > 300 && $0.resetsAt != nil }, id: \.identifier) { window in
-                if let minutes = window.effectiveWindowMinutes, let reset = window.resetsAt {
-                    let start = reset.addingTimeInterval(Double(-minutes * 60))
-                    let history = QuotaHistorySeries.currentCycle(state.quotaHistory[provider] ?? [], window: window, now: state.now())
+            ForEach(state.quotaCycles(provider), id: \.window.identifier) { cycle in
+                    let window = cycle.window, reset = cycle.reset, start = cycle.start
+                    let history = cycle.points
                     HStack { Text("\(window.displayName) · 从重置到重置，累计已用"); Spacer(minLength: 0); Text("已用 \(Int(window.usedPercent.rounded()))%") }.font(Design.caption).foregroundStyle(Design.secondary)
                     MiniLineGraph(points: history.map { GraphValue(date: $0.sampledAt, value: $0.usedPercent) }, domain: start...reset, range: 0...100, color: Design.blue, fill: true, pace: true, now: state.now(), height: Design.cycleHeight)
                     HStack { Text(DisplayDate.format(start, pattern: "M/d") + " 重置"); Spacer(); Text("现在"); Spacer(); Text(DisplayDate.format(reset, pattern: "M/d") + " 重置") }.font(Design.tiny).foregroundStyle(Design.secondary)
                     Text("匀速用完的节奏：曲线在虚线上方就是用得偏快").font(Design.tiny).foregroundStyle(Design.secondary)
-                }
             }
             if state.quotas[provider]?.windows.contains(where: { $0.effectiveWindowMinutes == 300 }) == true {
-                let peaks = QuotaHistorySeries.peaks(state.quotaHistory[provider] ?? [], now: state.now())
+                let peaks = state.quotaPeaks(provider)
                 Text("5 小时窗口 · 每个窗口的最高已用").font(Design.caption).foregroundStyle(Design.secondary)
                 MiniColumns(values: peaks.map(\.usedPercent), colors: peaks.map { $0.isCurrent ? Design.blue.opacity(Design.currentPeakFill) : $0.usedPercent > 80 ? Design.orange : Design.blue.opacity(Design.peakFill) }, maximum: 100)
                 HStack { Text(DisplayDate.format(state.now().addingTimeInterval(-6 * 86400), pattern: "M/d")); Spacer(); Text(DisplayDate.format(state.now().addingTimeInterval(-3 * 86400), pattern: "M/d")); Spacer(); Text("今天") }.font(Design.tiny).foregroundStyle(Design.secondary)

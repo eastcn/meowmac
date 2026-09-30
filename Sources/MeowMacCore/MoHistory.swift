@@ -1,6 +1,6 @@
 import Foundation
 
-public struct CleaningRecord {
+public struct CleaningRecord: Codable {
     public let startedAt: Date
     public let sizeDescription: String
     public init(startedAt: Date, sizeDescription: String) {

@@ -53,6 +53,17 @@ enum SelfTestMain {
             ("Core.System/mo 清理历史", { SelfTestMain.moHistory() }),
         ]
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }
+        tests.append(("UI.Snapshot/六部分与关键字段编码", { @MainActor in
+            let state = PanelPreviewRenderer.syntheticState(quotaAlert: true)
+            do {
+                let data = try JSONEncoder().encode(PanelSnapshot(state: state))
+                guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], object.count == 6,
+                    let quota = object["quota"] as? [[String: Any]], let codex = quota.first(where: { $0["provider"] as? String == "codex" }),
+                    let windows = codex["windows"] as? [[String: Any]] else { return false }
+                return Set(object.keys) == Set(["overview", "tabs", "system", "quota", "network", "cat"]) && windows.count == 2
+                    && windows[1]["remainingPercent"] as? Double == 30 && windows[1]["pace"] != nil && codex["resetCredits"] != nil && codex["storage"] != nil && codex["cost"] != nil
+            } catch { print("快照编码失败：\(error)"); return false }
+        }))
         tests.append(("UI.Cat/减少动态与速度线", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(alert: true)
             let cat = state.catDisplay(reducedMotion: true)

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ProcessEnergy: Equatable {
+public struct ProcessEnergy: Equatable, Codable {
     public let pid: Int32
     public let name: String
     public let cpuPercent: Double
@@ -31,7 +31,7 @@ public enum TopParser {
     }
 }
 
-public struct SleepAssertion: Equatable {
+public struct SleepAssertion: Equatable, Codable {
     public let pid: Int32
     public let type: String
     public let startedAt: Date
@@ -54,7 +54,7 @@ public struct SleepAssertion: Equatable {
     }
 }
 
-public struct EnergyDiagnosis {
+public struct EnergyDiagnosis: Codable {
     public let topFive: [ProcessEnergy]
     public let runaway: [ProcessEnergy]
     public let longAssertions: [SleepAssertion]

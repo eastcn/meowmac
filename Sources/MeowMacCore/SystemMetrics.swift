@@ -53,7 +53,7 @@ public struct ByteCounters: Equatable {
     }
 }
 
-public struct BatteryMetrics: Equatable {
+public struct BatteryMetrics: Equatable, Codable {
     public let temperatureCelsius: Double?
     public let systemPowerWatts: Double?
 
@@ -69,7 +69,7 @@ public struct BatteryMetrics: Equatable {
     }
 }
 
-public struct SystemSnapshot {
+public struct SystemSnapshot: Codable {
     public let timestamp: Date
     public let cpuUsage: Double?
     public let memoryPressure: MemoryPressure
@@ -105,7 +105,7 @@ public struct SystemSnapshot {
     }
 }
 
-public struct ChartPoint: Identifiable {
+public struct ChartPoint: Identifiable, Codable {
     public var id: Date { timestamp }
     public let timestamp: Date
     public let cpuUsage: Double?

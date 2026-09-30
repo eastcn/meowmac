@@ -4,7 +4,7 @@ import IOKit.pwr_mgt
 import MeowMacCore
 
 public enum EnergySampler {
-    public static func processes() throws -> [ProcessEnergy] {
+    public static func processes(rawOutput: ((Data) -> Void)? = nil) throws -> [ProcessEnergy] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/top")
         process.arguments = ["-l", "2", "-s", "1", "-o", "power", "-n", "10", "-stats", "pid,command,cpu,power"]
@@ -14,6 +14,7 @@ public enum EnergySampler {
         try process.run()
         let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
+        rawOutput?(data)
         guard process.terminationStatus == 0, let text = String(data: data, encoding: .utf8),
               let parsed = TopParser.secondSample(text) else { throw CocoaError(.fileReadCorruptFile) }
         return parsed.map { item in

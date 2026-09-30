@@ -25,12 +25,13 @@ public final class CodexBarClient {
         }
     }
 
+    private let rawOutput: (([String], Data, Data) -> Void)?
     private let executable: URL
     private let logger = Logger(subsystem: AppIdentity.bundleID, category: "quota")
     private let lock = NSLock()
     private var running = false
 
-    public init(path: String) { self.executable = URL(fileURLWithPath: path) }
+    public init(path: String, rawOutput: (([String], Data, Data) -> Void)? = nil) { self.executable = URL(fileURLWithPath: path); self.rawOutput = rawOutput }
 
     public func dashboard() throws -> (snapshots: [QuotaProvider: QuotaSnapshot], errors: [QuotaProvider: String]) {
         let data = try run(["dashboard", "--timeout", "60", "--identity", "redacted"])
@@ -94,6 +95,7 @@ public final class CodexBarClient {
         }
         lock.lock(); running = false; lock.unlock()
         let (data, errors) = output.read()
+        rawOutput?(arguments, data, errors)
         if !errors.isEmpty, let message = String(data: errors, encoding: .utf8) {
             logger.warning("CLI stderr：\(message, privacy: .private)")
         }
