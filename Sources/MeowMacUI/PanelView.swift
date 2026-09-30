@@ -155,7 +155,7 @@ public struct PanelView: View {
         VStack(alignment: .leading, spacing: Design.sectionGap) {
             switch state.selectedTab {
             case .system:
-                SystemChartCard(state: state); SectionRule(); EnergyCard(state: state); SectionRule(); DiskCard(state: state)
+                DiagnosisCard(state: state); SystemChartCard(state: state); SectionRule(); EnergyCard(state: state); SectionRule(); DiskCard(state: state)
             case .quota:
                 QuotaProvidersCard(state: state); SectionRule(); CostCard(state: state)
             case .network:

@@ -84,8 +84,9 @@ public final class SystemCollector {
     }
 
     public static func diskCapacity() -> (available: Int64?, total: Int64?) {
-        let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey])
-        return (values?.volumeAvailableCapacityForImportantUsage, values?.volumeTotalCapacity.map(Int64.init))
+        var value = statfs()
+        guard statfs("/", &value) == 0 else { return (nil, nil) }
+        return (Int64(value.f_bavail) * Int64(value.f_bsize), Int64(value.f_blocks) * Int64(value.f_bsize))
     }
 
     public static func networkCounters() -> ByteCounters? {

@@ -37,6 +37,6 @@ public enum EnergySampler {
               let value = raw?.takeRetainedValue() else { throw CocoaError(.fileReadUnknown) }
         let object = value as NSDictionary
         guard let dictionary = object as? [NSNumber: [[String: Any]]] else { throw CocoaError(.fileReadCorruptFile) }
-        return SleepAssertion.parse(dictionary)
+        return SleepAssertion.parse(dictionary).map { SleepAssertion(pid: $0.pid, type: $0.type, startedAt: $0.startedAt, processName: fullName(pid: $0.pid)) }
     }
 }

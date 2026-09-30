@@ -47,7 +47,8 @@ public enum PanelPreviewRenderer {
         state.costs[.codex] = (0..<7).map { DailyCost(date: "9-\(20 + $0)", totalCost: Double($0 + 1) * 0.2) }
         state.networkModel = AppModel.preview(.firstLaunch)
         state.networkTone = .green
-        state.lastRefreshedAt = now
+        state.lastCleaning = CleaningRecord(startedAt: now.addingTimeInterval(-172800), sizeDescription: "8.4 GB")
+        state.lastRefreshedAt = now.addingTimeInterval(-60)
         return state
     }
 
@@ -88,31 +89,9 @@ public enum PanelPreviewRenderer {
     }
 
     public static func png(state: PanelState, dark: Bool) -> Data? {
-        _ = NSApplication.shared
-        let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-        let view = PanelView(state: state)
-            .frame(width: 380)
-            .background(Color(nsColor: .windowBackgroundColor))
-            .environment(\.colorScheme, dark ? .dark : .light)
-        let hosting = NSHostingView(rootView: view)
-        hosting.appearance = appearance
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 380, height: 600),
-                              styleMask: [.borderless], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.appearance = appearance
-        window.contentView = hosting
-        let size = CGSize(width: 380, height: min(600, max(300, hosting.fittingSize.height)))
-        hosting.frame = NSRect(origin: .zero, size: size)
-        window.setContentSize(size)
-        hosting.layoutSubtreeIfNeeded()
-        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2),
-                                         pixelsHigh: Int(size.height * 2), bitsPerSample: 8,
-                                         samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
-        rep.size = size
-        hosting.cacheDisplay(in: hosting.bounds, to: rep)
-        window.contentView = nil
-        window.close()
-        return rep.representation(using: .png, properties: [:])
+        let view = PanelView(state: state, expanded: true)
+        let measure = NSHostingView(rootView: view.environment(\.previewMaterial, true))
+        let height = ceil(measure.fittingSize.height)
+        return renderPNG(view, width: Design.panelWidth, height: height, dark: dark)
     }
 }

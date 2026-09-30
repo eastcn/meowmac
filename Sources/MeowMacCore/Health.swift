@@ -74,9 +74,9 @@ public enum HealthEvaluator {
             add(.warn, .system, "磁盘剩余不足")
         }
         let runaway = input.energy?.runaway ?? []
-        if !runaway.isEmpty { add(.warn, .system, "进程 CPU 持续偏高，建议用 AI 诊断") }
-        if !(input.energy?.longAssertions ?? []).isEmpty { add(.warn, .system, "进程持续阻止休眠，建议用 AI 诊断") }
-        if input.energy?.prolongedMemoryPressure == true { add(.warn, .system, "内存压力持续偏高，建议用 AI 诊断") }
+        if !runaway.isEmpty { add(.warn, .system, "进程 CPU 持续偏高") }
+        if !(input.energy?.longAssertions ?? []).isEmpty { add(.warn, .system, "进程持续阻止休眠") }
+        if input.energy?.prolongedMemoryPressure == true { add(.warn, .system, "内存压力持续偏高") }
         if let system = input.system, system.thermal == .serious || system.thermal == .critical {
             let message = runaway.isEmpty ? "温度偏高，未发现异常进程，建议降温或用 AI 诊断" : "系统已降频，建议用 AI 诊断"
             add(.warn, .system, message)

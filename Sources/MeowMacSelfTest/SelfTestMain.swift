@@ -441,6 +441,11 @@ enum SelfTestMain {
                     try data.write(to: directory.appendingPathComponent(name), options: .atomic)
                 }
             }
+            let alert = PanelPreviewRenderer.syntheticState(alert: true)
+            for dark in [false, true] {
+                guard let data = PanelPreviewRenderer.png(state: alert, dark: dark) else { return false }
+                try data.write(to: directory.appendingPathComponent("panel-system-alert-\(dark ? "dark" : "light").png"))
+            }
             state.selectedTab = .quota
             state.quotas.removeValue(forKey: .deepseek)
             state.quotaErrors[.deepseek] = "示例：服务暂时不可用"

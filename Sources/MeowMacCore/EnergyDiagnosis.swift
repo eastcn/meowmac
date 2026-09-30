@@ -35,9 +35,10 @@ public struct SleepAssertion: Equatable {
     public let pid: Int32
     public let type: String
     public let startedAt: Date
+    public let processName: String?
 
-    public init(pid: Int32, type: String, startedAt: Date) {
-        self.pid = pid; self.type = type; self.startedAt = startedAt
+    public init(pid: Int32, type: String, startedAt: Date, processName: String? = nil) {
+        self.pid = pid; self.type = type; self.startedAt = startedAt; self.processName = processName
     }
 
     public static func parse(_ byPID: [NSNumber: [[String: Any]]]) -> [SleepAssertion] {
