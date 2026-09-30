@@ -53,9 +53,18 @@ enum SelfTestMain {
             ("Core.System/mo 清理历史", SelfTestMain.moHistory),
         ]
         tests += DataTests.tests
+        tests.append(("UI.Settings/原生菜单", { @MainActor in
+            let state = PanelPreviewRenderer.syntheticState(); state.loginEnabled = true
+            let menu = SettingsMenu.make(state: state)
+            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
+                && !menu.items[3].isEnabled && menu.items[4].state == .on
+                && menu.items[2].isSeparatorItem && menu.items[5].isSeparatorItem && menu.items[7].keyEquivalent == "q"
+                && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
+        }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.RenderPreview/三个标签页", SelfTestMain.renderPanel))
             tests.append(("UI.RenderComponents/基础组件", SelfTestMain.renderComponents))
+            tests.append(("UI.RenderOverview/总览与设置", SelfTestMain.renderOverview))
         }
         let filters = CommandLine.arguments.dropFirst().map { $0.lowercased() }
         if filters.contains("--list") {
@@ -399,6 +408,23 @@ enum SelfTestMain {
             }
             return true
         } catch { print("组件渲染失败：\(error)"); return false }
+    }
+
+    @MainActor private static func renderOverview() -> Bool {
+        guard let path = ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] else { return false }
+        do {
+            let directory = URL(fileURLWithPath: path, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            for dark in [false, true] {
+                for alert in [false, true] {
+                    guard let data = PanelPreviewRenderer.overviewPNG(alert: alert, dark: dark) else { return false }
+                    try data.write(to: directory.appendingPathComponent("overview-\(alert ? "alert" : "normal")-\(dark ? "dark" : "light").png"))
+                }
+                guard let data = PanelPreviewRenderer.settingsPNG(dark: dark) else { return false }
+                try data.write(to: directory.appendingPathComponent("settings-\(dark ? "dark" : "light").png"))
+            }
+            return true
+        } catch { print("总览渲染失败：\(error)"); return false }
     }
 
     @MainActor private static func renderPanel() -> Bool {

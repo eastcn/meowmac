@@ -4,7 +4,7 @@ import MeowMacCore
 
 /// 数值来自 SPEC 和终稿画板。页面只组合这些语义组件。
 enum Design {
-    static let panelWidth: CGFloat = 360, panelHeight: CGFloat = 820
+    static let panelWidth: CGFloat = 360, panelHeight: CGFloat = 820, fixedChromeHeight: CGFloat = 190
     static let inset: CGFloat = 16, sectionGap: CGFloat = 12, metricGap: CGFloat = 14
     static let gap: CGFloat = 6, smallGap: CGFloat = 3, rowGap: CGFloat = 8, tightGap: CGFloat = 2
     static let cardRadius: CGFloat = 12, cardInset: CGFloat = 12, cardVertical: CGFloat = 10

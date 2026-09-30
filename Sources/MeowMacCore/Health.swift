@@ -1,17 +1,17 @@
 import Foundation
 
-public enum HealthLevel: Int, Comparable {
+public enum HealthLevel: Int, Comparable, Codable {
     case normal, warn, severe
     public static func < (lhs: HealthLevel, rhs: HealthLevel) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
-public enum PanelTab: String, CaseIterable {
+public enum PanelTab: String, CaseIterable, Codable {
     case system, quota, network
 }
 
-public enum NetworkTone { case green, yellow, red, gray }
+public enum NetworkTone: String, Codable { case green, yellow, red, gray }
 
-public struct HealthIssue {
+public struct HealthIssue: Codable {
     public let level: HealthLevel
     public let tab: PanelTab
     public let message: String
@@ -21,7 +21,7 @@ public struct HealthIssue {
     }
 }
 
-public struct HealthSummary {
+public struct HealthSummary: Codable {
     public let level: HealthLevel
     public let issues: [HealthIssue]
     public let coolingHint: Bool
