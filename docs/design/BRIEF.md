@@ -1,5 +1,7 @@
 # MeowMac 设计需求
 
+> 状态：已用完。GPT 按本文交付的候选稿在 `docs/design/gpt/`，合成后的终稿见 `docs/design/SPEC.md` 和 `docs/design/mockups/`（D39）。本文只作历史记录。
+
 本文交给设计者出一版视觉稿（D39）。这里只写每个界面要展示什么内容，以及有哪些约束；怎么排版、用什么视觉语言，由设计者决定。
 
 仓库里已经有一版设计稿（`docs/design/mockups/`、`docs/design/SPEC.md`）。**为了得到一版独立的方案，设计者不要打开这两处。**
