@@ -65,7 +65,7 @@ scripts/install.sh    # 安装到 ~/Applications/MeowMac.app 并启动
 ## 禁止的操作
 
 - 执行真正的清理，例如不带 `--dry-run` 的 `mo clean`。
-- 结束任何进程。
+- 结束任何进程。唯一的例外：`scripts/install.sh` 可以让正在运行的 MeowMac 自己正常退出，例如 `osascript -e 'quit app id "io.github.eastcn.meowmac"'`，不能用 `kill`。
 - 启动或修改 CodexBar.app 及其配置。只调用 `/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI`。
 - 调试时 Claude 额度的实时调用每 5 分钟最多 1 次，避免触发频率限制。
 - 开启开机启动，或者退出、修改用户正在运行的 TunCanary。
@@ -78,6 +78,7 @@ scripts/install.sh    # 安装到 ~/Applications/MeowMac.app 并启动
 - 不写入任何与用户雇主或其内部 VPN 客户端相关的内容，包括名称、路径、网段和 DNS 地址，脱敏后也不行。
 - 不提交真实环境采集的数据。测试夹具只用虚构数据，不能有真实邮箱、IP、账号和组织名。
 - 使用真实数据的截图只放在 `build/acceptance/`（已被 git 忽略），不提交。提交进仓库的预览图只用合成数据渲染。
+- 验收需要的实机原值，例如 CPU、功耗、进程名和休眠断言，也写到 `build/acceptance/`。result 里只写对比结论和偏差，例如“两边的整机功耗相差不到 5%”。
 
 ## 提交
 
