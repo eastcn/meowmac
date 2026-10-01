@@ -45,7 +45,7 @@ public enum CatRenderer {
                 let scale = min((size.width - 4 * padding) / CGFloat(bounds.width), size.height * 0.62 / CGFloat(bounds.height))
                 let width = CGFloat(bounds.width) * scale, height = CGFloat(bounds.height) * scale
                 let left = (size.width - width) / 2
-                let bottom = size.height * 0.93 - height
+                let bottom = size.height * 0.07
                 let source = NSImage(cgImage: cat.severe, size: NSSize(width: cat.severe.width, height: cat.severe.height))
                 let from = NSRect(x: bounds.x, y: cat.severe.height - bounds.y - bounds.height, width: bounds.width, height: bounds.height)
                 source.draw(in: NSRect(x: left, y: bottom, width: width, height: height), from: from, operation: .sourceOver, fraction: 1)
@@ -53,9 +53,14 @@ public enum CatRenderer {
                 context.setFillColor(NSColor.systemRed.cgColor)
                 context.fill(CGRect(origin: .zero, size: size))
                 context.setBlendMode(.normal)
-                let zzX = size.width * CGFloat(package.zzAnchorFraction)
-                let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: max(4, size.height * 0.31)), .foregroundColor: NSColor.systemRed]
-                ("zz" as NSString).draw(at: NSPoint(x: zzX, y: size.height * 0.67), withAttributes: attributes)
+                let zzX = left + width * CGFloat(package.zzAnchorFraction)
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.systemFont(ofSize: size.height * 0.24, weight: .medium),
+                    .foregroundColor: NSColor.systemRed
+                ]
+                let zz = "zz" as NSString
+                let textHeight = zz.size(withAttributes: attributes).height
+                zz.draw(at: NSPoint(x: zzX, y: size.height * 0.98 - textHeight), withAttributes: attributes)
             } else {
                 let index = display.frame(frame)
                 let part = package.frames[index]
@@ -77,12 +82,13 @@ public enum CatRenderer {
                 if display.speedLines {
                     let lineColor: NSColor = level == .warn ? .systemOrange : package.rendering == "original" ? .labelColor : .black
                     context.setStrokeColor(lineColor.cgColor)
-                    context.setLineWidth(max(0.7, size.height / 18))
+                    context.setLineWidth(padding)
                     context.setLineCap(.round)
-                    for (index, length) in [4.0, 3.0, 4.0].enumerated() {
-                        let lineY = size.height * CGFloat(0.32 + Double(index) * 0.25)
-                        context.move(to: CGPoint(x: padding, y: lineY))
-                        context.addLine(to: CGPoint(x: padding + CGFloat(length) * padding, y: lineY))
+                    let lineStart = max(padding, canvasLeft - 4 * padding)
+                    for index in 0..<3 {
+                        let lineY = size.height * CGFloat(1 - (0.55 + Double(index) * 0.16))
+                        context.move(to: CGPoint(x: lineStart, y: lineY))
+                        context.addLine(to: CGPoint(x: lineStart + 2 * padding, y: lineY))
                     }
                     context.strokePath()
                 }

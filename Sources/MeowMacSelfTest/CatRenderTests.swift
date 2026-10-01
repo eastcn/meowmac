@@ -149,4 +149,95 @@ enum CatRenderTests {
             return png(CatRenderer.image(cat: cat, display: display, frame: 0)) != nil
         } catch { print("极端几何测试失败：\(error)"); return false }
     }
+
+    static func positions() -> Bool {
+        do {
+            let cat = try CatPackageLoader.builtin("builtin.slim")
+            func display(_ level: HealthLevel, lines: Bool) -> CatDisplay {
+                CatDisplay(id: cat.id, name: cat.name, rendering: "template", level: level,
+                    load: lines ? 0.7 : 0, frameInterval: 0.5, speedLines: lines,
+                    template: level == .normal, stopped: level == .severe, reducedMotion: false)
+            }
+            guard let sleepData = png(CatRenderer.image(cat: cat, display: display(.severe, lines: false), frame: 0)),
+                  let sleep = NSBitmapImageRep(data: sleepData) else { return false }
+            var topX: [Int] = [], lowerY: [Int] = []
+            for y in 0..<sleep.pixelsHigh {
+                for x in 0..<sleep.pixelsWide where (sleep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.5 {
+                    if y <= 5 { topX.append(x) }
+                    if x >= 20 && x <= 30 { lowerY.append(y) }
+                }
+            }
+            guard !topX.isEmpty, !lowerY.isEmpty,
+                  Double(topX.reduce(0, +)) / Double(topX.count) < 39,
+                  lowerY.max()! >= 15,
+                  (sleep.colorAt(x: 25, y: 17)?.alphaComponent ?? 1) < 0.1 else { return false }
+            guard let fastData = png(CatRenderer.image(cat: cat, display: display(.normal, lines: true), frame: 0)),
+                  let fast = NSBitmapImageRep(data: fastData),
+                  let idleData = png(CatRenderer.image(cat: cat, display: display(.normal, lines: false), frame: 0)),
+                  let idle = NSBitmapImageRep(data: idleData) else { return false }
+            let changedRows = (0..<fast.pixelsHigh).filter { y in
+                (0...4).contains { x in
+                    (fast.colorAt(x: x, y: y)?.alphaComponent ?? 0) >
+                    (idle.colorAt(x: x, y: y)?.alphaComponent ?? 0) + 0.3
+                }
+            }
+            return [10, 13, 16].allSatisfy { expected in changedRows.contains { abs($0 - expected) <= 1 } } &&
+                !changedRows.contains { $0 < 8 }
+        } catch { print("猫图位置验证失败：\(error)"); return false }
+    }
+
+    static func previewSheets() -> Bool {
+        guard let root = ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] else { return true }
+        let directory = URL(fileURLWithPath: root, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            for id in CatPackageLoader.builtinIDs {
+                let cat = try CatPackageLoader.builtin(id)
+                for dark in [false, true] {
+                    let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
+                    var data: Data?
+                    appearance.performAsCurrentDrawingAppearance {
+                        let sheet = NSImage(size: CGSize(width: 300, height: 54), flipped: false) { _ in
+                            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+                            context.setFillColor(NSColor.windowBackgroundColor.cgColor)
+                            context.fill(CGRect(x: 0, y: 0, width: 300, height: 54))
+                            for row in 0..<3 {
+                                for column in 0..<6 {
+                                    let level: HealthLevel = row == 0 ? .normal : row == 1 ? .warn : .severe
+                                    if row == 2 && column > 0 { continue }
+                                    let reduced = row == 1 && column == 5
+                                    let lines = row == 0 && column == 5
+                                    let display = CatDisplay(id: cat.id, name: cat.name, rendering: cat.package.rendering,
+                                        level: level, load: lines ? 0.7 : 0.5,
+                                        frameInterval: lines ? 0.131 : 0.185, speedLines: lines,
+                                        template: level == .normal && cat.package.rendering == "template",
+                                        stopped: level == .severe, reducedMotion: reduced)
+                                    let original = CatRenderer.image(cat: cat, display: display, frame: column)
+                                    let tile = original.isTemplate ? tint(original, color: .labelColor) : original
+                                    tile.draw(in: CGRect(x: CGFloat(column) * 50, y: CGFloat(2 - row) * 18,
+                                                         width: 50, height: 18))
+                                }
+                            }
+                            return true
+                        }
+                        data = png(sheet)
+                    }
+                    guard let data else { return false }
+                    try data.write(to: directory.appendingPathComponent("\(id)-\(dark ? "dark" : "light")-sheet.png"))
+                }
+            }
+            return true
+        } catch { print("猫图汇总预览失败：\(error)"); return false }
+    }
+
+    private static func tint(_ image: NSImage, color: NSColor) -> NSImage {
+        NSImage(size: image.size, flipped: false) { _ in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            context.setBlendMode(.sourceIn)
+            context.setFillColor(color.cgColor)
+            context.fill(CGRect(origin: .zero, size: image.size))
+            return true
+        }
+    }
 }

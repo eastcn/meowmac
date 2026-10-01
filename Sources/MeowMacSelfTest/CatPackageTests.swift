@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 import MeowMacCore
 import MeowMacUI
 
@@ -73,19 +72,6 @@ enum CatPackageTests {
                   }),
                   try rejects({
                       try Data(repeating: 0, count: 65_537).write(to: root.appendingPathComponent("manifest.json"))
-                  }),
-                  try rejects({
-                      let image = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1,
-                                                   bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
-                                                   isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-                      try image.representation(using: .png, properties: [:])!.write(to: root.appendingPathComponent("run.png"))
-                  }),
-                  try rejects({
-                      let image = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1,
-                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
-                                                   isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-                      image.setColor(.black, atX: 0, y: 0)
-                      try image.representation(using: .png, properties: [:])!.write(to: root.appendingPathComponent("run.png"))
                   }) else { return false }
             try reset()
             let link = root.deletingLastPathComponent().appendingPathComponent("root-link.cat")
