@@ -133,10 +133,9 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         Task.detached { [weak self] in
             do {
                 let processes = try EnergySampler.processes()
-                let assertions = try EnergySampler.assertions()
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    self.panelState.energy = self.energyTracker.evaluate(processes: processes, assertions: assertions,
+                    self.panelState.energy = self.energyTracker.evaluate(processes: processes,
                         pressure: self.snapshot?.memoryPressure ?? .unavailable, now: Date(), config: self.configResult.config)
                     self.panelState.failures["energy"] = 0
                 }

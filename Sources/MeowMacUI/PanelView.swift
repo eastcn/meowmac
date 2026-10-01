@@ -117,16 +117,16 @@ public extension PanelState {
     }
     var overviewMetrics: [OverviewMetric] {
         let cpu = snapshot?.cpuUsage
-        let memory = snapshot?.memoryUsedFraction
+        let memory = snapshot?.memoryPressurePercent
         let usedGB = snapshot?.memoryUsedBytes.map { Int((Double($0) / 1_073_741_824).rounded()) }
         let totalGB = snapshot?.memoryTotalBytes.map { Int((Double($0) / 1_073_741_824).rounded()) }
-        let memoryDetail = usedGB.flatMap { used in totalGB.map { "\(used) / \($0) GB" } } ?? "内存用量不可用"
+        let memoryDetail = usedGB.flatMap { used in totalGB.map { "已用 \(used) / \($0) GB" } } ?? "内存用量不可用"
         let memoryLevel: HealthLevel = snapshot?.memoryPressure == .critical ? .severe : snapshot?.memoryPressure == .warn ? .warn : .normal
         let quota = quotas[.claude]?.windows.first(where: { $0.effectiveWindowMinutes == 300 })
         let remaining = quota?.remainingPercent
         return [
             OverviewMetric(title: "CPU", value: cpu.map { "\(Int(($0 * 100).rounded()))%" } ?? "—", detail: "整机负载", fraction: cpu ?? 0, level: .normal, numericValue: cpu.map { $0 * 100 }),
-            OverviewMetric(title: "内存", value: memory.map { "\(Int(($0 * 100).rounded()))%" } ?? "—", detail: memoryDetail, fraction: memory ?? 0, level: memoryLevel, numericValue: memory.map { $0 * 100 }),
+            OverviewMetric(title: "内存", value: memory.map { "\(Int($0.rounded()))%" } ?? "—", detail: memoryDetail, fraction: (memory ?? 0) / 100, level: memoryLevel, numericValue: memory),
             OverviewMetric(title: "Claude", value: remaining.map { "\(Int($0.rounded()))%" } ?? "—", detail: "5 小时 · 剩余", fraction: (remaining ?? 0) / 100, level: Design.quotaLevel(remaining ?? 0), numericValue: remaining),
             OverviewMetric(title: "网络", value: snapshot?.networkReceivedBytesPerSecond.map { "↓" + MetricFormat.rate($0) } ?? "—", detail: snapshot?.networkSentBytesPerSecond.map { "↑" + MetricFormat.rate($0) } ?? "—", fraction: 1, level: networkTone == .red ? .severe : networkTone == .yellow ? .warn : .normal, numericValue: snapshot?.networkReceivedBytesPerSecond),
         ]

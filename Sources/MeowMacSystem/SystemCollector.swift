@@ -28,7 +28,8 @@ public final class SystemCollector {
                               swapUsedBytes: Self.swapUsedBytes(), diskAvailableBytes: disk.available,
                               diskTotalBytes: disk.total, networkReceivedBytesPerSecond: rates?.received,
                               networkSentBytesPerSecond: rates?.sent, battery: Self.batteryMetrics(),
-                              thermal: Self.thermalLevel(), memoryUsedBytes: memory.used, memoryTotalBytes: memory.total)
+                              thermal: Self.thermalLevel(), memoryUsedBytes: memory.used, memoryTotalBytes: memory.total,
+                              memoryPressurePercent: Self.memoryPressurePercent())
     }
 
     public static func cpuTicks() -> CPUTicks? {
@@ -59,9 +60,26 @@ public final class SystemCollector {
         }
         let total = ProcessInfo.processInfo.physicalMemory
         guard status == KERN_SUCCESS else { return (nil, total) }
-        let pages = UInt64(statistics.active_count) + UInt64(statistics.inactive_count)
-            + UInt64(statistics.wire_count) + UInt64(statistics.compressor_page_count)
-        return (min(total, pages * UInt64(vm_kernel_page_size)), total)
+        return (Self.usedMemoryBytes(statistics, pageSize: UInt64(vm_kernel_page_size)), total)
+    }
+
+    /// 活动监视器口径：App 内存、联动内存和被压缩，不含文件缓存。
+    public static func usedMemoryBytes(_ statistics: vm_statistics64, pageSize: UInt64) -> UInt64 {
+        let internalPages = UInt64(statistics.internal_page_count)
+        let purgeable = UInt64(statistics.purgeable_count)
+        let app = internalPages - min(internalPages, purgeable)
+        return (app + UInt64(statistics.wire_count) + UInt64(statistics.compressor_page_count)) * pageSize
+    }
+
+    public static func pressurePercent(availableLevel: Int32?) -> Double? {
+        availableLevel.map { min(100, max(0, 100 - Double($0))) }
+    }
+
+    public static func memoryPressurePercent() -> Double? {
+        var level: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname("kern.memorystatus_level", &level, &size, nil, 0) == 0 else { return nil }
+        return pressurePercent(availableLevel: level)
     }
 
     public static func memoryPressure() -> MemoryPressure {

@@ -21,10 +21,6 @@ public extension PanelState {
             DiagnosisRow(pid: process.pid, name: process.name, detail: "失控进程 · 占满 \(max(1, Int((process.cpuPercent / 100).rounded()))) 个核心",
                 value: String(format: "%.0f%%", process.cpuPercent), duration: "已持续 " + MetricFormat.duration(energy.runawayDurations[process.pid] ?? configResult.config.runawaySeconds), level: .warn)
         }
-        rows += energy.longAssertions.map { assertion in
-            DiagnosisRow(pid: assertion.pid, name: assertion.processName ?? energy.topFive.first(where: { $0.pid == assertion.pid })?.name ?? "进程 \(assertion.pid)", detail: "阻止系统休眠",
-                value: MetricFormat.duration(now().timeIntervalSince(assertion.startedAt)), duration: "从 " + DisplayDate.format(assertion.startedAt, pattern: "HH:mm") + " 开始", level: .warn)
-        }
         if energy.prolongedMemoryPressure {
             rows.append(DiagnosisRow(pid: nil, name: "内存压力", detail: "内存压力持续偏高", value: snapshot?.memoryPressure == .critical ? "严重" : "偏高",
                 duration: "已持续 " + MetricFormat.duration(energy.memoryPressureDuration ?? configResult.config.memoryPressureSeconds), level: snapshot?.memoryPressure == .critical ? .severe : .warn))

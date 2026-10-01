@@ -20,16 +20,15 @@ public enum PanelPreviewRenderer {
                                           battery: BatteryMetrics(temperatureCelsius: 34 + cpu * 5,
                                                                   systemPowerWatts: 7 + cpu * 12),
                                           thermal: alert && index >= 25 || (25...30).contains(index) ? .fair : .nominal,
-                                          memoryUsedBytes: 11 * 1_073_741_824, memoryTotalBytes: 16 * 1_073_741_824)
+                                          memoryUsedBytes: 11 * 1_073_741_824, memoryTotalBytes: 16 * 1_073_741_824, memoryPressurePercent: 55)
             state.chartHistory.append(snapshot)
             state.snapshot = snapshot
         }
         let names = ["WindowServer", "ExampleSync", "Finder", "kernel_task", "ExampleWorker"]
         let processes = names.enumerated().map { index, name in ProcessEnergy(pid: Int32(index + 42), name: name, cpuPercent: [12.4, 5.8, 2.1, 1.4, 0.2][index], impact: [18.2, 9.1, 3.4, 2.8, 0.4][index]) }
         let runaway = ProcessEnergy(pid: 50, name: "ExampleWorker", cpuPercent: 98, impact: 87.6)
-        let assertion = SleepAssertion(pid: 43, type: "PreventSystemSleep", startedAt: now.addingTimeInterval(-11520))
         state.energy = EnergyDiagnosis(topFive: alert ? [runaway] + Array(processes.prefix(4)) : processes,
-            runaway: alert ? [runaway] : [], longAssertions: alert ? [assertion] : [], prolongedMemoryPressure: false,
+            runaway: alert ? [runaway] : [], longAssertions: [], prolongedMemoryPressure: false,
             runawayDurations: alert ? [50: 2100] : [:])
         if alert { state.fairSince = now.addingTimeInterval(-2100) }
         for provider in QuotaProvider.allCases {

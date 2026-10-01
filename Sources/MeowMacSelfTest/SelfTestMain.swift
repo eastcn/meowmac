@@ -32,8 +32,10 @@ enum SelfTestMain {
             ("System.Live/系统采样", { SelfTestMain.liveSystem() }),
             ("Core.Energy/top 第二次采样", { SelfTestMain.topParser() }),
             ("Core.Energy/失控进程时间线", { SelfTestMain.runawayTimeline() }),
-            ("Core.Energy/休眠断言", { SelfTestMain.assertionParser() }),
-            ("System.Live.Energy/进程与断言", { SelfTestMain.liveEnergy() }),
+            ("Core.Energy/忽略三小时休眠断言", { MemoryTests.ignoredAssertions() }),
+            ("System.Metrics/活动监视器内存口径", { MemoryTests.usage() }),
+            ("UI.System/内存压力百分比", { MemoryTests.pressure() }),
+            ("System.Live.Energy/进程", { SelfTestMain.liveEnergy() }),
             ("System.Live.Energy.Rusage/跨用户读取", { SelfTestMain.liveRusage() }),
             ("Quota.Live/四渠道刷新", { SelfTestMain.liveQuota() }),
             ("Quota.Live.Cost/Codex 花费", { SelfTestMain.liveCodexCost() }),
@@ -54,7 +56,7 @@ enum SelfTestMain {
         ]
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }
-        tests.append(("UI.System/三类诊断与持续时间", { DiagnosisTests.rows() }))
+        tests.append(("UI.System/两类诊断与持续时间", { DiagnosisTests.rows() }))
         tests.append(("UI.Snapshot/六部分与关键字段编码", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(quotaAlert: true)
             do {
@@ -227,19 +229,10 @@ enum SelfTestMain {
         return tracker.evaluate(processes: [high], assertions: [], pressure: .normal, now: start.addingTimeInterval(1_300), config: config).runaway.isEmpty
     }
 
-    private static func assertionParser() -> Bool {
-        let date = Date(timeIntervalSince1970: 1_000_000)
-        let values = SleepAssertion.parse([42: [["AssertType": "PreventUserIdleSystemSleep", "AssertLevel": 1, "AssertStartWhen": date],
-                                                ["AssertType": "PreventSystemSleep", "AssertLevel": 0, "AssertStartWhen": date],
-                                                ["AssertType": "PreventUserIdleDisplaySleep", "AssertLevel": 1, "AssertStartWhen": date]]])
-        return values.count == 1 && values[0].pid == 42 && values[0].startedAt == date
-    }
-
     private static func liveEnergy() -> Bool {
         do {
             let values = try EnergySampler.processes()
-            let assertions = try EnergySampler.assertions()
-            print("能耗排行条目数=\(values.count)；休眠断言条目数=\(assertions.count)")
+            print("能耗排行条目数=\(values.count)")
             return !values.isEmpty
         } catch {
             print("能耗采样失败：\(error)")
@@ -358,9 +351,9 @@ enum SelfTestMain {
         let input = HealthInputs(system: snapshot, energy: energy, quotaUsedPercent: [], network: .green,
             failedSources: [:], fairSince: now.addingTimeInterval(-300), now: now)
         let result = HealthEvaluator.evaluate(input, config: LocalConfig())
-        return result.level == .warn && result.issues.count == 4 && result.coolingHint
+        return result.level == .warn && result.issues.count == 3 && result.coolingHint
             && result.issues.contains { $0.message.contains("磁盘") }
-            && result.issues.contains { $0.message.contains("休眠") }
+            && !result.issues.contains { $0.message.contains("休眠") }
             && result.issues.contains { $0.message.contains("内存") }
     }
 

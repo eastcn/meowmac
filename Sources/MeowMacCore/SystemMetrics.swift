@@ -82,6 +82,7 @@ public struct SystemSnapshot: Codable {
     public let thermal: ThermalLevel
     public let memoryUsedBytes: UInt64?
     public let memoryTotalBytes: UInt64?
+    public let memoryPressurePercent: Double?
 
     public var memoryUsedFraction: Double? {
         guard let used = memoryUsedBytes, let total = memoryTotalBytes, total > 0 else { return nil }
@@ -91,12 +92,13 @@ public struct SystemSnapshot: Codable {
     public init(timestamp: Date, cpuUsage: Double?, memoryPressure: MemoryPressure, swapUsedBytes: UInt64?,
                 diskAvailableBytes: Int64?, diskTotalBytes: Int64?, networkReceivedBytesPerSecond: Double?,
                 networkSentBytesPerSecond: Double?, battery: BatteryMetrics, thermal: ThermalLevel,
-                memoryUsedBytes: UInt64? = nil, memoryTotalBytes: UInt64? = nil) {
+                memoryUsedBytes: UInt64? = nil, memoryTotalBytes: UInt64? = nil, memoryPressurePercent: Double? = nil) {
         self.timestamp = timestamp; self.cpuUsage = cpuUsage; self.memoryPressure = memoryPressure
         self.swapUsedBytes = swapUsedBytes; self.diskAvailableBytes = diskAvailableBytes
         self.diskTotalBytes = diskTotalBytes; self.networkReceivedBytesPerSecond = networkReceivedBytesPerSecond
         self.networkSentBytesPerSecond = networkSentBytesPerSecond; self.battery = battery; self.thermal = thermal
         self.memoryUsedBytes = memoryUsedBytes; self.memoryTotalBytes = memoryTotalBytes
+        self.memoryPressurePercent = memoryPressurePercent
     }
 
     public var diskRemainingFraction: Double? {

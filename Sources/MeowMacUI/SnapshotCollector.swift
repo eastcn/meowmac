@@ -38,9 +38,8 @@ public enum SnapshotCollector {
         if latest.thermal == .fair { state.fairSince = latest.timestamp }
         let energy = try await Task.detached {
             let processes = try EnergySampler.processes { raw.write($0, name: "top.txt") }
-            let assertions = try EnergySampler.assertions()
             var tracker = EnergyTracker()
-            return tracker.evaluate(processes: processes, assertions: assertions, pressure: latest.memoryPressure, now: Date(), config: config)
+            return tracker.evaluate(processes: processes, pressure: latest.memoryPressure, now: Date(), config: config)
         }.value
         state.energy = energy
         for provider in QuotaProvider.allCases {

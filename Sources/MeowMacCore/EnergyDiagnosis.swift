@@ -41,22 +41,13 @@ public struct SleepAssertion: Equatable, Codable {
         self.pid = pid; self.type = type; self.startedAt = startedAt; self.processName = processName
     }
 
-    public static func parse(_ byPID: [NSNumber: [[String: Any]]]) -> [SleepAssertion] {
-        byPID.flatMap { pid, assertions in
-            assertions.compactMap { item in
-                guard let type = item["AssertType"] as? String,
-                      type == "PreventUserIdleSystemSleep" || type == "PreventSystemSleep",
-                      (item["AssertLevel"] as? Int ?? 1) > 0,
-                      let started = item["AssertStartWhen"] as? Date else { return nil }
-                return SleepAssertion(pid: pid.int32Value, type: type, startedAt: started)
-            }
-        }
-    }
+
 }
 
 public struct EnergyDiagnosis: Codable {
     public let topFive: [ProcessEnergy]
     public let runaway: [ProcessEnergy]
+    /// 保留旧数据结构，断言不再参与诊断。
     public let longAssertions: [SleepAssertion]
     public let prolongedMemoryPressure: Bool
     public let runawayDurations: [Int32: TimeInterval]
@@ -77,7 +68,7 @@ public struct EnergyTracker {
 
     public init() {}
 
-    public mutating func evaluate(processes: [ProcessEnergy], assertions: [SleepAssertion],
+    public mutating func evaluate(processes: [ProcessEnergy], assertions: [SleepAssertion] = [],
                                   pressure: MemoryPressure, now: Date, config: LocalConfig) -> EnergyDiagnosis {
         let currentPIDs = Set(processes.map(\.pid))
         aboveSince = aboveSince.filter { currentPIDs.contains($0.key) }
@@ -94,7 +85,7 @@ public struct EnergyTracker {
             return now.timeIntervalSince(since) >= config.runawaySeconds
         }
         return EnergyDiagnosis(topFive: Array(processes.prefix(5)), runaway: runaway,
-                               longAssertions: assertions.filter { now.timeIntervalSince($0.startedAt) >= config.sleepAssertionSeconds },
+                               longAssertions: [],
                                prolongedMemoryPressure: pressureSince.map { now.timeIntervalSince($0) >= config.memoryPressureSeconds } ?? false,
                                runawayDurations: Dictionary(uniqueKeysWithValues: runaway.compactMap { process in
                                    aboveSince[process.pid].map { (process.pid, now.timeIntervalSince($0)) }

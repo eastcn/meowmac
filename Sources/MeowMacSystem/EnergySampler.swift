@@ -1,6 +1,5 @@
 import Foundation
 import Darwin
-import IOKit.pwr_mgt
 import MeowMacCore
 
 public enum EnergySampler {
@@ -32,12 +31,4 @@ public enum EnergySampler {
         return URL(fileURLWithPath: String(cString: buffer)).lastPathComponent
     }
 
-    public static func assertions() throws -> [SleepAssertion] {
-        var raw: Unmanaged<CFDictionary>?
-        guard IOPMCopyAssertionsByProcess(&raw) == kIOReturnSuccess,
-              let value = raw?.takeRetainedValue() else { throw CocoaError(.fileReadUnknown) }
-        let object = value as NSDictionary
-        guard let dictionary = object as? [NSNumber: [[String: Any]]] else { throw CocoaError(.fileReadCorruptFile) }
-        return SleepAssertion.parse(dictionary).map { SleepAssertion(pid: $0.pid, type: $0.type, startedAt: $0.startedAt, processName: fullName(pid: $0.pid)) }
-    }
 }
