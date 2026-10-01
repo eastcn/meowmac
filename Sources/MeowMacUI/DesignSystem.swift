@@ -22,6 +22,7 @@ enum Design {
     static let menuWidth: CGFloat = 260, menuRow: CGFloat = 26
     static let graphStroke: CGFloat = 1.6, graphDot: CGFloat = 2.6
     static let mutedFill: Double = 0.12, thermalFill: Double = 0.16
+    static let quotaCurveFill: Double = 0.15, quotaPeakFill: Double = 0.55
     static let peakFill: Double = 0.6, currentPeakFill: Double = 0.28, costFill: Double = 0.35
     static let title = Font.system(size: 13, weight: .semibold)
     static let body = Font.system(size: 13)
@@ -39,6 +40,8 @@ enum Design {
     static let orange = Color(nsColor: .systemOrange), red = Color(nsColor: .systemRed)
     static let gray = Color(nsColor: .systemGray)
     static let selection = Color(nsColor: .controlBackgroundColor)
+    static let background = Color(nsColor: .windowBackgroundColor)
+    static func provider(_ provider: QuotaProvider) -> Color { Color(nsColor: QuotaPalette.color(provider)) }
     static func state(_ level: HealthLevel) -> Color {
         switch level { case .normal: return Color(nsColor: .systemGreen); case .warn: return orange; case .severe: return red }
     }
@@ -195,6 +198,7 @@ struct LineBar: View {
                 RoundedRectangle(cornerRadius: Design.barRadius).fill(color).frame(width: proxy.size.width * min(1, max(0, fraction)))
                 if let marker {
                     RoundedRectangle(cornerRadius: Design.rule).fill(Design.red)
+                        .overlay(RoundedRectangle(cornerRadius: Design.rule).stroke(Design.background, lineWidth: Design.rule))
                         .frame(width: Design.tickWidth, height: Design.tickHeight)
                         .offset(x: min(proxy.size.width - Design.tickWidth, max(0, proxy.size.width * marker - Design.rule)))
                 }
@@ -244,6 +248,7 @@ struct MiniLineGraph: View {
     let range: ClosedRange<Double>
     let color: Color
     var fill = false
+    var fillOpacity = Design.mutedFill
     var warmPeriods: [ClosedRange<Date>] = []
     var pace = false
     var now: Date? = nil
@@ -269,7 +274,7 @@ struct MiniLineGraph: View {
                 for point in visible.dropFirst() { path.addLine(to: CGPoint(x: x(point.date), y: y(point.value))) }
                 if fill, let last = visible.last {
                     var area = path; area.addLine(to: CGPoint(x: x(last.date), y: size.height)); area.addLine(to: CGPoint(x: x(first.date), y: size.height)); area.closeSubpath()
-                    context.fill(area, with: .color(color.opacity(Design.mutedFill)))
+                    context.fill(area, with: .color(color.opacity(fillOpacity)))
                 }
                 context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: Design.graphStroke, lineJoin: .round))
                 if pace, let last = visible.last {
@@ -321,5 +326,20 @@ struct DesignComponentPreview: View {
             HStack { CapsuleAction(title: "刷新", symbol: "arrow.clockwise") {}; Spacer(); LinkAction(title: "在访达中显示 ↗") {} }
             MiniColumns(values: [30, 80, 60, 95, 40], colors: [Design.blue, Design.orange, Design.blue, Design.orange, Design.blue])
         }.padding(Design.inset).frame(width: Design.panelWidth).foregroundStyle(Design.label)
+    }
+}
+
+/// 额度页的渠道色。状态色由 Design 单独提供。
+public enum QuotaPalette {
+    public static func color(_ provider: QuotaProvider) -> NSColor {
+        switch provider {
+        case .codex: return .labelColor
+        case .claude: return NSColor(srgbRed: 217 / 255, green: 119 / 255, blue: 87 / 255, alpha: 1)
+        case .deepseek: return NSColor(srgbRed: 77 / 255, green: 107 / 255, blue: 254 / 255, alpha: 1)
+        case .opencodego: return .systemGray
+        }
+    }
+    public static func peakOpacity(usedPercent: Double, isCurrent: Bool) -> Double {
+        isCurrent ? Design.currentPeakFill : usedPercent > 80 ? 1 : Design.quotaPeakFill
     }
 }
