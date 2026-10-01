@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.round",
+  "name": "圆润",
+  "run": {
+    "image": "run.png",
+    "rendering": "template",
+    "sheetSize": [
+      2172,
+      724
+    ],
+    "canvas": [
+      434,
+      210
+    ],
+    "noseAnchor": 391,
+    "topPadding": 4,
+    "frames": [
+      {
+        "source": [
+          43,
+          263,
+          426,
+          202
+        ],
+        "noseX": 444
+      },
+      {
+        "source": [
+          502,
+          263,
+          398,
+          202
+        ],
+        "noseX": 899
+      },
+      {
+        "source": [
+          927,
+          263,
+          352,
+          202
+        ],
+        "noseX": 1278
+      },
+      {
+        "source": [
+          1318,
+          263,
+          372,
+          202
+        ],
+        "noseX": 1689
+      },
+      {
+        "source": [
+          1730,
+          263,
+          421,
+          202
+        ],
+        "noseX": 2132
+      }
+    ]
+  },
+  "severe": {
+    "image": "severe.png",
+    "sheetSize": [
+      1815,
+      867
+    ],
+    "bounds": [
+      287,
+      158,
+      1395,
+      573
+    ],
+    "zzAnchorFraction": 0.83
+  }
+}

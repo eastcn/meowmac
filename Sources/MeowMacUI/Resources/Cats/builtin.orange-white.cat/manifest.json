@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.orange-white",
+  "name": "瘦身橘白",
+  "run": {
+    "image": "run.png",
+    "rendering": "original",
+    "sheetSize": [
+      2172,
+      724
+    ],
+    "canvas": [
+      459,
+      205
+    ],
+    "noseAnchor": 422,
+    "topPadding": 4,
+    "frames": [
+      {
+        "source": [
+          26,
+          255,
+          447,
+          197
+        ],
+        "noseX": 448
+      },
+      {
+        "source": [
+          473,
+          255,
+          423,
+          197
+        ],
+        "noseX": 893
+      },
+      {
+        "source": [
+          923,
+          255,
+          342,
+          197
+        ],
+        "noseX": 1262
+      },
+      {
+        "source": [
+          1295,
+          255,
+          383,
+          197
+        ],
+        "noseX": 1666
+      },
+      {
+        "source": [
+          1702,
+          255,
+          445,
+          197
+        ],
+        "noseX": 2116
+      }
+    ]
+  },
+  "severe": {
+    "image": "severe.png",
+    "sheetSize": [
+      1816,
+      866
+    ],
+    "bounds": [
+      464,
+      266,
+      1000,
+      383
+    ],
+    "zzAnchorFraction": 0.83
+  }
+}

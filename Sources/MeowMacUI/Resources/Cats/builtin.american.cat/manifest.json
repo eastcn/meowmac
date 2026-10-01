@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.american",
+  "name": "圆润美短",
+  "run": {
+    "image": "run.png",
+    "rendering": "original",
+    "sheetSize": [
+      2172,
+      724
+    ],
+    "canvas": [
+      439,
+      219
+    ],
+    "noseAnchor": 402,
+    "topPadding": 4,
+    "frames": [
+      {
+        "source": [
+          45,
+          260,
+          427,
+          211
+        ],
+        "noseX": 440
+      },
+      {
+        "source": [
+          499,
+          260,
+          398,
+          211
+        ],
+        "noseX": 894
+      },
+      {
+        "source": [
+          919,
+          260,
+          340,
+          211
+        ],
+        "noseX": 1256
+      },
+      {
+        "source": [
+          1296,
+          260,
+          372,
+          211
+        ],
+        "noseX": 1665
+      },
+      {
+        "source": [
+          1720,
+          260,
+          408,
+          211
+        ],
+        "noseX": 2120
+      }
+    ]
+  },
+  "severe": {
+    "image": "severe.png",
+    "sheetSize": [
+      1815,
+      867
+    ],
+    "bounds": [
+      287,
+      158,
+      1395,
+      573
+    ],
+    "zzAnchorFraction": 0.83
+  }
+}

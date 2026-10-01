@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.slim",
+  "name": "标准瘦身",
+  "run": {
+    "image": "run.png",
+    "rendering": "template",
+    "sheetSize": [
+      2172,
+      724
+    ],
+    "canvas": [
+      451,
+      191
+    ],
+    "noseAnchor": 411,
+    "topPadding": 4,
+    "frames": [
+      {
+        "source": [
+          22,
+          275,
+          443,
+          187
+        ],
+        "noseX": 429
+      },
+      {
+        "source": [
+          489,
+          275,
+          398,
+          187
+        ],
+        "noseX": 885
+      },
+      {
+        "source": [
+          924,
+          275,
+          330,
+          187
+        ],
+        "noseX": 1249
+      },
+      {
+        "source": [
+          1301,
+          275,
+          368,
+          187
+        ],
+        "noseX": 1667
+      },
+      {
+        "source": [
+          1728,
+          275,
+          417,
+          187
+        ],
+        "noseX": 2125
+      }
+    ]
+  },
+  "severe": {
+    "image": "severe.png",
+    "sheetSize": [
+      1816,
+      866
+    ],
+    "bounds": [
+      464,
+      266,
+      1000,
+      383
+    ],
+    "zzAnchorFraction": 0.83
+  }
+}

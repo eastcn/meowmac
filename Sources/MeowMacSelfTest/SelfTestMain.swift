@@ -45,6 +45,8 @@ enum SelfTestMain {
             ("Core.Health/系统与能耗信号", { SelfTestMain.healthSystemSignals() }),
             ("Core.Panel/默认标签页", { SelfTestMain.openingTab() }),
             ("Core.Cat/速度映射", { SelfTestMain.catMotion() }),
+            ("Core.CatPackage/严格清单", { CatPackageTests.core() }),
+            ("UI.CatPackage/内置资源与文件边界", { CatPackageTests.ui() }),
             ("UI.RenderCat/三档帧图", { SelfTestMain.renderCat() }),
             ("UI.Cat/帧图透明区域", { SelfTestMain.catPixels() }),
             ("Core.Quota/四渠道解析", { SelfTestMain.quotaParsing() }),
