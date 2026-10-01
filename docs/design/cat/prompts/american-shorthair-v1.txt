@@ -1,0 +1,18 @@
+工具：内置 imagegen
+输入：docs/design/cat/nian-gao-round-v3.png
+输出：docs/design/cat/nian-gao-american-shorthair-v1.png
+
+Use case: precise-object-edit.
+Input image 1 is the edit target: the USER-APPROVED compact rounded MeowMac cat silhouette, version 3.
+Change ONLY the coloration and internal coat markings. Preserve its exact external contour, body proportions, head and pointed ears, short legs, tail curve, right-facing side profile, airborne running pose, placement, and framing. Do not redesign, fatten, slim, lengthen, or change the pose.
+Color it as a SILVER CLASSIC TABBY AMERICAN SHORTHAIR:
+- light cool silver-gray base coat;
+- bold charcoal-gray classic tabby markings, with one clear rounded swirl/bullseye on the visible flank, broad curved bands over the shoulders and back;
+- a few simple dark bars on the legs and ring bands on the long tail, ending in a dark tip;
+- lighter silver chin, short muzzle and underside, blended through clean flat-color boundaries, not a stark white bib;
+- modest dark forehead/cheek stripes;
+- a tiny muted rose nose and subdued warm pink ear interior;
+- one small warm golden-green eye, subtle and feline, no huge cartoon eye.
+Use a tasteful, LIMITED palette and broad readable markings suitable for a tiny macOS menu-bar animal. Keep the face gentle and understated. A thin charcoal edge may define the silver contour against white without altering its shape.
+Style: clean flat-color icon illustration with smooth deliberate curves, the same restrained aesthetic as the silhouette. Not a photograph, no individual fur hairs, no glossy gradients, no 3D rendering, no texture. Preserve all four legs and clear spaces between them.
+One cat only on the same plain white background with generous padding. No scenery, ground, cast shadow, speed streaks, text, labels, collar, accessories, additional cats, or watermark.

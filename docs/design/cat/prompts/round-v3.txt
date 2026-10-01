@@ -1,0 +1,15 @@
+工具：内置 imagegen
+输入：docs/design/cat/nian-gao-round-v2.png
+输出：docs/design/cat/nian-gao-round-v3.png
+
+Use case: precise-object-edit.
+Input image 1 is the edit target: MeowMac's compact running-cat silhouette, version 2. The user likes exploring the shorter compact direction but says this version is TOO FAT.
+Make ONE restrained intermediate version: keep this compact cat's shorter legs and shorter neck, but slim the torso down.
+Change ONLY the body mass and a small amount of torso length:
+- Reduce chest, abdomen and haunch bulk by approximately 15–20%, evenly around the body, not by cutting only the belly.
+- Lift the belly contour into a gentle shallow curve instead of the deep low round belly. Keep a small natural waist.
+- Flatten the inflated back slightly while preserving a supple feline spine.
+- Lengthen shoulder-to-hip distance just a little, about 5–8%, so it feels compact but no longer barrel shaped.
+Invariants: keep the same recognizable head size, pointed ears and short muzzle, flowing tail, right-facing strict side profile, airborne galloping pose and short legs. Do not restore the very long slim proportions. Four anatomically connected limbs with clear gaps and simple paws. Do not enlarge head, change pose or add details.
+Visual target: a normal healthy domestic cat with a softly rounded compact body, moderately short legs, light lively movement. Pleasantly rounded but NOT visibly overweight. The overall impression is halfway between a lean cat and the plump input.
+Same clean smooth solid-black silhouette on plain white, one centered cat with generous padding. No eyes, fur, shading, textures, text, labels, shadows, ground, extra limbs or watermark.

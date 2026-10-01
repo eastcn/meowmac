@@ -1,0 +1,89 @@
+{
+  "sheet": "american-run-sheet-v2.png",
+  "sheetSize": [
+    2172,
+    724
+  ],
+  "canvas": [
+    439,
+    219
+  ],
+  "noseAnchor": 402,
+  "topPadding": 4,
+  "frames": [
+    {
+      "source": [
+        45,
+        260,
+        427,
+        211
+      ],
+      "noseX": 440
+    },
+    {
+      "source": [
+        499,
+        260,
+        398,
+        211
+      ],
+      "noseX": 894
+    },
+    {
+      "source": [
+        919,
+        260,
+        340,
+        211
+      ],
+      "noseX": 1256
+    },
+    {
+      "source": [
+        1296,
+        260,
+        372,
+        211
+      ],
+      "noseX": 1665
+    },
+    {
+      "source": [
+        1720,
+        260,
+        408,
+        211
+      ],
+      "noseX": 2120
+    }
+  ],
+  "labels": [
+    "伸展",
+    "前爪落地",
+    "收腿",
+    "收拢腾空",
+    "后腿蹬地"
+  ],
+  "frameInterval": "0.5 - 0.45 * load",
+  "previewTiming": {
+    "version": "midpoint-v1",
+    "method": "piecewise-linear",
+    "points": [
+      [
+        0,
+        0.5
+      ],
+      [
+        0.5,
+        0.185
+      ],
+      [
+        1,
+        0.05
+      ]
+    ],
+    "basis": "用户要求新 50% 采用原 70% 的节奏；原公式保留供对照，SPEC 已同步，应用实现待执行"
+  },
+  "status": "design-approved-by-user-2026-10-02",
+  "normalRendering": "original-color"
+}

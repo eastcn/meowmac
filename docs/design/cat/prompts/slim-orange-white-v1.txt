@@ -1,0 +1,17 @@
+工具：内置 imagegen
+输入：docs/design/cat/nian-gao-slim-v1.png
+输出：docs/design/cat/nian-gao-slim-orange-white-v1.png
+
+Use case: precise-object-edit.
+Input image 1 is the edit target: MeowMac's approved STANDARD SLIM original cat silhouette. This is the long, lean version, not the rounded variant.
+Change ONLY the coloration and internal markings to an ORANGE-AND-WHITE domestic cat.
+Preserve the original external silhouette, slender shoulder-to-hip length, slim waist, leg lengths, restrained head size, pointed ears, long flowing tail, strict right-facing profile, airborne extended galloping pose, placement and framing. Do not shorten, fatten, round or redesign this cat.
+Coat palette and distribution:
+- warm soft ginger-orange head, ears, upper shoulders, back, flanks and long tail;
+- creamy white short muzzle, chin, chest, underside of belly and four paw socks;
+- natural curved orange/white coat boundaries, visually connected white chin/chest/underside;
+- a few restrained darker orange tabby stripes on the orange areas, including simple tail rings, sparse shoulder/flank stripes and subtle cheek/forehead marks; no black or gray coat patches, no exaggerated spiral;
+- small muted pink nose and warm pink ear interior;
+- one small understated amber-green eye, feline and gentle, no giant cartoon eye.
+Style: polished flat-color icon illustration with broad readable color patches, smooth controlled curves, very limited palette. A thin warm brown contour may define white paws and chest against the white background while preserving the shape. No detailed fur, no photorealism, no 3D, no glossy rendering, no noisy texture or heavy shading.
+One cat only on the same plain white background with generous padding. Four legs with clear negative spaces. No added whiskers outside the silhouette, collar, accessories, text, labels, ground, shadows, speed lines, extra characters or watermark.

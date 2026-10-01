@@ -1,0 +1,8 @@
+工具：内置 imagegen
+输入：docs/design/cat/nian-gao-slim-v1.png
+输出：docs/design/cat/nian-gao-round-v1.png
+
+Use case: precise-object-edit. The input is the approved slim MeowMac cat. Create its clearly ROUNDER sibling variant. Keep the same cat identity and right-facing extended airborne running pose.
+Make a visible, tasteful change to the torso, not a nearly identical copy: draw a fuller oval ribcage with a soft rounded back and a gently bulging convex belly. Increase the trunk's thickness by about 40–45% over the slim input, distributing the extra fullness across chest, belly and haunches. Reduce the sharp waist tuck. The hips and shoulders should feel softly padded. It should unmistakably look like a pleasantly plump domestic cat, with harmonious athletic anatomy.
+Keep exactly the same recognizable pointed ears, short muzzle and head scale, long curved tail, four legs reaching in the same directions, and same smooth solid-black silhouette style. Preserve negative spaces between the legs and a clean chest-to-front-leg connection. The belly must NOT swallow the legs. Do not just globally stretch or scale the whole image. Do not make legs thicker. No exaggerated giant head, no blob body, no pregnant belly, no hanging skin.
+One cat only, centered on the same white background, same side view and similar framing. Pure black fill, no texture, shading, text, labels, eyes or additional elements. This is a shape comparison draft: a clearly rounder torso while keeping the charm and motion of the slim original.

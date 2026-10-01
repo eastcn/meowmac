@@ -1,0 +1,15 @@
+工具：内置 imagegen
+输入：docs/design/cat/nian-gao-round-v1.png
+输出：docs/design/cat/nian-gao-round-v2.png
+
+Use case: precise-object-edit.
+Input image 1 is the edit target: the previous rounded MeowMac cat candidate. The user rejected its proportions because it only added belly volume while keeping a long thin body and long legs.
+Make a clearly SHORTER, STOCKIER, COMPACT version of this same original cat. This is a coordinated proportion redesign, not a belly enlargement.
+Specific changes:
+- Shorten the shoulder-to-hip torso length by about 20–25%.
+- Shorten all four legs by about 25–30%, retaining readable knees, hocks and small paws. Short legs must connect naturally to shoulders and hips.
+- Shorten the neck; nest the head closer to a softly rounded chest.
+- Give the back, ribcage, chest and haunches balanced roundness throughout. Use a compact oval torso, not a sagging belly. Belly fullness should match the rounded back and shoulders.
+- Keep a natural modest head size and the recognizable pointed ears and short cat muzzle. No oversized chibi head.
+Keep the recognizable flowing tail, a little more compact if needed to balance the shorter body. Preserve the side-profile right-facing airborne running pose: two front legs reaching forward and two hind legs sweeping back, with clear negative space between limbs. Same smooth flat black silhouette style on plain white, one cat only.
+The result should read as a cute short-legged, well-fed domestic cat in a lively gallop. It should look harmoniously stout, visibly different from the long slim input. Do not mechanically squash the entire image; redraw anatomically balanced contours. No pregnant-looking belly, blob anatomy, thick sausage limbs, missing/extra limbs, dog muzzle, rabbit ears, fur texture, shading, interior lines, facial features, text, ground, shadow or watermark. Center the complete silhouette with generous white padding.

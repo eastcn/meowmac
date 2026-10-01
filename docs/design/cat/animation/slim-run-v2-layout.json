@@ -1,0 +1,75 @@
+{
+  "sheet": "slim-run-sheet-v2.png",
+  "sheetSize": [
+    2172,
+    724
+  ],
+  "canvas": [
+    451,
+    191
+  ],
+  "noseAnchor": 411,
+  "topPadding": 4,
+  "frames": [
+    {
+      "source": [
+        22,
+        275,
+        443,
+        187
+      ],
+      "noseX": 429
+    },
+    {
+      "source": [
+        489,
+        275,
+        398,
+        187
+      ],
+      "noseX": 885
+    },
+    {
+      "source": [
+        924,
+        275,
+        330,
+        187
+      ],
+      "noseX": 1249
+    },
+    {
+      "source": [
+        1301,
+        275,
+        368,
+        187
+      ],
+      "noseX": 1667
+    },
+    {
+      "source": [
+        1728,
+        275,
+        417,
+        187
+      ],
+      "noseX": 2125
+    }
+  ],
+  "labels": [
+    "伸展",
+    "前爪落地",
+    "收腿",
+    "收拢腾空",
+    "后腿蹬地"
+  ],
+  "frameInterval": "0.5 - 0.45 * load",
+  "previewTiming": {
+    "version": "midpoint-v1",
+    "method": "piecewise-linear",
+    "points": [[0, 0.5], [0.5, 0.185], [1, 0.05]],
+    "basis": "用户要求新 50% 采用原 70% 的节奏；原公式保留供对照，SPEC 已同步，应用实现待执行"
+  },
+  "status": "design-approved-by-user-2026-10-02"
+}

@@ -1,0 +1,14 @@
+{
+  "image": "slim-severe-v2.png",
+  "size": [
+    1816,
+    866
+  ],
+  "bounds": [
+    464,
+    265,
+    1007,
+    384
+  ],
+  "status": "head-pose-revision-required-by-user"
+}
