@@ -1,13 +1,10 @@
 import AppKit
-import ScreenCaptureKit
 import SwiftUI
 import MeowMacCore
 import TunCanaryUI
-import os
 
 @MainActor
 public enum PanelPreviewRenderer {
-    private static var previewApplicationLaunched = false
     public static func syntheticState(alert: Bool = false, quotaAlert: Bool = false) -> PanelState {
         let state = PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil))
         let now = ISO8601DateFormatter().date(from: "2026-09-30T06:35:00Z")!
@@ -117,45 +114,6 @@ public enum PanelPreviewRenderer {
         let measure = NSHostingView(rootView: view.environment(\.previewMaterial, true))
         let height = ceil(measure.fittingSize.height)
         return renderPNG(view, width: Design.panelWidth, height: height, dark: dark)
-    }
-
-    /// 用不激活的合成窗口取图，容器、收起布局和材质与应用相同。
-    public static func nativePNG(state: PanelState, dark: Bool) async -> Data? {
-        let app = NSApplication.shared
-        app.setActivationPolicy(.accessory)
-        if !app.isRunning && !previewApplicationLaunched {
-            app.finishLaunching()
-            previewApplicationLaunched = true
-        }
-        let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
-        let panel = PanelHosting.make(state: state)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: Design.panelWidth, height: 1),
-            styleMask: [.borderless], backing: .buffered, defer: false)
-        window.appearance = appearance
-        window.contentViewController = panel.controller
-        defer { window.orderOut(nil); window.contentViewController = nil }
-        do {
-            let size = try await settleLayout(panel.controller)
-            // 系统合成器要求普通可见窗口；放在其他窗口后面，不激活应用。
-            window.setFrameOrigin(NSScreen.main?.visibleFrame.origin ?? .zero)
-            window.orderBack(nil)
-            try await Task.sleep(nanoseconds: 100_000_000)
-            guard CGPreflightScreenCaptureAccess() else { throw CocoaError(.fileReadNoPermission) }
-            // 系统合成器负责玻璃和其内部内容；只捕获本进程的合成窗口。
-            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
-            guard let ownWindow = content.windows.first(where: { Int($0.windowID) == window.windowNumber }) else {
-                throw CocoaError(.fileReadUnknown)
-            }
-            let configuration = SCStreamConfiguration()
-            configuration.width = Int(size.width * 2); configuration.height = Int(size.height * 2)
-            configuration.showsCursor = false
-            let image = try await SCScreenshotManager.captureImage(contentFilter: SCContentFilter(desktopIndependentWindow: ownWindow), configuration: configuration)
-            return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
-        } catch {
-            Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "preview").error("真实面板渲染失败：\(error.localizedDescription, privacy: .private)")
-            fputs("真实面板渲染失败：\(error)\n", stderr)
-            return nil
-        }
     }
 
     /// 等 SwiftUI 的几何偏好和 preferredContentSize 连续稳定，再取尺寸。

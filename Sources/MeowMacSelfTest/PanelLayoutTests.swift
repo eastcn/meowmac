@@ -41,25 +41,4 @@ enum PanelLayoutTests {
             return warning.height > normal.height && warning.height <= 820 && measurements.headerHeight > header
         } catch { print("面板尺寸验证失败：\(error)"); return false }
     }
-
-    static func renderNative() async -> Bool {
-        guard let path = ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] else { return false }
-        let directory = URL(fileURLWithPath: path, isDirectory: true)
-        do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            for scene in ["system-normal", "system-alert", "quota-claude", "network"] {
-                let state = PanelPreviewRenderer.syntheticState(alert: scene == "system-alert")
-                state.selectedTab = scene == "quota-claude" ? .quota : scene == "network" ? .network : .system
-                state.selectedProvider = .claude
-                state.networkModel?.checkEgressIP()
-                while state.networkModel?.isCheckingEgress == true { await Task.yield() }
-                for dark in [false, true] {
-                    guard let data = await PanelPreviewRenderer.nativePNG(state: state, dark: dark),
-                          let image = NSBitmapImageRep(data: data), image.pixelsWide > 0, image.pixelsHigh > 0 else { return false }
-                    try data.write(to: directory.appendingPathComponent("native-\(scene)-\(dark ? "dark" : "light").png"), options: .atomic)
-                }
-            }
-            return true
-        } catch { print("真实路径预览失败：\(error)"); return false }
-    }
 }
