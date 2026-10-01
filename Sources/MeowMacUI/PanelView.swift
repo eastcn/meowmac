@@ -190,7 +190,7 @@ public struct PanelView: View {
                     Text(state.quotaUpdatedAt.map { "额度更新于 " + DisplayDate.format($0, pattern: "HH:mm") } ?? "等待额度采集")
                         .font(Design.caption).foregroundStyle(Design.secondary)
                     Spacer(minLength: 0)
-                    CapsuleAction(title: "设置⌄", symbol: "gearshape") { SettingsMenu.present(state: state) }
+                    CapsuleAction(title: "设置", symbol: "gearshape") { SettingsMenu.present(state: state) }
                 }.padding(.horizontal, Design.inset).padding(.vertical, Design.footerInset)
             }.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.footer)
         }.frame(width: Design.panelWidth)

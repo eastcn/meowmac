@@ -160,6 +160,7 @@ struct CapsuleSelector: View {
                     .padding(.horizontal, compact ? Design.footerInset : 0)
                     .frame(height: compact ? Design.tableRow : Design.tabHeight)
                     .modifier(CapsuleSurface(selected: selected == index))
+                    .contentShape(Capsule())
                 }.buttonStyle(.plain)
             }
         }.padding(Design.tabPadding).modifier(CapsuleTrack())

@@ -76,6 +76,7 @@ struct QuotaPage: View {
                                 .font(Design.caption).fontWeight(.semibold).foregroundStyle(window.map { Design.stateText(Design.quotaLevel($0.remainingPercent)) } ?? Design.secondary)
                         }.padding(Design.gap).frame(maxWidth: .infinity).frame(height: Design.providerHeight)
                             .modifier(GlassSurface()).overlay(RoundedRectangle(cornerRadius: Design.cardRadius).stroke(provider == item ? Design.blue.opacity(Design.peakFill) : .clear, lineWidth: Design.rule))
+                            .contentShape(RoundedRectangle(cornerRadius: Design.cardRadius))
                     }.buttonStyle(.plain)
                 }
             }
