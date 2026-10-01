@@ -11,23 +11,33 @@ public enum SettingsMenu {
     }
     public static func make(state: PanelState) -> NSMenu {
         let menu = NSMenu(); menu.autoenablesItems = false
-        func add(_ title: String, key: String = "", enabled: Bool = true, checked: Bool = false, action: @escaping () -> Void) {
+        func add(_ title: String, to destination: NSMenu? = nil, key: String = "", enabled: Bool = true, checked: Bool = false, action: @escaping () -> Void) {
             let target = Action(action)
             let item = NSMenuItem(title: title, action: #selector(Action.invoke), keyEquivalent: key)
             item.target = target; item.representedObject = target
             item.isEnabled = enabled; item.state = checked ? .on : .off
-            menu.addItem(item)
+            (destination ?? menu).addItem(item)
         }
         add("打开配置文件…", action: state.onOpenConfig)
         add("在访达中显示配置目录", action: state.onShowConfigFolder)
         menu.addItem(.separator())
-        add("猫配置", enabled: false) {}
-        let catRow = NSHostingView(rootView: HStack {
-            Text("猫配置"); Spacer(); Text("暂未开放").font(Design.button)
-        }.font(Design.body).foregroundStyle(Design.secondary).padding(.horizontal, Design.inset)
-            .frame(width: Design.menuWidth, height: Design.menuRow))
-        catRow.frame = NSRect(x: 0, y: 0, width: Design.menuWidth, height: Design.menuRow)
-        menu.items.last?.view = catRow
+        let catMenu = NSMenu(title: "猫配置"); catMenu.autoenablesItems = false
+        let builtin = CatPackageLoader.builtinIDs.compactMap { try? CatPackageLoader.builtin($0) }
+        let imported = (state.catStore?.importedCats() ?? []).sorted {
+            $0.name == $1.name ? $0.id < $1.id : $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+        let all = builtin + imported
+        let nameCounts = Dictionary(grouping: all, by: \.name).mapValues(\.count)
+        for cat in all {
+            let title = nameCounts[cat.name, default: 0] > 1 ? "\(cat.name)（\(cat.id)）" : cat.name
+            add(title, to: catMenu, checked: state.selectedCat?.id == cat.id) { state.onSelectCat(cat.id) }
+        }
+        catMenu.addItem(.separator())
+        add("导入猫配置…", to: catMenu, action: state.onImportCat)
+        add("在访达中显示猫配置", to: catMenu, action: state.onShowCats)
+        let catItem = NSMenuItem(title: "猫配置", action: nil, keyEquivalent: "")
+        catItem.submenu = catMenu
+        menu.addItem(catItem)
         add("开机启动", checked: state.loginEnabled) { state.onToggleLogin(!state.loginEnabled) }
         menu.addItem(.separator())
         add("关于 MeowMac") { NSApplication.shared.orderFrontStandardAboutPanel(nil) }
@@ -52,7 +62,7 @@ struct SettingsMenuPreview: View {
                     HStack(spacing: Design.gap) {
                         Text(item.state == .on ? "✓" : "").frame(width: Design.cardInset)
                         Text(item.title)
-                        if !item.isEnabled { Spacer(minLength: 0); Text("暂未开放").font(Design.button) }
+                        if item.submenu != nil { Spacer(minLength: 0); Text("›").font(Design.button) }
                         Spacer(minLength: 0)
                         if !item.keyEquivalent.isEmpty { Text("⌘" + item.keyEquivalent.uppercased()).foregroundStyle(Design.secondary) }
                     }.font(Design.body).foregroundStyle(item.isEnabled ? Design.label : Design.secondary).frame(height: Design.menuRow)

@@ -92,7 +92,8 @@ public final class CatStore {
         guard count == bytes.count, let value = try? JSONSerialization.jsonObject(with: Data(bytes)) as? [String: Any],
               Set(value.keys) == [ "schemaVersion", "selectedID" ],
               let version = value["schemaVersion"] as? NSNumber, CFGetTypeID(version) != CFBooleanGetTypeID(),
-              version.intValue == 1, let id = value["selectedID"] as? String,
+              !CFNumberIsFloatType(version), version.doubleValue.isFinite, version.doubleValue == 1,
+              let id = value["selectedID"] as? String,
               validID(id) else { throw invalid("选择文件版本或内容无效") }
         return id
     }
@@ -200,6 +201,14 @@ public final class CatStore {
             logger.error("读取 Cats 目录失败：\(error.localizedDescription, privacy: .private)")
             return []
         }
+    }
+
+    public func catsDirectoryIfSafe() throws -> URL? {
+        guard let root = try rootFD(create: false) else { return nil }
+        defer { close(root) }
+        guard let cats = try catsFD(root: root, create: false) else { return nil }
+        close(cats)
+        return rootURL.appendingPathComponent("Cats", isDirectory: true)
     }
 
     @discardableResult

@@ -13,6 +13,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var networkBridge: NetworkBridge?
     private var quotaCoordinator: QuotaCoordinator?
     private let panelState = PanelState()
+    private let catStore = CatStore()
     private let logger = Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "app")
     private let collector = SystemCollector()
     private var energyTracker = EnergyTracker()
@@ -37,8 +38,9 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        CatRuntime.initialize(state: panelState, store: catStore)
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = CatRenderer.image(frame: 0, level: displayLevel)
+        item.button?.image = CatRenderer.image(cat: panelState.selectedCat, display: panelState.catDisplay(), frame: 0)
         item.button?.target = self
         item.button?.action = #selector(togglePopover)
         statusItem = item
@@ -63,6 +65,9 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         panelState.onClean = { [weak self] in self?.openCleanCommand() }
         panelState.onOpenConfig = { [weak self] in self?.openConfig() }
         panelState.onShowConfigFolder = { [weak self] in self?.showConfigFolder() }
+        panelState.onSelectCat = { [weak self] id in self?.selectCat(id) }
+        panelState.onImportCat = { [weak self] in self?.importCat() }
+        panelState.onShowCats = { [weak self] in self?.showCats() }
         panelState.onQuit = { NSApplication.shared.terminate(nil) }
         panelState.loginEnabled = loginItem.status == .enabled
         panelState.onToggleLogin = { [weak self] enabled in
@@ -94,15 +99,6 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
                                                                             object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in self?.screenSleeping = false }
         })
-    }
-
-    private var displayLevel: HealthLevel {
-        switch ProcessInfo.processInfo.environment["MEOWMAC_FORCE_LEVEL"] {
-        case "warn": return .warn
-        case "severe": return .severe
-        case "normal": return .normal
-        default: return panelState.health.level
-        }
     }
 
     private func sample(thermalChanged: Bool = false) {
@@ -192,15 +188,65 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.activateFileViewerSelecting([ConfigStore.defaultURL.deletingLastPathComponent()])
     }
 
+    private func showCats() {
+        do {
+            if let folder = try catStore.catsDirectoryIfSafe() {
+                NSWorkspace.shared.activateFileViewerSelecting([folder])
+            } else { showCatError("尚未导入猫配置。") }
+        } catch { showCatError(error.localizedDescription) }
+    }
+
+    private func showCatError(_ message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "猫配置"
+        alert.informativeText = message
+        alert.runModal()
+    }
+
+    private func updateCatImage() {
+        statusItem?.button?.image = CatRenderer.image(cat: panelState.selectedCat, display: panelState.catDisplay(), frame: frame)
+    }
+
+    private func selectCat(_ id: String) {
+        do {
+            try catStore.select(id, state: panelState)
+            frame = 0
+            updateCatImage()
+            scheduleFrame()
+        } catch {
+            logger.error("切换猫配置失败：\(error.localizedDescription, privacy: .private)")
+            showCatError(error.localizedDescription)
+        }
+    }
+
+    private func importCat() {
+        let panel = NSOpenPanel()
+        panel.message = "选择一个 .cat 目录包"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        guard panel.runModal() == .OK, let source = panel.url else { return }
+        do {
+            try catStore.importCat(from: source, state: panelState)
+            frame = 0
+            updateCatImage()
+            scheduleFrame()
+        } catch {
+            logger.error("导入猫配置失败：\(error.localizedDescription, privacy: .private)")
+            showCatError(error.localizedDescription)
+        }
+    }
+
     private func scheduleFrame() {
         frameTimer?.invalidate()
         frameTimer = Timer.scheduledTimer(withTimeInterval: frameInterval, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if !self.screenSleeping && self.displayLevel != .severe {
-                    self.frame = self.panelState.catDisplay().frame(self.frame + 1)
-                }
-                self.statusItem?.button?.image = CatRenderer.image(frame: self.frame, level: self.displayLevel, load: self.panelState.catDisplay().load, reducedMotion: self.panelState.catDisplay().reducedMotion)
+                let display = self.panelState.catDisplay()
+                self.frame = display.nextFrame(self.frame, sleeping: self.screenSleeping)
+                self.updateCatImage()
                 self.scheduleFrame()
             }
         }

@@ -56,13 +56,10 @@ public final class PanelState: ObservableObject {
     public var networkCapture: NetworkCaptureInfo?
     @Published public var lastCleaning: CleaningRecord?
     @Published public var selectedCat: LoadedCat? = CatPackageLoader.defaultCat
+    public var catStore: CatStore?
+    @Published public var catLevelOverride: HealthLevel?
     public var effectiveCatLevel: HealthLevel {
-        switch ProcessInfo.processInfo.environment["MEOWMAC_FORCE_LEVEL"] {
-        case "warn": return .warn
-        case "severe": return .severe
-        case "normal": return .normal
-        default: return health.level
-        }
+        catLevelOverride ?? health.level
     }
 
     public var onShowStorage: (QuotaProvider) -> Void = { _ in }
@@ -72,6 +69,9 @@ public final class PanelState: ObservableObject {
     public var onShowConfigFolder: () -> Void = {}
     public var onQuit: () -> Void = {}
     public var onToggleLogin: (Bool) -> Void = { _ in }
+    public var onSelectCat: (String) -> Void = { _ in }
+    public var onImportCat: () -> Void = {}
+    public var onShowCats: () -> Void = {}
 
     public init(configResult: ConfigLoadResult = ConfigStore.load()) {
         self.configResult = configResult
@@ -270,7 +270,10 @@ struct OverviewView: View {
                     if let issue = state.health.worst { state.select(issue.tab) }
                 } label: {
                     HStack(spacing: Design.rowGap) {
-                        Image(nsImage: CatRenderer.image(frame: 0, level: state.health.level, load: state.catDisplay().load)).renderingMode(state.health.level == .normal ? .template : .original).resizable().foregroundStyle(Design.label).frame(width: Design.catWidth, height: Design.catHeight)
+                        Image(nsImage: CatRenderer.image(cat: state.selectedCat, display: state.catDisplay(), frame: 0))
+                            .renderingMode(state.catDisplay().template ? .template : .original)
+                            .resizable().aspectRatio(contentMode: .fit).foregroundStyle(Design.label)
+                            .frame(width: Design.catWidth, height: Design.catHeight)
                         if let issue = state.health.worst {
                             HStack(spacing: Design.smallGap) {
                                 Text(state.health.level == .severe ? "严重" : "提醒").foregroundStyle(Design.stateText(state.health.level))

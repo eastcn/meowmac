@@ -13,6 +13,9 @@ public struct CatDisplay: Codable {
         self.stopped = stopped; self.reducedMotion = reducedMotion
     }
     public func frame(_ requested: Int) -> Int { stopped || reducedMotion ? 0 : (requested % 5 + 5) % 5 }
+    public func nextFrame(_ current: Int, sleeping: Bool) -> Int {
+        sleeping || stopped ? current : frame(current + 1)
+    }
 }
 public extension PanelState {
     func catDisplay(reducedMotion: Bool = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) -> CatDisplay {

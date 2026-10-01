@@ -67,8 +67,16 @@ enum CatStoreTests {
             let invalid = CatStore(rootURL: root)
             guard invalid.loadSelection()?.id == "builtin.slim", invalid.recoveryReason != nil,
                   (try? Data(contentsOf: selection)) == Data("broken".utf8) else { return false }
-            try Data(#"{"schemaVersion":2,"selectedID":"sample-cat"}"#.utf8).write(to: selection)
-            guard CatStore(rootURL: root).loadSelection()?.id == "builtin.slim" else { return false }
+            for bad in [#"{"schemaVersion":2,"selectedID":"sample-cat"}"#,
+                        #"{"schemaVersion":1.5,"selectedID":"sample-cat"}"#,
+                        #"{"schemaVersion":true,"selectedID":"sample-cat"}"#,
+                        #"{"schemaVersion":"1","selectedID":"sample-cat"}"#] {
+                let bytes = Data(bad.utf8)
+                try bytes.write(to: selection)
+                let recovered = CatStore(rootURL: root)
+                guard recovered.loadSelection()?.id == "builtin.slim", recovered.recoveryReason != nil,
+                      (try? Data(contentsOf: selection)) == bytes else { return false }
+            }
             try Data(#"{"schemaVersion":1,"selectedID":"sample-cat"}"#.utf8).write(to: selection)
             try manager.removeItem(at: root.appendingPathComponent("Cats/sample-cat.cat/run.png"))
             let missing = CatStore(rootURL: root)

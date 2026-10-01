@@ -23,6 +23,7 @@ public enum SnapshotCollector {
     @MainActor public static func collect(rawDirectory: URL? = nil) async throws -> PanelState {
         let raw = try RawCapture(rawDirectory)
         let state = PanelState()
+        CatRuntime.initialize(state: state, store: CatStore())
         let config = state.configResult.config
         let client = CodexBarClient(path: config.codexBarCLIPath) { args, output, errors in
             let provider = args.indices.contains(2) ? args[2] : "all"

@@ -141,12 +141,26 @@ enum SelfTestMain {
         tests.append(("UI.Quota/近七天花费快照", { CostTests.snapshot() }))
         tests.append(("UI.Settings/原生菜单", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(); state.loginEnabled = true
+            var selected: String?, imported = false, shown = false
+            state.onSelectCat = { selected = $0 }
+            state.onImportCat = { imported = true }
+            state.onShowCats = { shown = true }
             let menu = SettingsMenu.make(state: state)
+            guard let cats = menu.items[3].submenu,
+                  cats.items.map(\.title) == ["标准瘦身", "圆润", "圆润美短", "瘦身橘白", "", "导入猫配置…", "在访达中显示猫配置"],
+                  cats.items[0].state == .on, cats.items[1].state == .off else { return false }
+            for index in [1, 5, 6] {
+                let item = cats.items[index]
+                guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
+            }
             return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
-                && !menu.items[3].isEnabled && menu.items[4].state == .on
+                && menu.items[3].isEnabled && menu.items[4].state == .on
                 && menu.items[2].isSeparatorItem && menu.items[5].isSeparatorItem && menu.items[7].keyEquivalent == "q"
+                && selected == "builtin.round" && imported && shown
                 && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
+        tests.append(("UI.Cat/真实初始化与诊断快照", { CatIntegrationTests.snapshotAndSwitch() }))
+        tests.append(("UI.Cat/同名导入菜单", { CatIntegrationTests.menuDuplicates() }))
         tests.append(("UI.Panel/真实容器的自然高度与切换", { await PanelLayoutTests.heights() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.RenderPreview/三个标签页", { await SelfTestMain.renderPanel() }))
