@@ -28,7 +28,7 @@ enum Design {
     static let body = Font.system(size: 13)
     static let status = Font.system(size: 15, weight: .semibold)
     static let metric = Font.system(size: 20, weight: .semibold)
-    static let amount = Font.system(size: 22, weight: .semibold)
+    static let amount = Font.system(size: 20, weight: .semibold)
     static let button = Font.system(size: 12)
     static let caption = Font.system(size: 11)
     static let tiny = Font.system(size: 10)
@@ -294,14 +294,21 @@ struct MiniColumns: View {
     let values: [Double]
     var colors: [Color] = []
     var maximum: Double? = nil
+    var action: ((Int) -> Void)? = nil
     var body: some View {
         GeometryReader { proxy in
             let maxValue = max(1, maximum ?? values.max() ?? 1)
             HStack(alignment: .bottom, spacing: Design.tightGap) {
                 ForEach(values.indices, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: Design.tightGap)
+                    let column = RoundedRectangle(cornerRadius: Design.tightGap)
                         .fill(colors.indices.contains(index) ? colors[index] : Design.blue.opacity(Design.costFill))
                         .frame(maxWidth: .infinity).frame(height: max(Design.rule, proxy.size.height * values[index] / maxValue))
+                    if let action {
+                        Button { action(index) } label: {
+                            column.frame(maxWidth: .infinity).frame(height: proxy.size.height, alignment: .bottom)
+                                .contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    } else { column }
                 }
             }.frame(height: proxy.size.height, alignment: .bottom)
         }.frame(height: Design.columnHeight)

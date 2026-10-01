@@ -47,7 +47,10 @@ public final class PanelState: ObservableObject {
     @Published public var lastRefreshedAt: Date?
     @Published public var selectedTab: PanelTab = .system
     @Published public var chartMinutes = 60
-    @Published public var selectedProvider: QuotaProvider = .codex
+    @Published public var selectedProvider: QuotaProvider = .codex {
+        didSet { if oldValue != selectedProvider { selectedCostDate = nil } }
+    }
+    @Published public private(set) var selectedCostDate: String?
     @Published public var loginEnabled = false
     @Published public var networkModel: AppModel?
     public var networkCapture: NetworkCaptureInfo?
@@ -93,6 +96,11 @@ public final class PanelState: ObservableObject {
                 }
             }
         }
+    }
+
+    public func selectCostDay(_ date: String) {
+        guard costChartDates.contains(date) else { return }
+        selectedCostDate = date == displayedCostDate ? nil : date
     }
 
     public func select(_ tab: PanelTab) {

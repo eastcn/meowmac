@@ -126,6 +126,9 @@ enum SelfTestMain {
             return value.todayCost == 2.5 && value.totalCost == 5.5 && value.todayTokens == 100 && value.totalTokens == 300 && value.mostUsedModel == "example-b" && state.costDisplay(.deepseek) == nil
         }))
         tests.append(("UI.Quota/渠道色与峰值透明度", { QuotaColorTests.palette() }))
+        tests.append(("UI.Quota/花费三列与日期边界", { CostTests.totals() }))
+        tests.append(("UI.Quota/花费点击与渠道切换", { CostTests.selection() }))
+        tests.append(("UI.Quota/近七天花费快照", { CostTests.snapshot() }))
         tests.append(("UI.Settings/原生菜单", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(); state.loginEnabled = true
             let menu = SettingsMenu.make(state: state)

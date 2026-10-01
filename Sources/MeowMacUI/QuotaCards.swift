@@ -13,10 +13,32 @@ public struct QuotaWindowDisplay: Codable {
     public let paceText: String?
 }
 public struct CostDisplay: Codable {
-    public let todayCost: Double, totalCost: Double
-    public let todayTokens: Int?, totalTokens: Int?
+    public let todayCost: Double, weekCost: Double, totalCost: Double
+    public let todayTokens: Int?, weekTokens: Int?, totalTokens: Int?
     public let mostUsedModel: String?
     public let days: [DailyCost]
+}
+public struct CostDayDisplay: Codable {
+    public let date: String
+    public let totalCost: Double
+    public let totalTokens: Int?
+    public let mostUsedModel: String?
+    public let hasData: Bool
+    public var detailText: String {
+        let parts = date.split(separator: "-")
+        let day = parts.count == 3 ? "\(Int(parts[1]) ?? 0)/\(Int(parts[2]) ?? 0)" : date
+        guard hasData else { return day + " · 无花费" }
+        var fields = [day, String(format: "$%.2f", totalCost)]
+        if let totalTokens { fields.append(CostTokenFormat.text(totalTokens)) }
+        if let mostUsedModel { fields.append(mostUsedModel) }
+        return fields.joined(separator: " · ")
+    }
+}
+private enum CostTokenFormat {
+    static func text(_ count: Int) -> String {
+        if count < 1_000 { return "\(count) tokens" }
+        return count >= 1_000_000 ? String(format: "%.1fM tokens", Double(count) / 1_000_000) : String(format: "%.0fK tokens", Double(count) / 1000)
+    }
 }
 public extension PanelState {
     func displayedWindows(_ provider: QuotaProvider) -> [QuotaWindowDisplay] {
@@ -39,12 +61,32 @@ public extension PanelState {
         let first = DisplayDate.format(Calendar.current.date(byAdding: .day, value: -29, to: now())!, pattern: "yyyy-MM-dd")
         let days = all.filter { $0.date >= first && $0.date <= today }.sorted { $0.date < $1.date }
         let todayRows = days.filter { $0.date == today }
+        let weekStart = DisplayDate.format(Calendar.current.date(byAdding: .day, value: -6, to: now())!, pattern: "yyyy-MM-dd")
+        let weekRows = days.filter { $0.date >= weekStart }
         let models = Dictionary(grouping: days.flatMap(\.models), by: \.name).mapValues { $0.reduce(0) { $0 + $1.tokens } }
-        return CostDisplay(todayCost: todayRows.reduce(0) { $0 + $1.totalCost }, totalCost: days.reduce(0) { $0 + $1.totalCost },
+        return CostDisplay(todayCost: todayRows.reduce(0) { $0 + $1.totalCost }, weekCost: weekRows.reduce(0) { $0 + $1.totalCost }, totalCost: days.reduce(0) { $0 + $1.totalCost },
             todayTokens: todayRows.contains(where: { $0.totalTokens != nil }) ? todayRows.reduce(0) { $0 + ($1.totalTokens ?? 0) } : nil,
+            weekTokens: weekRows.contains(where: { $0.totalTokens != nil }) ? weekRows.reduce(0) { $0 + ($1.totalTokens ?? 0) } : nil,
             totalTokens: days.contains(where: { $0.totalTokens != nil }) ? days.reduce(0) { $0 + ($1.totalTokens ?? 0) } : nil,
             mostUsedModel: models.max(by: { $0.value < $1.value })?.key, days: days)
     }
+    var costChartDates: [String] {
+        (-29...0).map { offset in
+            DisplayDate.format(Calendar.current.date(byAdding: .day, value: offset, to: now())!, pattern: "yyyy-MM-dd")
+        }
+    }
+    var displayedCostDate: String {
+        if let selectedCostDate, costChartDates.contains(selectedCostDate) { return selectedCostDate }
+        return DisplayDate.format(now(), pattern: "yyyy-MM-dd")
+    }
+    func costDayDisplay(_ provider: QuotaProvider, date: String) -> CostDayDisplay {
+        let rows = (costDisplay(provider)?.days ?? []).filter { $0.date == date }
+        let models = Dictionary(grouping: rows.flatMap(\.models), by: \.name).mapValues { $0.reduce(0) { $0 + $1.tokens } }
+        return CostDayDisplay(date: date, totalCost: rows.reduce(0) { $0 + $1.totalCost },
+            totalTokens: rows.contains(where: { $0.totalTokens != nil }) ? rows.reduce(0) { $0 + ($1.totalTokens ?? 0) } : nil,
+            mostUsedModel: models.max(by: { $0.value < $1.value })?.key, hasData: !rows.isEmpty)
+    }
+
 }
 struct ProviderLogo: View {
     let provider: QuotaProvider
@@ -106,7 +148,7 @@ struct QuotaPage: View {
                 SectionRule()
                 QuotaTrendView(state: state, provider: provider)
             }
-            if let cost = state.costDisplay(provider) { SectionRule(); CostCard(value: cost, now: state.now(), provider: provider) }
+            if let cost = state.costDisplay(provider) { SectionRule(); CostCard(state: state, value: cost, provider: provider) }
             if [.claude, .codex].contains(provider), let storage = state.localStorage[provider] { SectionRule(); StorageCard(state: state, provider: provider, value: storage) }
         }
     }
@@ -159,24 +201,36 @@ struct QuotaTrendView: View {
     }
 }
 struct CostCard: View {
-    let value: CostDisplay, now: Date
+    @ObservedObject var state: PanelState
+    let value: CostDisplay
     let provider: QuotaProvider
-    private func tokens(_ count: Int) -> String { count >= 1_000_000 ? String(format: "%.1fM tokens", Double(count) / 1_000_000) : String(format: "%.0fK tokens", Double(count) / 1000) }
     var body: some View {
         VStack(alignment: .leading, spacing: Design.rowGap) {
             SectionHeading(title: "花费", detail: "按 token 估算，不是账单")
-            HStack {
-                ForEach([0, 1], id: \.self) { index in
+            HStack(spacing: Design.gap) {
+                ForEach([0, 1, 2], id: \.self) { index in
                     VStack(alignment: .leading, spacing: Design.smallGap) {
-                        Text(index == 0 ? "今天" : "近 30 天").font(Design.caption).foregroundStyle(Design.secondary)
-                        Text(String(format: "$%.2f", index == 0 ? value.todayCost : value.totalCost)).font(Design.amount)
-                        if let count = index == 0 ? value.todayTokens : value.totalTokens { Text(tokens(count)).font(Design.caption).foregroundStyle(Design.secondary) }
+                        Text(["今天", "近 7 天", "近 30 天"][index]).font(Design.caption).foregroundStyle(Design.secondary)
+                        Text(String(format: "$%.2f", [value.todayCost, value.weekCost, value.totalCost][index]))
+                            .font(Design.amount).monospacedDigit()
+                        if let count = [value.todayTokens, value.weekTokens, value.totalTokens][index] {
+                            Text(CostTokenFormat.text(count)).font(Design.caption).foregroundStyle(Design.secondary).monospacedDigit()
+                        }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            MiniColumns(values: value.days.map(\.totalCost), colors: value.days.map { $0.date == DisplayDate.format(now, pattern: "yyyy-MM-dd") ? Design.provider(provider) : Design.provider(provider).opacity(Design.costFill) })
-            HStack { Text(DisplayDate.format(Calendar.current.date(byAdding: .day, value: -29, to: now)!, pattern: "M/d")); Spacer(); Text("今天") }.font(Design.tiny).foregroundStyle(Design.secondary)
-            if let model = value.mostUsedModel { HStack { Text("最常用模型").foregroundStyle(Design.secondary); Spacer(); Text(model) }.font(Design.caption) }
+            let dates = state.costChartDates
+            let days = dates.map { state.costDayDisplay(provider, date: $0) }
+            MiniColumns(values: days.map(\.totalCost), colors: days.map {
+                Design.provider(provider).opacity($0.date == state.displayedCostDate ? 1 : Design.costFill)
+            }, action: { state.selectCostDay(dates[$0]) })
+            HStack { Text(days.first?.detailText.components(separatedBy: " · ").first ?? ""); Spacer(); Text("今天") }
+                .font(Design.tiny).foregroundStyle(Design.secondary)
+            Text(state.costDayDisplay(provider, date: state.displayedCostDate).detailText)
+                .font(Design.caption).monospacedDigit().fixedSize(horizontal: false, vertical: true)
+            if let model = value.mostUsedModel {
+                HStack(alignment: .top) { Text("最常用模型").foregroundStyle(Design.secondary); Spacer(); Text(model).fixedSize(horizontal: false, vertical: true) }.font(Design.caption)
+            }
         }
     }
 }

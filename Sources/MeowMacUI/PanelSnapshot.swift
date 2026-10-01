@@ -36,6 +36,8 @@ public struct QuotaChannelDisplay: Codable {
     public let cycles: [QuotaCycleDisplay]
     public let peaks: [QuotaPeak]
     public let cost: CostDisplay?
+    public let costDays: [CostDayDisplay]
+    public let selectedCostDay: CostDayDisplay?
     public let storage: LocalStorageSnapshot?
     public let error: String?
 }
@@ -72,6 +74,9 @@ public extension PanelState {
         let windows = displayedWindows(provider)
         return QuotaChannelDisplay(provider: provider, accountEmail: snapshot?.accountEmail, planName: snapshot?.planName, source: snapshot?.source, updatedAt: snapshot?.updatedAt,
             windows: windows, buttonWindow: windows.min { $0.remainingPercent < $1.remainingPercent }, resetCredits: snapshot?.codexResetCredits,
-            cycles: quotaCycles(provider), peaks: quotaPeaks(provider), cost: costDisplay(provider), storage: localStorage[provider], error: quotaErrors[provider])
+            cycles: quotaCycles(provider), peaks: quotaPeaks(provider), cost: costDisplay(provider),
+            costDays: costDisplay(provider) == nil ? [] : costChartDates.map { costDayDisplay(provider, date: $0) },
+            selectedCostDay: costDisplay(provider) == nil ? nil : costDayDisplay(provider, date: displayedCostDate),
+            storage: localStorage[provider], error: quotaErrors[provider])
     }
 }
