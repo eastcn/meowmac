@@ -47,6 +47,10 @@ enum SelfTestMain {
             ("Core.Cat/速度映射", { SelfTestMain.catMotion() }),
             ("Core.CatPackage/严格清单", { CatPackageTests.core() }),
             ("UI.CatPackage/内置资源与文件边界", { CatPackageTests.ui() }),
+            ("UI.Cat/四版状态与静止", { CatRenderTests.states() }),
+            ("UI.Cat/非对称源坐标方向", { CatRenderTests.orientation() }),
+            ("UI.Cat/真实负载速度线阈值", { CatRenderTests.threshold() }),
+            ("UI.Cat/极端几何不溢出", { CatRenderTests.extremeGeometry() }),
             ("UI.RenderCat/三档帧图", { SelfTestMain.renderCat() }),
             ("UI.Cat/帧图透明区域", { SelfTestMain.catPixels() }),
             ("Core.Quota/四渠道解析", { SelfTestMain.quotaParsing() }),
@@ -73,7 +77,7 @@ enum SelfTestMain {
         tests.append(("UI.Cat/减少动态与速度线", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(alert: true)
             let cat = state.catDisplay(reducedMotion: true)
-            return cat.frame(3) == 0 && cat.speedLines && abs(cat.frameInterval - (0.5 - 0.45 * cat.load)) < 0.000001
+            return cat.frame(3) == 0 && cat.speedLines && abs(cat.frameInterval - CatMotion.frameInterval(load: cat.load, config: state.configResult.config)) < 0.000001
                 && CatRenderer.image(frame: 2, level: .normal).isTemplate
                 && !CatRenderer.image(frame: 2, level: .warn).isTemplate
                 && CatRenderer.png(frame: 0, level: .normal, reducedMotion: true) == CatRenderer.png(frame: 3, level: .normal, reducedMotion: true)
@@ -373,7 +377,16 @@ enum SelfTestMain {
     private static func catMotion() -> Bool {
         let config = LocalConfig()
         guard abs(CatMotion.frameInterval(load: 0, config: config) - 0.5) < 0.000001,
+              abs(CatMotion.frameInterval(load: 0.5, config: config) - 0.185) < 0.000001,
+              abs(CatMotion.frameInterval(load: 0.7, config: config) - 0.131) < 0.000001,
               abs(CatMotion.frameInterval(load: 1, config: config) - 0.05) < 0.000001 else { return false }
+        let samples = (0...100).map { CatMotion.frameInterval(load: Double($0) / 100, config: config) }
+        guard zip(samples, samples.dropFirst()).allSatisfy({ $0 >= $1 }),
+              CatMotion.frameInterval(load: .nan, config: config) == 0.5 else { return false }
+        var custom = config; custom.idleFrameSeconds = 0.8; custom.fullFrameSeconds = 0.1
+        guard abs(CatMotion.frameInterval(load: 0.5, config: custom) - 0.31) < 0.000001 else { return false }
+        custom.fullFrameSeconds = .nan
+        guard CatMotion.frameInterval(load: 0.5, config: custom) == 0.185 else { return false }
         var motion = CatMotion(alpha: 0.5)
         let first = motion.update(cpu: 1, pressure: .normal, config: config)
         let second = motion.update(cpu: 1, pressure: .normal, config: config)

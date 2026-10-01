@@ -2,20 +2,93 @@ import AppKit
 import MeowMacCore
 
 public struct CatDisplay: Codable {
+    public let id: String, name: String, rendering: String
     public let level: HealthLevel
     public let load: Double, frameInterval: Double
     public let speedLines: Bool, template: Bool, stopped: Bool, reducedMotion: Bool
+    public init(id: String, name: String, rendering: String, level: HealthLevel, load: Double, frameInterval: Double,
+                speedLines: Bool, template: Bool, stopped: Bool, reducedMotion: Bool) {
+        self.id = id; self.name = name; self.rendering = rendering; self.level = level; self.load = load
+        self.frameInterval = frameInterval; self.speedLines = speedLines; self.template = template
+        self.stopped = stopped; self.reducedMotion = reducedMotion
+    }
     public func frame(_ requested: Int) -> Int { stopped || reducedMotion ? 0 : (requested % 5 + 5) % 5 }
 }
 public extension PanelState {
     func catDisplay(reducedMotion: Bool = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) -> CatDisplay {
-        let load = min(1, max(0, max(snapshot?.cpuUsage ?? 0, snapshot?.memoryPressure.load(config: configResult.config) ?? 0)))
-        return CatDisplay(level: health.level, load: load, frameInterval: CatMotion.frameInterval(load: load, config: configResult.config),
-            speedLines: load >= 0.7 && health.level != .severe, template: health.level == .normal, stopped: health.level == .severe, reducedMotion: reducedMotion)
+        let raw = max(snapshot?.cpuUsage ?? 0, snapshot?.memoryPressure.load(config: configResult.config) ?? 0)
+        let load = raw.isFinite ? min(1, max(0, raw)) : 0
+        let level = effectiveCatLevel
+        let rendering = selectedCat?.package.rendering ?? "vector"
+        return CatDisplay(id: selectedCat?.id ?? "builtin.slim", name: selectedCat?.name ?? "标准瘦身", rendering: rendering,
+            level: level, load: load, frameInterval: CatMotion.frameInterval(load: load, config: configResult.config),
+            speedLines: load >= 0.7 && level != .severe, template: level == .normal && rendering != "original",
+            stopped: level == .severe, reducedMotion: reducedMotion)
     }
 }
 
 public enum CatRenderer {
+    public static func image(cat: LoadedCat?, display: CatDisplay, frame: Int, size: CGSize = CGSize(width: 50, height: 18)) -> NSImage {
+        guard let cat else { return image(frame: frame, level: display.level, load: display.load, reducedMotion: display.reducedMotion, size: size) }
+        let package = cat.package
+        let level = display.level
+        let image = NSImage(size: size, flipped: false) { _ in
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            context.saveGState()
+            defer { context.restoreGState() }
+            let padding = size.height / 18
+            if level == .severe {
+                let bounds = package.severeBounds
+                let scale = min((size.width - 4 * padding) / CGFloat(bounds.width), size.height * 0.62 / CGFloat(bounds.height))
+                let width = CGFloat(bounds.width) * scale, height = CGFloat(bounds.height) * scale
+                let left = (size.width - width) / 2
+                let bottom = size.height * 0.93 - height
+                let source = NSImage(cgImage: cat.severe, size: NSSize(width: cat.severe.width, height: cat.severe.height))
+                let from = NSRect(x: bounds.x, y: cat.severe.height - bounds.y - bounds.height, width: bounds.width, height: bounds.height)
+                source.draw(in: NSRect(x: left, y: bottom, width: width, height: height), from: from, operation: .sourceOver, fraction: 1)
+                context.setBlendMode(.sourceIn)
+                context.setFillColor(NSColor.systemRed.cgColor)
+                context.fill(CGRect(origin: .zero, size: size))
+                context.setBlendMode(.normal)
+                let zzX = size.width * CGFloat(package.zzAnchorFraction)
+                let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: max(4, size.height * 0.31)), .foregroundColor: NSColor.systemRed]
+                ("zz" as NSString).draw(at: NSPoint(x: zzX, y: size.height * 0.67), withAttributes: attributes)
+            } else {
+                let index = display.frame(frame)
+                let part = package.frames[index]
+                let scale = (size.height - padding) / CGFloat(package.canvas[1])
+                let canvasLeft = (size.width - CGFloat(package.canvas[0]) * scale) / 2
+                let x = canvasLeft + CGFloat(package.noseAnchor - (part.noseX - part.source.x)) * scale
+                let y = size.height - (CGFloat(package.topPadding) + CGFloat(part.source.height)) * scale
+                let source = NSImage(cgImage: cat.run, size: NSSize(width: cat.run.width, height: cat.run.height))
+                let from = NSRect(x: part.source.x, y: cat.run.height - part.source.y - part.source.height,
+                                  width: part.source.width, height: part.source.height)
+                source.draw(in: NSRect(x: x, y: y, width: CGFloat(part.source.width) * scale,
+                                       height: CGFloat(part.source.height) * scale), from: from, operation: .sourceOver, fraction: 1)
+                if level == .warn {
+                    context.setBlendMode(.sourceIn)
+                    context.setFillColor(NSColor.systemOrange.cgColor)
+                    context.fill(CGRect(origin: .zero, size: size))
+                    context.setBlendMode(.normal)
+                }
+                if display.speedLines {
+                    let lineColor: NSColor = level == .warn ? .systemOrange : package.rendering == "original" ? .labelColor : .black
+                    context.setStrokeColor(lineColor.cgColor)
+                    context.setLineWidth(max(0.7, size.height / 18))
+                    context.setLineCap(.round)
+                    for (index, length) in [4.0, 3.0, 4.0].enumerated() {
+                        let lineY = size.height * CGFloat(0.32 + Double(index) * 0.25)
+                        context.move(to: CGPoint(x: padding, y: lineY))
+                        context.addLine(to: CGPoint(x: padding + CGFloat(length) * padding, y: lineY))
+                    }
+                    context.strokePath()
+                }
+            }
+            return true
+        }
+        image.isTemplate = level == .normal && package.rendering == "template"
+        return image
+    }
     // MenuBar.dc.html 的 44×28 矢量路径，坐标、帧和笔宽保持原稿。
     private static let offsets: [Double] = [0, 0.8, 0.4, -0.8, -0.3]
     private static let legs = [

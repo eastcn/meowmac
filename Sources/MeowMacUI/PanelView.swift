@@ -55,6 +55,15 @@ public final class PanelState: ObservableObject {
     @Published public var networkModel: AppModel?
     public var networkCapture: NetworkCaptureInfo?
     @Published public var lastCleaning: CleaningRecord?
+    @Published public var selectedCat: LoadedCat? = CatPackageLoader.defaultCat
+    public var effectiveCatLevel: HealthLevel {
+        switch ProcessInfo.processInfo.environment["MEOWMAC_FORCE_LEVEL"] {
+        case "warn": return .warn
+        case "severe": return .severe
+        case "normal": return .normal
+        default: return health.level
+        }
+    }
 
     public var onShowStorage: (QuotaProvider) -> Void = { _ in }
     public var onRefresh: () -> Void = {}
