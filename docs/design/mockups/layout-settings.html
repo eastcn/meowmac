@@ -1,0 +1,272 @@
+<div id="meowmac-layout-draft" class="viz-dotted-background">
+  <style>
+    #meowmac-layout-draft {
+      --mm-surface: light-dark(#f7f7f9, #252527);
+      --mm-titlebar: light-dark(#ececef, #303033);
+      --mm-field: light-dark(#fff, #202022);
+      --mm-text: light-dark(#1d1d1f, #f2f2f7);
+      --mm-muted: light-dark(#66666c, #aaaab0);
+      --mm-rule: light-dark(#dcdce0, #434348);
+      --mm-blue: light-dark(#0069df, #70b0ff);
+      --mm-selected: light-dark(#e6effc, #2b405d);
+      --mm-shadow: light-dark(#0000001c, #00000055);
+      padding: 24px 12px;
+      color: var(--mm-text);
+      font: 13px/1.5 -apple-system, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+    }
+    #meowmac-layout-draft * { box-sizing: border-box; }
+    #meowmac-layout-draft .mm-window {
+      width: 100%; max-width: 520px; margin: auto; background: var(--mm-surface);
+      border: 1px solid var(--mm-rule); border-radius: 12px;
+      box-shadow: 0 12px 28px var(--mm-shadow); overflow: hidden;
+    }
+    #meowmac-layout-draft .mm-titlebar {
+      padding: 14px 20px; background: var(--mm-titlebar);
+      border-bottom: 1px solid var(--mm-rule); display: flex; align-items: center; gap: 10px;
+    }
+    #meowmac-layout-draft .mm-titlebar strong { font-size: 13px; font-weight: 600; }
+    #meowmac-layout-draft .mm-app { margin-left: auto; color: var(--mm-muted); font-size: 11px; }
+    #meowmac-layout-draft .mm-content { padding: 20px 24px 24px; }
+    #meowmac-layout-draft .mm-cat { display: flex; gap: 8px; align-items: baseline; margin-bottom: 20px; }
+    #meowmac-layout-draft .mm-cat span { color: var(--mm-muted); font-size: 11px; }
+    #meowmac-layout-draft .mm-cat strong { font-size: 15px; font-weight: 600; }
+    #meowmac-layout-draft .mm-section-label {
+      display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+      font-weight: 600; margin-bottom: 8px;
+    }
+    #meowmac-layout-draft .mm-section-label small { color: var(--mm-muted); font-size: 11px; font-weight: 400; }
+    #meowmac-layout-draft .mm-tabs { display: flex; gap: 6px; margin-bottom: 24px; }
+    #meowmac-layout-draft button { font: inherit; color: inherit; }
+    #meowmac-layout-draft .mm-tab {
+      flex: 1; min-width: 0; min-height: 44px; padding: 8px 10px;
+      display: flex; justify-content: center; align-items: center; gap: 7px;
+      border: 1px solid var(--mm-rule); border-radius: 8px; background: var(--mm-field); touch-action: none;
+    }
+    #meowmac-layout-draft .mm-tab[aria-selected="true"] {
+      background: var(--mm-selected); border-color: var(--mm-blue); color: var(--mm-blue); font-weight: 600;
+    }
+    #meowmac-layout-draft .mm-tab i, #meowmac-layout-draft .mm-grip { color: var(--mm-muted); }
+    #meowmac-layout-draft .mm-list {
+      border: 1px solid var(--mm-rule); border-radius: 8px; background: var(--mm-field);
+    }
+    #meowmac-layout-draft .mm-row {
+      display: flex; align-items: center; min-height: 52px; padding-right: 14px; gap: 2px;
+    }
+    #meowmac-layout-draft .mm-row + .mm-row { border-top: 1px solid var(--mm-rule); }
+    #meowmac-layout-draft .mm-grip {
+      display: flex; justify-content: center; align-items: center;
+      width: 44px; min-height: 44px; border: 0; background: transparent; cursor: grab; flex: none; touch-action: none;
+    }
+    #meowmac-layout-draft .mm-name { flex: 1; padding: 8px 0; }
+    #meowmac-layout-draft .mm-toggle {
+      display: flex; align-items: center; gap: 6px; min-height: 44px; white-space: nowrap;
+    }
+    #meowmac-layout-draft input { width: 15px; height: 15px; accent-color: var(--mm-blue); }
+    #meowmac-layout-draft .mm-locked { color: var(--mm-muted); font-size: 11px; }
+    #meowmac-layout-draft .mm-row[data-visible="false"] .mm-name { color: var(--mm-muted); }
+    #meowmac-layout-draft .mm-note { margin: 10px 0 0; color: var(--mm-muted); font-size: 11px; }
+    #meowmac-layout-draft .mm-footer {
+      border-top: 1px solid var(--mm-rule); padding: 14px 20px;
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    }
+    #meowmac-layout-draft .mm-action {
+      border: 1px solid var(--mm-rule); border-radius: 6px;
+      padding: 5px 14px; min-height: 30px; background: var(--mm-field);
+    }
+    #meowmac-layout-draft .mm-action-primary {
+      background: var(--mm-blue); color: light-dark(#fff, #071c35); border-color: var(--mm-blue);
+    }
+    #meowmac-layout-draft .mm-action:disabled { opacity: .4; cursor: default; }
+    #meowmac-layout-draft .mm-status { padding: 0 20px 12px; color: var(--mm-muted); font-size: 11px; }
+    #meowmac-layout-draft .mm-spacer { flex: 1; }
+    #meowmac-layout-draft .mm-drop { outline: 2px solid var(--mm-blue); outline-offset: -2px; }
+    @media (max-width: 400px) {
+      #meowmac-layout-draft .mm-content { padding: 18px 16px; }
+      #meowmac-layout-draft .mm-footer { padding: 12px 16px; }
+      #meowmac-layout-draft .mm-tab { gap: 4px; padding: 6px; }
+      #meowmac-layout-draft .mm-action { padding: 5px 10px; }
+    }
+    @media (pointer: coarse) {
+      #meowmac-layout-draft .mm-action { min-height: 44px; }
+    }
+  </style>
+  <section class="mm-window" aria-label="MeowMac 布局与显示设计草稿">
+    <header class="mm-titlebar">
+      <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+      <strong>布局与显示</strong><span class="mm-app">MeowMac</span>
+    </header>
+    <div class="mm-content">
+      <div class="mm-cat"><span>当前猫</span><strong>标准瘦身</strong></div>
+      <div class="mm-section-label">标签页顺序<small>拖动排序 · ⌥← / →</small></div>
+      <div class="mm-tabs" role="tablist" aria-label="选择标签页并调整顺序"></div>
+      <div class="mm-section-label"><span class="mm-page-title">系统页功能</span><small>拖动排序 · ⌥↑ / ↓</small></div>
+      <div class="mm-list" id="mm-feature-list" role="tabpanel" aria-label="功能块排序与显示"></div>
+      <p class="mm-note"></p>
+    </div>
+    <footer class="mm-footer">
+      <button type="button" class="mm-action cursor-interaction" data-action="reset">恢复默认布局</button>
+      <span class="mm-spacer"></span>
+      <button type="button" class="mm-action cursor-interaction" data-action="cancel">取消</button>
+      <button type="button" class="mm-action mm-action-primary cursor-interaction" data-action="save" disabled>保存</button>
+    </footer>
+    <div class="mm-status" role="status" aria-live="polite">尚未修改</div>
+  </section>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('meowmac-layout-draft');
+  const definitions = {
+    system: { name: '系统', note: '有问题时，能耗诊断固定在最前。', items: [
+      { id: 'system.chart', name: '系统趋势', fixed: true },
+      { id: 'system.energy', name: '能耗排行' }, { id: 'system.disk', name: '磁盘' }
+    ] },
+    quota: { name: '额度', note: '渠道切换、额度窗口和采集错误提示固定在上方。', items: [
+      { id: 'quota.trend', name: '用量趋势' }, { id: 'quota.cost', name: '花费' },
+      { id: 'quota.storage', name: '本地存储' }
+    ] },
+    network: { name: '网络', note: '网络结论固定在上方，隐藏功能不影响健康判定。', items: [
+      { id: 'network.checks', name: '连接检查' }, { id: 'network.sites', name: '站点连通性' },
+      { id: 'network.egress', name: '出口 IP' }
+    ] }
+  };
+  const copy = value => JSON.parse(JSON.stringify(value));
+  const defaults = () => ({
+    tabs: Object.keys(definitions),
+    order: Object.fromEntries(Object.entries(definitions).map(([id, def]) => [id, def.items.map(item => item.id)])),
+    hidden: []
+  });
+  const isPermutation = (value, expected) => Array.isArray(value) && value.length === expected.length &&
+    new Set(value).size === expected.length && expected.every(id => value.includes(id));
+  function valid(value) {
+    const base = defaults();
+    const hideable = Object.values(definitions).flatMap(def => def.items.filter(item => !item.fixed).map(item => item.id));
+    return value && isPermutation(value.tabs, base.tabs) && value.order &&
+      base.tabs.every(id => isPermutation(value.order[id], base.order[id])) && Array.isArray(value.hidden) &&
+      new Set(value.hidden).size === value.hidden.length && value.hidden.every(id => hideable.includes(id));
+  }
+  let saved = defaults(), draft = copy(saved), selected = 'system', gesture = null, suppressClick = false;
+  const tabs = root.querySelector('.mm-tabs'), list = root.querySelector('.mm-list');
+  const status = root.querySelector('.mm-status'), saveButton = root.querySelector('[data-action="save"]');
+  const dirty = () => JSON.stringify(draft) !== JSON.stringify(saved);
+  function restore(state) {
+    const stored = state && state.privateContent;
+    if (!stored || stored.version !== 1 || !valid(stored.saved) || !valid(stored.draft)) return false;
+    if (JSON.stringify(stored.saved) === JSON.stringify(saved) && JSON.stringify(stored.draft) === JSON.stringify(draft) && stored.selected === selected) return false;
+    saved = copy(stored.saved); draft = copy(stored.draft);
+    selected = definitions[stored.selected] ? stored.selected : 'system'; return true;
+  }
+  restore(window.openai && window.openai.widgetState);
+  function remember() {
+    if (!window.openai || typeof window.openai.setWidgetState !== 'function') return;
+    window.openai.setWidgetState({
+      modelContent: { previewOnly: true, selectedTab: selected, draftLayout: copy(draft) },
+      privateContent: { version: 1, saved: copy(saved), draft: copy(draft), selected }
+    }).catch(() => {});
+  }
+  function updateStatus(message) {
+    saveButton.disabled = !dirty();
+    status.textContent = message || (dirty() ? '有未保存的更改' : '尚未修改');
+  }
+  function render(message) {
+    tabs.replaceChildren();
+    for (const id of draft.tabs) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'mm-tab cursor-interaction';
+      button.dataset.kind = 'tabs'; button.dataset.key = id; button.id = 'mm-tab-' + id;
+      button.setAttribute('role', 'tab'); button.setAttribute('aria-selected', String(id === selected));
+      button.setAttribute('aria-controls', 'mm-feature-list');
+      button.setAttribute('aria-label', definitions[id].name + '，拖动排序，或按 Option 加左右键');
+      button.innerHTML = '<i data-lucide="grip-vertical" aria-hidden="true"></i><span>' + definitions[id].name + '</span>';
+      button.addEventListener('click', () => { selected = id; render(); remember(); }); tabs.append(button);
+    }
+    list.replaceChildren();
+    root.querySelector('.mm-page-title').textContent = definitions[selected].name + '页功能';
+    list.setAttribute('aria-labelledby', 'mm-tab-' + selected);
+    for (const id of draft.order[selected]) {
+      const definition = definitions[selected].items.find(item => item.id === id);
+      const row = document.createElement('div'); row.className = 'mm-row';
+      row.dataset.kind = 'items'; row.dataset.key = id; row.dataset.visible = String(!draft.hidden.includes(id));
+      const handle = document.createElement('button'); handle.type = 'button'; handle.className = 'mm-grip';
+      handle.dataset.kind = 'items'; handle.dataset.key = id;
+      handle.setAttribute('aria-label', '排序' + definition.name + '，拖动或按 Option 加上下键');
+      handle.innerHTML = '<i data-lucide="grip-vertical" aria-hidden="true"></i>';
+      const name = document.createElement('span'); name.className = 'mm-name'; name.textContent = definition.name;
+      row.append(handle, name);
+      if (definition.fixed) {
+        const fixed = document.createElement('span'); fixed.className = 'mm-locked'; fixed.textContent = '常驻'; row.append(fixed);
+      } else {
+        const label = document.createElement('label'); label.className = 'mm-toggle cursor-interaction';
+        const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = !draft.hidden.includes(id);
+        checkbox.setAttribute('aria-label', '显示' + definition.name);
+        const labelText = document.createElement('span'); labelText.textContent = '显示';
+        checkbox.addEventListener('change', () => {
+          draft.hidden = checkbox.checked ? draft.hidden.filter(item => item !== id) : [...draft.hidden, id].sort();
+          row.dataset.visible = String(checkbox.checked); updateStatus(); remember();
+        });
+        label.append(checkbox, labelText); row.append(label);
+      }
+      list.append(row);
+    }
+    root.querySelector('.mm-note').textContent = definitions[selected].note;
+    updateStatus(message);
+    if (globalThis.lucide) lucide.createIcons({ attrs: { width: 16, height: 16 } });
+  }
+  function move(kind, source, target) {
+    const order = kind === 'tabs' ? draft.tabs : draft.order[selected];
+    const from = order.indexOf(source), to = order.indexOf(target);
+    if (from < 0 || to < 0 || from === to) return;
+    order.splice(from, 1); order.splice(to, 0, source); render(); remember();
+    const focus = kind === 'tabs' ? tabs.querySelector('[data-key="' + source + '"]') : list.querySelector('button[data-key="' + source + '"]');
+    if (focus) focus.focus();
+  }
+  const clearDrop = () => root.querySelectorAll('.mm-drop').forEach(el => el.classList.remove('mm-drop'));
+  root.addEventListener('click', event => {
+    if (suppressClick) { event.preventDefault(); event.stopImmediatePropagation(); }
+  }, true);
+  root.addEventListener('pointerdown', event => {
+    const source = event.target.closest('button[data-kind]');
+    if (!source || event.button !== 0) return;
+    gesture = { kind: source.dataset.kind, key: source.dataset.key, x: event.clientX, y: event.clientY, moved: false };
+    source.setPointerCapture(event.pointerId);
+  });
+  root.addEventListener('pointermove', event => {
+    if (!gesture) return;
+    if (Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) < 6 && !gesture.moved) return;
+    gesture.moved = true; event.preventDefault(); clearDrop();
+    const hit = document.elementFromPoint(event.clientX, event.clientY);
+    const target = hit && hit.closest('[data-kind]');
+    if (target && target.dataset.kind === gesture.kind) target.classList.add('mm-drop');
+  });
+  root.addEventListener('pointerup', event => {
+    if (!gesture) return;
+    const source = gesture; gesture = null; clearDrop();
+    if (!source.moved) return;
+    event.preventDefault(); suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+    const hit = document.elementFromPoint(event.clientX, event.clientY);
+    const target = hit && hit.closest('[data-kind]');
+    if (target && target.dataset.kind === source.kind) move(source.kind, source.key, target.dataset.key);
+  });
+  root.addEventListener('pointercancel', () => { gesture = null; clearDrop(); });
+  root.addEventListener('keydown', event => {
+    const source = event.target.closest('button[data-kind]');
+    if (!source || !event.altKey) return;
+    const kind = source.dataset.kind;
+    const delta = kind === 'tabs' ? ({ ArrowLeft: -1, ArrowRight: 1 })[event.key] : ({ ArrowUp: -1, ArrowDown: 1 })[event.key];
+    if (!delta) return; event.preventDefault();
+    const order = kind === 'tabs' ? draft.tabs : draft.order[selected];
+    const target = order[order.indexOf(source.dataset.key) + delta];
+    if (target) move(kind, source.dataset.key, target);
+  });
+  root.querySelector('[data-action="reset"]').addEventListener('click', () => {
+    draft = defaults(); render(dirty() ? '默认布局已恢复，保存后生效' : '已经是默认布局'); remember();
+  });
+  root.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+    draft = copy(saved); render('已放弃未保存的更改'); remember();
+  });
+  saveButton.addEventListener('click', () => { saved = copy(draft); render('已保存当前猫的布局（演示）'); remember(); });
+  window.addEventListener('openai:set_globals', event => {
+    if (restore(event.detail && event.detail.globals && event.detail.globals.widgetState)) render();
+  });
+  render();
+})();
+</script>
