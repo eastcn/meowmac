@@ -141,9 +141,12 @@ public enum ReminderCollector {
             let key = ReminderKind.source.rawValue + "." + object
             if failures == 0 { batch.confirmedKeys.insert(key) }
             if failures >= config.sourceFailureCount {
+                let provider = source.hasPrefix("quota.") ? QuotaProvider(rawValue: String(source.dropFirst(6))) : nil
+                let names = ["energy": "能耗", "system": "系统", "quota": "额度", "network": "网络"]
                 add(Reminder(kind: .source, object: object,
                              tab: source.hasPrefix("network") ? .network : source.hasPrefix("quota") ? .quota : .system,
-                             title: "数据源失效：\(source)", detail: "连续 \(failures) 次采集失败"))
+                             title: "数据源失效：" + (provider?.displayName ?? names[source] ?? source),
+                             detail: "连续 \(failures) 次采集失败", provider: provider))
             }
         }
         return batch
@@ -170,7 +173,7 @@ public struct SnoozeRecord: Codable, Equatable {
     public init(reminder: Reminder, acknowledgedAt: Date, until: Date) throws {
         guard reminder.canSnooze else { throw SnoozeError.invalid("这类问题需要持续提醒") }
         self.key = reminder.id; self.kind = reminder.kind; self.acknowledgedAt = acknowledgedAt
-        self.until = until; self.cycleResetAt = reminder.resetAt
+        self.until = until; self.cycleResetAt = [.quotaLow, .quotaPace].contains(reminder.kind) ? reminder.resetAt : nil
         try validate()
     }
     public static func validKey(_ key: String, kind: ReminderKind) -> Bool {
@@ -183,7 +186,8 @@ public struct SnoozeRecord: Codable, Equatable {
         guard Self.validKey(key, kind: kind), acknowledgedAt.timeIntervalSince1970.isFinite,
               until.timeIntervalSince1970.isFinite, duration >= 60,
               cycleResetAt.map({ $0.timeIntervalSince1970.isFinite }) ?? true,
-              duration <= 30 * 86400 || cycleResetAt == until else {
+              cycleResetAt == nil || [.quotaLow, .quotaPace].contains(kind),
+              duration <= 30 * 86400 || ([.quotaLow, .quotaPace].contains(kind) && cycleResetAt == until) else {
             throw SnoozeError.invalid("暂缓记录的类型、身份或时间无效")
         }
     }
@@ -202,7 +206,11 @@ public struct ReminderTracker {
         }
         for (key, fresh) in incoming {
             var value = fresh
-            if !fresh.confirmed, let old = current[key] { value.resetAt = old.resetAt }
+            if !fresh.confirmed, let old = current[key] {
+                // 不完整检测不能用较轻的局部结果覆盖已确认的严重问题。
+                if fresh.level < old.level { value = old; value.confirmed = false }
+                value.resetAt = old.resetAt
+            }
             if let saved = snoozes[key], fresh.confirmed, let oldReset = saved.cycleResetAt, let newReset = fresh.resetAt,
                abs(oldReset.timeIntervalSince(newReset)) > QuotaHistorySeries.resetTolerance {
                 snoozes.removeValue(forKey: key)

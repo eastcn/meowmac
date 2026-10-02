@@ -64,19 +64,19 @@ public enum PanelCardRegistry {
 
 @MainActor
 public final class PanelState: ObservableObject {
-    @Published public var snapshot: SystemSnapshot?
-    @Published public var energy: EnergyDiagnosis?
+    @Published public var snapshot: SystemSnapshot? { didSet { refreshReminders() } }
+    @Published public var energy: EnergyDiagnosis? { didSet { refreshReminders() } }
     @Published public var chartHistory = ChartHistory()
-    @Published public var quotas: [QuotaProvider: QuotaSnapshot] = [:]
+    @Published public var quotas: [QuotaProvider: QuotaSnapshot] = [:] { didSet { refreshReminders() } }
     @Published public var quotaHistory: [QuotaProvider: [QuotaHistoryLine]] = [:]
     @Published public var quotaErrors: [QuotaProvider: String] = [:]
     @Published public var localStorage: [QuotaProvider: LocalStorageSnapshot] = [:]
     private var storageLoading: Set<QuotaProvider> = []
     public var now: () -> Date = Date.init
     @Published public var costs: [QuotaProvider: [DailyCost]] = [:]
-    @Published public var networkTone: NetworkTone = .gray
-    @Published public var failures: [String: Int] = [:]
-    @Published public var fairSince: Date?
+    @Published public var networkTone: NetworkTone = .gray { didSet { refreshReminders() } }
+    @Published public var failures: [String: Int] = [:] { didSet { refreshReminders() } }
+    @Published public var fairSince: Date? { didSet { refreshReminders() } }
     @Published public var configResult: ConfigLoadResult
     @Published public var lastRefreshedAt: Date?
     @Published public var selectedTab: PanelTab = .system
@@ -86,7 +86,7 @@ public final class PanelState: ObservableObject {
     }
     @Published public private(set) var selectedCostDate: String?
     @Published public var loginEnabled = false
-    @Published public var networkModel: AppModel?
+    @Published public var networkModel: AppModel? { didSet { refreshReminders() } }
     public var networkCapture: NetworkCaptureInfo?
     @Published public var lastCleaning: CleaningRecord?
     @Published public var selectedCat: LoadedCat? = CatPackageLoader.defaultCat
@@ -95,6 +95,15 @@ public final class PanelState: ObservableObject {
     @Published public private(set) var panelLayout: PanelLayout = .default
     @Published public private(set) var layoutRecoveryReason: String?
     @Published public var catLevelOverride: HealthLevel?
+    @Published var reminderTracker = ReminderTracker()
+    @Published public var showingReminders = false
+    @Published public var reminderFilter: PanelTab?
+    @Published public var activeSnoozeID: String?
+    @Published public var reminderError: String?
+    public var energyUpdatedAt: Date?
+    var reminderStore: ReminderStore?
+    var reminderPersistenceDirty = false
+    var reminderSaveAttempt: Date?
     public var effectiveCatLevel: HealthLevel {
         catLevelOverride ?? health.level
     }
@@ -140,13 +149,13 @@ public final class PanelState: ObservableObject {
     }
 
     public var health: HealthSummary {
-        HealthEvaluator.evaluate(HealthInputs(system: snapshot, energy: energy,
-                                               quotaUsedPercent: quotas.values.flatMap { $0.windows.map(\.usedPercent) },
-                                               network: networkTone, failedSources: failures,
-                                               fairSince: fairSince, now: now(), quotaSnapshots: Array(quotas.values)), config: configResult.config)
+        projectedReminders.health(now: now())
     }
 
     public func open() {
+        showingReminders = false
+        activeSnoozeID = nil
+        refreshReminders()
         selectedTab = DefaultPanelLayout.openingTab(summary: health, lastViewed: readLastTab())
         if selectedTab == .quota { refreshStorageIfNeeded() }
     }
@@ -191,10 +200,10 @@ public struct OverviewMetric: Codable {
 
 public extension PanelState {
     var tabLevels: [HealthLevel] {
-        PanelTab.allCases.map { tab in health.issues.filter { $0.tab == tab }.map(\.level).max() ?? .normal }
+        PanelTab.allCases.map { tab in level(for: tab) }
     }
     func level(for tab: PanelTab) -> HealthLevel {
-        health.issues.filter { $0.tab == tab }.map(\.level).max() ?? .normal
+        allReminders.filter { $0.tab == tab }.map(\.level).max() ?? .normal
     }
     var overviewMetrics: [OverviewMetric] {
         let cpu = snapshot?.cpuUsage
@@ -261,16 +270,28 @@ public struct PanelView: View {
     public var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
+                if state.showingReminders {
+                    if state.activeSnoozeID != nil {
+                        Text("我已知道").font(Design.status).padding(Design.inset)
+                    } else { ReminderHeader(state: state) }
+                } else {
                 OverviewView(state: state)
                 CapsuleSelector(titles: state.panelLayout.tabs.map(\.title), selected: state.panelLayout.tabs.firstIndex(of: state.selectedTab) ?? 0,
                                 levels: state.panelLayout.tabs.map { state.level(for: $0) }) { state.select(state.panelLayout.tabs[$0]) }
                     .padding(.horizontal, Design.inset).padding(.bottom, Design.sectionGap)
+                }
                 SectionRule()
             }.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.header)
             if expanded { measuredContent }
             else { ScrollView { measuredContent }.frame(height: measurements.viewportHeight) }
             VStack(spacing: 0) {
                 SectionRule()
+                if state.showingReminders {
+                    VStack(alignment: .leading, spacing: Design.gap) {
+                        Text("已知晓会暂缓告警；持续故障仍需关注。").font(Design.caption).foregroundStyle(Design.secondary)
+                        if let error = state.reminderError { Text(error).font(Design.caption).foregroundStyle(Design.stateText(.warn)) }
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(Design.inset)
+                } else {
                 HStack(spacing: Design.rowGap) {
                     CapsuleAction(title: "刷新", symbol: "arrow.clockwise", action: state.onRefresh)
                     Spacer(minLength: 0)
@@ -279,6 +300,7 @@ public struct PanelView: View {
                     Spacer(minLength: 0)
                     CapsuleAction(title: "设置", symbol: "gearshape") { SettingsMenu.present(state: state) }
                 }.padding(.horizontal, Design.inset).padding(.vertical, Design.footerInset)
+                }
             }.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.footer)
         }.frame(width: Design.panelWidth)
             .frame(height: expanded ? nil : measurements.panelHeight, alignment: .top)
@@ -287,7 +309,13 @@ public struct PanelView: View {
     }
 
     private var measuredContent: some View {
-        tabContent.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.content)
+        Group {
+            if state.showingReminders {
+                if let id = state.activeSnoozeID, let reminder = state.allReminders.first(where: { $0.id == id }) {
+                    SnoozeForm(state: state, reminder: reminder).id(id)
+                } else { ReminderList(state: state) }
+            } else { tabContent }
+        }.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.content)
     }
 }
 
@@ -351,7 +379,7 @@ struct OverviewView: View {
                                 Text(issue.message)
                                 Image(systemName: "chevron.right").foregroundStyle(Design.secondary).font(Design.caption)
                             }.font(Design.status).multilineTextAlignment(.leading)
-                        } else { Text("一切正常").font(Design.status) }
+                        } else { Text(state.snoozedReminders.isEmpty ? "一切正常" : "当前无待关注提醒").font(Design.status) }
                         Spacer(minLength: 0)
                         if state.health.level == .normal {
                             Text(DisplayDate.age(state.lastRefreshedAt, now: state.now())).font(Design.caption).foregroundStyle(Design.secondary)
@@ -362,10 +390,17 @@ struct OverviewView: View {
                     HStack(spacing: Design.rowGap) {
                         Text("建议降温").font(Design.caption).fontWeight(.semibold).foregroundStyle(Design.stateText(.warn))
                             .padding(.horizontal, Design.rowGap).padding(.vertical, Design.rule).background(Design.orange.opacity(Design.mutedFill), in: Capsule())
-                        if state.health.issues.count > 1 { Text("另有 \(state.health.issues.count - 1) 项问题，见系统页").font(Design.caption).foregroundStyle(Design.secondary) }
                     }.padding(.leading, Design.catWidth + Design.rowGap)
                 }
             }
+            Button { state.showReminders() } label: {
+                HStack {
+                    Text("全部提醒 · \(state.allReminders.count) 项")
+                    if !state.snoozedReminders.isEmpty { Text("已知晓 \(state.snoozedReminders.count)").foregroundStyle(Design.secondary) }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }.font(Design.caption).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityIdentifier("reminders.open")
             HStack(alignment: .top, spacing: Design.metricGap) {
                 ForEach(state.overviewMetrics.indices, id: \.self) { index in
                     let metric = state.overviewMetrics[index]
@@ -374,6 +409,7 @@ struct OverviewView: View {
                 }
             }
             if let error = state.configResult.error { Text(error).font(Design.caption).foregroundStyle(Design.stateText(.warn)) }
+            if let error = state.reminderError { Text(error).font(Design.caption).foregroundStyle(Design.stateText(.warn)) }
         }.padding(.horizontal, Design.inset).padding(.top, Design.headerTop).padding(.bottom, Design.headerTop)
     }
 }

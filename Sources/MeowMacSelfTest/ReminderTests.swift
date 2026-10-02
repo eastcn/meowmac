@@ -51,7 +51,12 @@ enum ReminderTests {
             var tracker = ReminderTracker();let normal = disk()
             tracker.snoozes[normal.id] = try SnoozeRecord(reminder: normal, acknowledgedAt: now, until: now.addingTimeInterval(3600))
             tracker.reconcile(ReminderBatch(reminders: [serious]), now: now)
-            return tracker.snoozes.isEmpty && tracker.health(now: now).level == .severe
+            guard tracker.snoozes.isEmpty && tracker.health(now: now).level == .severe else { return false }
+            let network = Reminder(kind: .network, object: "sample", tab: .network, level: .severe, title: "严重网络问题")
+            tracker.reconcile(ReminderBatch(reminders: [network]), now: now)
+            let partial = Reminder(kind: .network, object: "sample", tab: .network, title: "局部结果", confirmed: false)
+            tracker.reconcile(ReminderBatch(reminders: [partial]), now: now)
+            return tracker.current[network.id]?.level == .severe && tracker.current[network.id]?.confirmed == false
         }),
         ("Core.Reminders/无效时间拒绝", {
             for seconds in [-1.0, 0, 59, 30 * 86400 + 1, .infinity, .nan] {
