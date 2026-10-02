@@ -162,9 +162,9 @@ enum SelfTestMain {
                 let item = cats.items[index]
                 guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
             }
-            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
-                && menu.items[3].isEnabled && menu.items[4].state == .on
-                && menu.items[2].isSeparatorItem && menu.items[5].isSeparatorItem && menu.items[7].keyEquivalent == "q"
+            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
+                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].state == .on
+                && menu.items[2].isSeparatorItem && menu.items[6].isSeparatorItem && menu.items[8].keyEquivalent == "q"
                 && selected == "builtin.round" && imported && shown
                 && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
@@ -173,6 +173,10 @@ enum SelfTestMain {
         tests.append(("UI.Panel/真实容器的自然高度与切换", { await PanelLayoutTests.heights() }))
         tests.append(("UI.PanelLayout/渲染顺序固定区与快照", { PanelLayoutUITests.renderingAndSnapshot() }))
         tests.append(("UI.PanelLayout/默认与极端容器尺寸", { await PanelLayoutUITests.sizes() }))
+        tests.append(("UI.LayoutSettings/原生菜单与草稿", { LayoutSettingsTests.menuAndDraft() }))
+        tests.append(("UI.LayoutSettings/保存失败与切猫", { LayoutSettingsTests.saveAndFailure() }))
+        tests.append(("UI.LayoutSettings/拖动回调与坏文件提示", { await LayoutSettingsTests.dropAndRecovery() }))
+        tests.append(("UI.LayoutSettings/真实控件操作", { LayoutSettingsTests.actualControls() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.RenderPreview/三个标签页", { await SelfTestMain.renderPanel() }))
             tests.append(("UI.RenderComponents/基础组件", { SelfTestMain.renderComponents() }))

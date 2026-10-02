@@ -14,6 +14,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var quotaCoordinator: QuotaCoordinator?
     private let panelState = PanelState()
     private let catStore = CatStore()
+    private lazy var layoutSettings = LayoutSettingsController(state: panelState)
     private let logger = Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "app")
     private let collector = SystemCollector()
     private var energyTracker = EnergyTracker()
@@ -68,6 +69,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         panelState.onSelectCat = { [weak self] id in self?.selectCat(id) }
         panelState.onImportCat = { [weak self] in self?.importCat() }
         panelState.onShowCats = { [weak self] in self?.showCats() }
+        panelState.onShowLayoutSettings = { [weak self] in self?.layoutSettings.present() }
+        panelState.onCatChanged = { [weak self] in self?.layoutSettings.catDidChange() }
         panelState.onQuit = { NSApplication.shared.terminate(nil) }
         panelState.loginEnabled = loginItem.status == .enabled
         panelState.onToggleLogin = { [weak self] enabled in

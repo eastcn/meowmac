@@ -176,6 +176,7 @@ public final class CatStore {
         try saveSelection(id, root: root)
         state.selectedCat = selected
         state.loadLayoutForSelectedCat()
+        state.onCatChanged()
         return selected
     }
 
@@ -257,6 +258,7 @@ public final class CatStore {
         }
         state.selectedCat = copied
         state.loadLayoutForSelectedCat()
+        state.onCatChanged()
         return copied
     }
 }

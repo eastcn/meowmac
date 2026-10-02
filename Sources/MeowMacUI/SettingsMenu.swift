@@ -38,6 +38,7 @@ public enum SettingsMenu {
         let catItem = NSMenuItem(title: "猫配置", action: nil, keyEquivalent: "")
         catItem.submenu = catMenu
         menu.addItem(catItem)
+        add("布局与显示…", enabled: state.selectedCat != nil, action: state.onShowLayoutSettings)
         add("开机启动", checked: state.loginEnabled) { state.onToggleLogin(!state.loginEnabled) }
         menu.addItem(.separator())
         add("关于 MeowMac") { NSApplication.shared.orderFrontStandardAboutPanel(nil) }
