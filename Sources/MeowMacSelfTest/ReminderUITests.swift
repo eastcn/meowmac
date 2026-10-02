@@ -21,6 +21,10 @@ enum ReminderUITests {
     static func lifecycle() -> Bool {
         do {
             let (state, root) = try prepare(); setDisk(state, available: 50)
+            state.failures["quota.claude"] = 2
+            guard let source = state.allReminders.first(where: { $0.kind == .source }), source.provider == .claude,
+                  state.reminderDataTime(source) == "待确认 · 没有有效数据时间" else { return false }
+            state.failures["quota.claude"] = 0
             guard let disk = state.allReminders.first(where: { $0.kind == .disk }), state.health.level == .warn else { return false }
             let clock = state.now()
             try state.snooze(disk.id, seconds: 2 * 86400)

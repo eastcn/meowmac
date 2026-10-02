@@ -65,7 +65,7 @@ private struct ReminderRow: View {
                         .overlay(RoundedRectangle(cornerRadius: 5).stroke(Design.state(reminder.level)))
                 }
                 if !reminder.detail.isEmpty { Text(reminder.detail).font(Design.body).fixedSize(horizontal: false, vertical: true) }
-                Text(reminder.confirmed ? reminder.sampledAt.map { "数据：" + DisplayDate.age($0, now: state.now()) } ?? "采集时间不可用" : "待确认 · 保留上次问题")
+                Text(state.reminderDataTime(reminder))
                     .font(Design.caption).foregroundStyle(Design.secondary)
                 if let end = state.snoozeDeadline(reminder) {
                     Text("暂缓至 " + DisplayDate.format(end, pattern: "M 月 d 日 HH:mm")).font(Design.caption).foregroundStyle(Design.secondary)

@@ -23,6 +23,11 @@ public extension PanelState {
     var allReminders: [Reminder] { projectedReminders.sorted() }
     var snoozedReminders: [Reminder] { allReminders.filter { projectedReminders.isSnoozed($0, now: now()) } }
     var pendingReminders: [Reminder] { allReminders.filter { $0.level > .normal && !projectedReminders.isSnoozed($0, now: now()) } }
+    func reminderDataTime(_ reminder: Reminder) -> String {
+        guard reminder.confirmed else { return "待确认 · 保留上次问题" }
+        guard let date = reminder.sampledAt else { return "待确认 · 没有有效数据时间" }
+        return "数据：" + DisplayDate.age(date, now: now())
+    }
     func snoozeDeadline(_ reminder: Reminder) -> Date? {
         let tracker = projectedReminders
         return tracker.isSnoozed(reminder, now: now()) ? tracker.snoozes[reminder.id]?.until : nil
