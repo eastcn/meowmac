@@ -44,6 +44,8 @@ enum SelfTestMain {
             ("Core.Health/降温与诊断文案", { SelfTestMain.healthMessages() }),
             ("Core.Health/系统与能耗信号", { SelfTestMain.healthSystemSignals() }),
             ("Core.Panel/默认标签页", { SelfTestMain.openingTab() }),
+            ("Core.PanelLayout/完整排列与严格校验", { PanelLayoutCoreTests.validation() }),
+            ("Core.PanelLayout/v1 v2 包兼容", { PanelLayoutCoreTests.packageCompatibility() }),
             ("Core.Cat/速度映射", { SelfTestMain.catMotion() }),
             ("Core.CatPackage/严格清单", { CatPackageTests.core() }),
             ("UI.CatPackage/内置资源与文件边界", { CatPackageTests.ui() }),

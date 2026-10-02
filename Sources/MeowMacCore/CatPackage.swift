@@ -36,6 +36,7 @@ public struct CatPackage: Equatable {
     public let severeSize: [Int]
     public let severeBounds: CatRect
     public let zzAnchorFraction: Double
+    public let panel: PanelLayout
 
     public static func parse(_ data: Data, builtin: Bool = false) throws -> CatPackage {
         func fail(_ reason: String) -> CatPackageError { .invalid(reason) }
@@ -73,8 +74,16 @@ public struct CatPackage: Equatable {
             return name
         }
         guard let raw = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else { throw fail("清单不是有效 JSON") }
-        let root = try object(raw, keys: ["schemaVersion", "id", "name", "run", "severe"], label: "清单")
-        guard try integer(root["schemaVersion"], label: "schemaVersion") == 1 else { throw fail("不支持的 schemaVersion") }
+        guard let root = raw as? [String: Any] else { throw fail("清单字段无效") }
+        let version = try integer(root["schemaVersion"], label: "schemaVersion")
+        guard version == 1 || version == 2 else { throw fail("不支持的 schemaVersion") }
+        let keys: Set<String> = version == 1 ? ["schemaVersion", "id", "name", "run", "severe"] : ["schemaVersion", "id", "name", "run", "severe", "panel"]
+        guard Set(root.keys) == keys else { throw fail("清单字段缺失或含未知字段") }
+        let panel: PanelLayout
+        if version == 2 {
+            guard let value = root["panel"], let data = try? JSONSerialization.data(withJSONObject: value) else { throw fail("panel 无效") }
+            panel = try PanelLayout.parse(data)
+        } else { panel = .default }
         let id = try string(root["id"], label: "id")
         let allowed = builtin ? "abcdefghijklmnopqrstuvwxyz0123456789._-" : "abcdefghijklmnopqrstuvwxyz0123456789._-"
         guard (1...64).contains(id.utf8.count), id.first.map({ "abcdefghijklmnopqrstuvwxyz0123456789".contains($0) }) == true,
@@ -115,6 +124,6 @@ public struct CatPackage: Equatable {
               zzNumber.doubleValue.isFinite, (0...1).contains(zzNumber.doubleValue) else { throw fail("zzAnchorFraction 须在 0～1 之间") }
         return CatPackage(id: id, name: name, runImage: runImage, rendering: rendering, runSize: runSize,
                           canvas: canvas, noseAnchor: noseAnchor, topPadding: topPadding, frames: frames,
-                          severeImage: severeImage, severeSize: severeSize, severeBounds: severeBounds, zzAnchorFraction: zzNumber.doubleValue)
+                          severeImage: severeImage, severeSize: severeSize, severeBounds: severeBounds, zzAnchorFraction: zzNumber.doubleValue, panel: panel)
     }
 }
