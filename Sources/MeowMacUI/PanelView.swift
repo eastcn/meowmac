@@ -21,11 +21,45 @@ public struct AnyPanelCard: Card {
     public let id: String
     public let title: String
     private let render: (PanelState) -> AnyView
+    private let available: (PanelState) -> Bool
 
-    public init(id: String, title: String, render: @escaping (PanelState) -> AnyView) {
-        self.id = id; self.title = title; self.render = render
+    public init(id: String, title: String, available: @escaping (PanelState) -> Bool = { _ in true },
+                render: @escaping (PanelState) -> AnyView) {
+        self.id = id; self.title = title; self.available = available; self.render = render
     }
     public func makeView(state: PanelState) -> AnyView { render(state) }
+    public func isAvailable(state: PanelState) -> Bool { available(state) }
+}
+
+@MainActor
+public enum PanelCardRegistry {
+    public static let cards: [String: AnyPanelCard] = Dictionary(uniqueKeysWithValues:
+        PanelLayoutCatalog.definitions.values.flatMap { $0 }.map { definition in
+            (definition.id, AnyPanelCard(id: definition.id, title: definition.title, available: { state in
+                switch definition.id {
+                case "quota.trend": return state.quotas[state.selectedProvider] != nil
+                case "quota.cost": return state.costDisplay(state.selectedProvider) != nil
+                case "quota.storage": return [.claude, .codex].contains(state.selectedProvider) && state.localStorage[state.selectedProvider] != nil
+                case "network.checks", "network.sites", "network.egress": return state.networkModel != nil
+                default: return true
+                }
+            }, render: { state in
+                switch definition.id {
+                case "system.chart": return AnyView(SystemChartCard(state: state))
+                case "system.energy": return AnyView(EnergyCard(state: state))
+                case "system.disk": return AnyView(DiskCard(state: state))
+                case "quota.trend": return AnyView(QuotaTrendView(state: state, provider: state.selectedProvider))
+                case "quota.cost":
+                    return AnyView(state.costDisplay(state.selectedProvider).map { CostCard(state: state, value: $0, provider: state.selectedProvider) })
+                case "quota.storage":
+                    return AnyView(state.localStorage[state.selectedProvider].map { StorageCard(state: state, provider: state.selectedProvider, value: $0) })
+                case "network.checks": return AnyView(state.networkModel.map { NetworkChecks(model: $0) })
+                case "network.sites": return AnyView(state.networkModel.map { NetworkSites(model: $0) })
+                case "network.egress": return AnyView(state.networkModel.map { NetworkEgress(model: $0) })
+                default: return AnyView(EmptyView())
+                }
+            }))
+        })
 }
 
 @MainActor
@@ -76,6 +110,10 @@ public final class PanelState: ObservableObject {
     public var onImportCat: () -> Void = {}
     public var onShowCats: () -> Void = {}
     public var onShowLayoutSettings: () -> Void = {}
+    public var readLastTab: () -> PanelTab = {
+        UserDefaults.standard.string(forKey: "lastPanelTab").flatMap(PanelTab.init(rawValue:)) ?? .system
+    }
+    public var writeLastTab: (PanelTab) -> Void = { UserDefaults.standard.set($0.rawValue, forKey: "lastPanelTab") }
 
     public func loadLayoutForSelectedCat() {
         let loaded = layoutStore?.load(cat: selectedCat) ?? PanelLayoutLoad(layout: selectedCat?.package.panel ?? .default, recoveryReason: nil)
@@ -92,6 +130,10 @@ public final class PanelState: ObservableObject {
         layoutRecoveryReason = nil
     }
 
+    public func renderedCardIDs(for tab: PanelTab) -> [String] {
+        panelLayout.visibleIDs(for: tab).filter { PanelCardRegistry.cards[$0]?.isAvailable(state: self) == true }
+    }
+
     public init(configResult: ConfigLoadResult = ConfigStore.load()) {
         self.configResult = configResult
     }
@@ -104,8 +146,7 @@ public final class PanelState: ObservableObject {
     }
 
     public func open() {
-        let last = UserDefaults.standard.string(forKey: "lastPanelTab").flatMap(PanelTab.init(rawValue:)) ?? .system
-        selectedTab = DefaultPanelLayout.openingTab(summary: health, lastViewed: last)
+        selectedTab = DefaultPanelLayout.openingTab(summary: health, lastViewed: readLastTab())
         if selectedTab == .quota { refreshStorageIfNeeded() }
     }
 
@@ -134,7 +175,7 @@ public final class PanelState: ObservableObject {
     public func select(_ tab: PanelTab) {
         if tab == .quota { refreshStorageIfNeeded() }
         selectedTab = tab
-        UserDefaults.standard.set(tab.rawValue, forKey: "lastPanelTab")
+        writeLastTab(tab)
     }
 }
 
@@ -150,6 +191,9 @@ public struct OverviewMetric: Codable {
 public extension PanelState {
     var tabLevels: [HealthLevel] {
         PanelTab.allCases.map { tab in health.issues.filter { $0.tab == tab }.map(\.level).max() ?? .normal }
+    }
+    func level(for tab: PanelTab) -> HealthLevel {
+        health.issues.filter { $0.tab == tab }.map(\.level).max() ?? .normal
     }
     var overviewMetrics: [OverviewMetric] {
         let cpu = snapshot?.cpuUsage
@@ -198,11 +242,16 @@ public struct PanelView: View {
         VStack(alignment: .leading, spacing: Design.sectionGap) {
             switch state.selectedTab {
             case .system:
-                DiagnosisCard(state: state); SystemChartCard(state: state); SectionRule(); EnergyCard(state: state); SectionRule(); DiskCard(state: state)
+                if !state.diagnosisRows.isEmpty { DiagnosisCard(state: state) }
+                let ids = state.renderedCardIDs(for: .system)
+                ForEach(Array(ids.enumerated()), id: \.element) { index, id in
+                    if index > 0 { SectionRule() }
+                    PanelCardRegistry.cards[id]?.makeView(state: state)
+                }
             case .quota:
                 QuotaPage(state: state)
             case .network:
-                if let model = state.networkModel { NetworkPage(model: model) }
+                if let model = state.networkModel { NetworkPage(model: model, state: state) }
                 else { Text("网络检测未启动").font(Design.caption).foregroundStyle(Design.secondary) }
             }
         }.padding(.horizontal, Design.inset).padding(.vertical, Design.sectionGap)
@@ -212,7 +261,8 @@ public struct PanelView: View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
                 OverviewView(state: state)
-                CapsuleSelector(titles: ["系统", "额度", "网络"], selected: PanelTab.allCases.firstIndex(of: state.selectedTab) ?? 0, levels: state.tabLevels) { state.select(PanelTab.allCases[$0]) }
+                CapsuleSelector(titles: state.panelLayout.tabs.map(\.title), selected: state.panelLayout.tabs.firstIndex(of: state.selectedTab) ?? 0,
+                                levels: state.panelLayout.tabs.map { state.level(for: $0) }) { state.select(state.panelLayout.tabs[$0]) }
                     .padding(.horizontal, Design.inset).padding(.bottom, Design.sectionGap)
                 SectionRule()
             }.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.header)

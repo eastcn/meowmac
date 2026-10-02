@@ -145,11 +145,12 @@ struct QuotaPage: View {
                         if !credits.expiresAt.isEmpty { Text(credits.expiresAt.map { DisplayDate.format($0, pattern: "M/d") + " 过期" }.joined(separator: " · ")).font(Design.caption).foregroundStyle(Design.secondary) }
                     } }
                 }
-                SectionRule()
-                QuotaTrendView(state: state, provider: provider)
             }
-            if let cost = state.costDisplay(provider) { SectionRule(); CostCard(state: state, value: cost, provider: provider) }
-            if [.claude, .codex].contains(provider), let storage = state.localStorage[provider] { SectionRule(); StorageCard(state: state, provider: provider, value: storage) }
+            let ids = state.renderedCardIDs(for: .quota)
+            ForEach(ids, id: \.self) { id in
+                SectionRule()
+                PanelCardRegistry.cards[id]?.makeView(state: state)
+            }
         }
     }
 }

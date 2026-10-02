@@ -11,6 +11,10 @@ public struct TabsSnapshot: Codable {
     public let levels: [String: HealthLevel]
     public let defaultTab: PanelTab
 }
+public struct PanelLayoutSnapshot: Codable {
+    public let effective: PanelLayout
+    public let fallback: Bool
+}
 public struct SystemPanelSnapshot: Codable {
     public let latest: SystemSnapshot?
     public let diagnosis: [DiagnosisRow]
@@ -48,6 +52,7 @@ public struct PanelSnapshot: Codable {
     public let quota: [QuotaChannelDisplay]
     public let network: NetworkDisplay?
     public let cat: CatDisplay
+    public let layout: PanelLayoutSnapshot
     @MainActor public init(state: PanelState) {
         overview = OverviewSnapshot(capturedAt: state.now(), health: state.health, metrics: state.overviewMetrics, quotaUpdatedAt: state.quotaUpdatedAt)
         tabs = TabsSnapshot(levels: Dictionary(uniqueKeysWithValues: zip(PanelTab.allCases.map(\.rawValue), state.tabLevels)), defaultTab: DefaultPanelLayout.openingTab(summary: state.health, lastViewed: state.selectedTab))
@@ -58,6 +63,7 @@ public struct PanelSnapshot: Codable {
         networkDisplay?.capture = state.networkCapture
         network = networkDisplay
         cat = state.catDisplay()
+        layout = PanelLayoutSnapshot(effective: state.panelLayout, fallback: state.layoutRecoveryReason != nil || state.selectedCat == nil)
     }
 }
 public extension PanelState {

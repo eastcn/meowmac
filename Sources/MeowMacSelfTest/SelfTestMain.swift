@@ -76,14 +76,14 @@ enum SelfTestMain {
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }
         tests.append(("UI.System/两类诊断与持续时间", { DiagnosisTests.rows() }))
-        tests.append(("UI.Snapshot/六部分与关键字段编码", { @MainActor in
+        tests.append(("UI.Snapshot/七部分与关键字段编码", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(quotaAlert: true)
             do {
                 let data = try JSONEncoder().encode(PanelSnapshot(state: state))
-                guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], object.count == 6,
+                guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], object.count == 7,
                     let quota = object["quota"] as? [[String: Any]], let codex = quota.first(where: { $0["provider"] as? String == "codex" }),
                     let windows = codex["windows"] as? [[String: Any]] else { return false }
-                return Set(object.keys) == Set(["overview", "tabs", "system", "quota", "network", "cat"]) && windows.count == 2
+                return Set(object.keys) == Set(["overview", "tabs", "system", "quota", "network", "cat", "layout"]) && windows.count == 2
                     && windows[1]["remainingPercent"] as? Double == 30 && windows[1]["pace"] != nil && codex["resetCredits"] != nil && codex["storage"] != nil && codex["cost"] != nil
             } catch { print("快照编码失败：\(error)"); return false }
         }))
@@ -171,6 +171,8 @@ enum SelfTestMain {
         tests.append(("UI.Cat/真实初始化与诊断快照", { CatIntegrationTests.snapshotAndSwitch() }))
         tests.append(("UI.Cat/同名导入菜单", { CatIntegrationTests.menuDuplicates() }))
         tests.append(("UI.Panel/真实容器的自然高度与切换", { await PanelLayoutTests.heights() }))
+        tests.append(("UI.PanelLayout/渲染顺序固定区与快照", { PanelLayoutUITests.renderingAndSnapshot() }))
+        tests.append(("UI.PanelLayout/默认与极端容器尺寸", { await PanelLayoutUITests.sizes() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.RenderPreview/三个标签页", { await SelfTestMain.renderPanel() }))
             tests.append(("UI.RenderComponents/基础组件", { SelfTestMain.renderComponents() }))

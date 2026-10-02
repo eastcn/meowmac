@@ -63,6 +63,7 @@ public extension AppModel {
 }
 struct NetworkPage: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var state: PanelState
     var body: some View {
         let value = model.meowMacDisplay
         VStack(alignment: .leading, spacing: Design.sectionGap) {
@@ -81,8 +82,18 @@ struct NetworkPage: View {
                 Text(DisplayDate.age(value.checkedAt, now: model.now()) + "检测").font(Design.caption).foregroundStyle(Design.secondary)
                 Spacer(); CapsuleAction(title: value.isChecking ? "正在检测…" : "立即复测", action: model.recheck).disabled(value.isChecking)
             }
-            SectionRule()
-            VStack(alignment: .leading, spacing: Design.rowGap) {
+            ForEach(state.renderedCardIDs(for: .network), id: \.self) { id in
+                SectionRule()
+                PanelCardRegistry.cards[id]?.makeView(state: state)
+            }
+        }
+    }
+}
+struct NetworkChecks: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        let value = model.meowMacDisplay
+        VStack(alignment: .leading, spacing: Design.rowGap) {
                 SectionHeading(title: "连接检查", detail: "\(value.passed) / 5 通过")
                 ForEach(value.checks.indices, id: \.self) { index in
                     let check = value.checks[index]
@@ -96,9 +107,14 @@ struct NetworkPage: View {
                         Text(check.status).font(Design.caption).foregroundStyle(check.tone == .gray ? Design.secondary : Design.stateText(check.tone == .green ? .normal : check.tone == .red ? .severe : .warn)).fixedSize()
                     }
                 }
-            }
-            SectionRule()
-            VStack(alignment: .leading, spacing: Design.gap) {
+        }
+    }
+}
+struct NetworkSites: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        let value = model.meowMacDisplay
+        VStack(alignment: .leading, spacing: Design.gap) {
                 SectionHeading(title: "站点连通性", detail: "最近 5 轮")
                 HStack { Text("目标分组"); Spacer(); Text("通过").frame(width: Design.siteCountColumn, alignment: .trailing); Text("延迟中位数").frame(width: Design.siteLatencyColumn, alignment: .trailing) }.font(Design.tiny).foregroundStyle(Design.secondary).frame(height: Design.tableHeader)
                 ForEach(value.groups.indices, id: \.self) { index in
@@ -109,9 +125,14 @@ struct NetworkPage: View {
                         HStack(spacing: Design.smallGap) { Text(row.medianMilliseconds.map { String(format: "%.0f", $0) } ?? "—"); Text("ms").foregroundStyle(Design.secondary) }.frame(width: Design.siteLatencyColumn, alignment: .trailing)
                     }.font(Design.body).frame(height: Design.tableRow)
                 }
-            }
-            SectionRule()
-            VStack(alignment: .leading, spacing: Design.rowGap) {
+        }
+    }
+}
+struct NetworkEgress: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        let value = model.meowMacDisplay
+        VStack(alignment: .leading, spacing: Design.rowGap) {
                 SectionHeading(title: "出口 IP", detail: "每 \(Int(value.samplingInterval / 60)) 分钟采样")
                 ForEach(value.egress.indices, id: \.self) { index in
                     let row = value.egress[index]
@@ -120,7 +141,6 @@ struct NetworkPage: View {
                         HStack { if let region = row.region { Text(region) }; Spacer(); Text(row.stability) }.font(Design.caption).foregroundStyle(Design.secondary)
                     }
                 }
-            }
         }
     }
 }
