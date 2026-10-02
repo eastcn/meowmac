@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeowMac · 提醒交互草稿</title>
+<style>
+:root{color-scheme:light;--ink:#1d1d1f;--muted:#68686e;--line:#d8d8dd;--track:#e4e4e9;--panel:rgba(250,250,252,.94);--orange:#b25000;--red:#d70015;--green:#1e8e3e;--blue:#0a6cff}
+*{box-sizing:border-box}body{margin:0;background:#ececef;color:var(--ink);font:13px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;font-variant-numeric:tabular-nums}button,input,select{font:inherit;color:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:3px}button:disabled{cursor:default;opacity:.45}button{border:0;background:none}button:hover{background:rgba(128,128,140,.10)}[hidden]{display:none!important}
+.studio{max-width:1120px;margin:0 auto;padding:40px 32px}.mast{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #cccdd2;padding-bottom:18px}.brand{font-size:24px;font-weight:650;letter-spacing:-.7px}.draft{color:var(--muted);font-size:12px}.workspace{display:grid;grid-template-columns:260px 360px;gap:64px;justify-content:center;align-items:start;margin-top:34px}.notes{padding-top:9px}.eyebrow{font-size:11px;color:var(--muted);letter-spacing:1px}.notes h1{font-size:26px;font-weight:620;line-height:1.3;margin:10px 0 18px;letter-spacing:-.6px}.notes p{font-size:13px;line-height:1.8;margin:0 0 16px}.notes ol{padding-left:20px;line-height:1.9;color:var(--muted)}.sim{border-top:1px solid var(--line);margin-top:26px;padding-top:20px;display:flex;flex-wrap:wrap;gap:8px}.sim .eyebrow{width:100%;margin-bottom:4px}.sim button,.theme{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:11px}.caption{color:var(--muted);line-height:1.7;font-size:11px;margin-top:16px}.device{width:360px}.menubar{height:30px;margin-right:16px;text-align:right;display:flex;gap:12px;align-items:center;justify-content:flex-end;font-size:11px;color:var(--muted)}.menubar svg{width:32px;height:19px}.panel{width:360px;border:1px solid rgba(128,128,140,.18);border-radius:19px;background:var(--panel);box-shadow:0 22px 65px #17172420,0 3px 12px #1717240d;overflow:hidden;position:relative}.top{padding:16px}.statusline{display:flex;gap:8px;align-items:flex-start;font-size:15px;font-weight:600;line-height:1.4}.statusline svg{width:27px;height:20px;flex-shrink:0}.statusline .text{min-width:0}.tone-warn{color:var(--orange)}.tone-severe{color:var(--red)}.tone-normal{color:var(--green)}.minor{font-size:11px;color:var(--muted);font-weight:400}.entry{margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}.link{color:var(--blue);padding:4px 0;font-size:12px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px}.metric small{color:var(--muted);font-size:11px}.metric strong{display:block;font-size:20px;font-weight:600;margin:3px 0}.metric .sub{font-size:10px;color:var(--muted);white-space:nowrap}.bar{height:3px;border-radius:4px;background:var(--track);margin-top:6px}.bar i{display:block;height:100%;border-radius:4px;background:#0a84ff}.tabs{display:flex;margin:0 16px 12px;padding:3px;background:var(--track);border-radius:20px;gap:2px}.tabs button{flex:1;border-radius:20px;font-size:13px;height:28px}.tabs button.active{background:#fff;box-shadow:0 1px 4px #0002;font-weight:600}.cardbody{padding:0 16px 18px;min-height:270px}.section{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.heading{font-weight:600;font-size:13px;display:flex;justify-content:space-between}.heading span{font-weight:400;color:var(--muted);font-size:11px}.chart{height:70px;width:100%;margin:12px 0 5px}.table-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)}.diagnosis{background:#ff950012;border:1px solid #ff950033;border-radius:12px;padding:12px;line-height:1.6}.foot{display:flex;gap:12px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding:12px 16px}.capsule{border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-size:12px;background:#ffffff55}.listhead{padding:14px 16px 12px;border-bottom:1px solid var(--line)}.titleline{display:flex;align-items:center;gap:12px}.back{font-size:17px;padding:0 6px 0 0;color:var(--blue);line-height:24px}.titleline h2{font-size:15px;margin:0;font-weight:600;flex:1}.filters{display:flex;gap:4px;margin-top:13px;border-radius:20px;padding:3px;background:var(--track)}.filters button{flex:1;height:26px;font-size:12px;border-radius:20px}.filters button[aria-pressed=true]{background:#fff;box-shadow:0 1px 4px #0002;font-weight:600}.listbody{padding:0 16px 14px;max-height:650px;overflow:auto;scrollbar-width:thin}.grouphead{display:flex;justify-content:space-between;font-size:12px;font-weight:600;padding-top:16px;padding-bottom:6px}.grouphead .minor{font-size:11px}.row{padding:12px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}.rowtitle{font-weight:600;display:flex;align-items:center;gap:7px}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}.badge{font-size:10px;border:1px solid currentColor;border-radius:5px;padding:0 4px;margin-left:auto;font-weight:400}.detail{line-height:1.6;margin:5px 0 4px;color:var(--muted);font-size:11px;padding-left:14px}.actions{display:flex;justify-content:space-between;align-items:center;margin-top:5px;padding-left:14px}.actions button{font-size:12px}.snooze{border:1px solid var(--line);border-radius:14px;padding:4px 9px;background:#fff}.readonly{font-size:10px;color:var(--muted)}.empty{padding:36px 4px;text-align:center;color:var(--muted);line-height:1.9}.listfoot{border-top:1px solid var(--line);padding:10px 16px;font-size:10px;line-height:1.6;color:var(--muted)}.overlay{position:absolute;inset:0;background:#20202740;display:flex;align-items:center;justify-content:center;padding:16px}.dialog{width:100%;border:1px solid var(--line);border-radius:14px;background:#fafafc;box-shadow:0 8px 28px #0002;padding:16px}.dialog h3{font-size:15px;margin:0 0 8px}.dialog p{color:var(--muted);font-size:11px;line-height:1.6;margin:0 0 14px}.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.presets button{padding:8px 4px;border-radius:8px;background:#fff;border:1px solid var(--line);font-size:12px}.presets button.selected{border-color:var(--blue);color:var(--blue);background:#0a6cff0b}.reset-choice{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:8px;text-align:left;font-size:12px}.reset-choice.selected{border-color:var(--blue);color:var(--blue)}.custom{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px}.custom input{width:85px;border:1px solid var(--line);border-radius:6px;background:#fff;padding:6px}.custom select{border:1px solid var(--line);border-radius:6px;background:#fff;padding:6px}.deadline{margin-top:12px!important;margin-bottom:0!important}.dialogfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.primary{border-radius:8px;padding:7px 12px;background:var(--blue);color:#fff}.primary:hover{background:#0056ce}.cancel{padding:7px 10px;border-radius:8px}.theme{margin-left:auto}.error{color:var(--red)!important}
+body.dark{color-scheme:dark;--ink:#eeeef0;--muted:#a5a5ac;--line:#49494f;--track:#39393f;--panel:#26262bf5;--orange:#ff9f0a;--red:#ff453a;--green:#30d158;--blue:#70acff;background:#17171b}body.dark .tabs button.active,body.dark .filters button[aria-pressed=true],body.dark .snooze,body.dark .sim button,body.dark .theme,body.dark .presets button,body.dark .custom input,body.dark .custom select{background:#39393f}body.dark .dialog{background:#2a2a2f}body.dark .primary{background:#0a6cff;color:white}
+@media(max-width:720px){.studio{padding:20px 14px}.workspace{grid-template-columns:360px;gap:20px}.notes{max-width:360px}.notes h1{font-size:22px}.notes ol{display:none}.sim{margin-top:12px}.mast{flex-wrap:wrap}.theme{margin-left:0}}
+</style>
+</head>
+<body>
+<main class="studio">
+ <header class="mast"><span class="brand">MeowMac</span><span class="draft">提醒 · 交互草稿</span><button class="theme" id="theme">切换深浅色</button></header>
+ <div class="workspace">
+  <aside class="notes">
+   <div class="eyebrow">首版功能规划</div><h1>把所有提醒<br>放在一起看。</h1>
+   <p>总览仍显示最严重的待关注项。点击“全部提醒”，集中查看系统、额度和网络的问题。</p>
+   <ol><li>选择“我已知道…”</li><li>选择小时、天或自定义时长</li><li>到期仍有问题，再次提醒</li></ol>
+   <p>暂缓项仍可查看和恢复。严重故障、持续能耗异常等保持告警，检测恢复后消除。</p>
+   <div class="sim"><div class="eyebrow">演示场景</div><button id="severe">加入严重故障</button><button id="advance">时间推进 1 小时</button><button id="resolve">全部问题恢复</button><button id="restart">模拟重启</button><button id="reset">重置示例</button></div>
+   <p class="caption">全部数值均为合成示例。页面只演示交互，不读写应用配置；玻璃为浏览器模拟，原生材质需实机验收。</p>
+  </aside>
+  <div class="device"><div class="menubar"><span id="menu-cat"></span><span>五 14:00</span></div><section class="panel" aria-label="MeowMac 面板">
+   <div id="home">
+    <div class="top"><div class="statusline"><span id="status-cat"></span><div class="text" id="status-text"></div></div>
+     <div class="entry"><button class="link" id="open-list"></button><span class="minor" id="known-count"></span></div>
+     <div class="metrics"><div class="metric"><small>CPU</small><strong>24%</strong><div class="sub">整机负载</div><div class="bar"><i style="width:24%"></i></div></div><div class="metric"><small>内存</small><strong>38%</strong><div class="sub">已用 9 / 16 GB</div><div class="bar"><i style="width:38%;background:#30a34a"></i></div></div><div class="metric"><small>Claude</small><strong>14%</strong><div class="sub">5 小时 · 剩余</div><div class="bar"><i style="width:14%;background:#ff9500"></i></div></div><div class="metric"><small>网络</small><strong>↓2.4M</strong><div class="sub">↑128K</div><div class="bar"><i style="width:100%;background:#30a34a"></i></div></div></div>
+    </div>
+    <nav class="tabs" aria-label="标签页"><button data-tab="system" class="active">系统</button><button data-tab="quota">额度</button><button data-tab="network">网络</button></nav>
+    <div class="cardbody" id="detail-body"></div>
+    <div class="foot"><button class="capsule" id="refresh">↻ 刷新</button><span class="minor">额度更新于 13:50</span><span class="minor">⚙ 设置</span></div>
+   </div>
+   <div id="list" hidden><div class="listhead"><div class="titleline"><button class="back" id="back" aria-label="返回总览">‹</button><h2>提醒</h2><span class="minor" id="list-count"></span></div><nav class="filters" aria-label="提醒分类"><button data-filter="all" aria-pressed="true">全部</button><button data-filter="system" aria-pressed="false">系统</button><button data-filter="quota" aria-pressed="false">额度</button><button data-filter="network" aria-pressed="false">网络</button></nav></div><div class="listbody" id="rows"></div><div class="listfoot">“我已知道”会限时暂缓提醒，问题本身仍存在。<br>数值和数据失效提示继续显示；严重故障立即告警。</div></div>
+   <div class="overlay" id="overlay" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="duration-title"><h3 id="duration-title">我已知道</h3><p id="duration-context"></p><div class="presets"><button data-hours="0.5">30 分钟</button><button data-hours="1">1 小时</button><button data-hours="4">4 小时</button><button data-hours="24">1 天</button><button data-hours="48">2 天</button><button data-hours="72">3 天</button></div><button class="reset-choice" id="until-reset" hidden>直到本轮额度重置</button><div class="custom"><label for="custom-value">自定义</label><input id="custom-value" type="number" min="1" step="1" value="1"><select id="custom-unit" aria-label="自定义时长单位"><option value="60">分钟</option><option value="3600" selected>小时</option><option value="86400">天</option></select></div><p class="deadline" id="deadline"></p><div class="dialogfoot"><button class="cancel" id="cancel">取消</button><button class="primary" id="confirm">暂缓提醒</button></div></section></div>
+  </section></div>
+ </div>
+</main>
+<script>
+// 只维护演示内存，不访问应用、账户或网络。
+const $ = id => document.getElementById(id);
+const labels = {system:'系统',quota:'额度',network:'网络'};
+const base = new Date('2030-04-05T14:00:00');
+let now, issues, filter='all', tab='system', editing=null, selectedSeconds=3600, opener=null;
+function fixtures(){return [
+ {id:'quota-low',tab:'quota',title:'Claude · 5 小时额度不足',detail:'剩余 14%，本轮于今天 18:00 重置。',level:'warn',canSnooze:true,reset:base.getTime()+4*3600000},
+ {id:'quota-pace',tab:'quota',title:'Codex · 每周额度偏快',detail:'预计 1 天后用完，距离重置还有 3 天。',level:'warn',canSnooze:true,reset:base.getTime()+72*3600000},
+ {id:'disk',tab:'system',title:'磁盘剩余不足',detail:'可用 36 GB，占总容量的 7%。',level:'warn',canSnooze:true},
+ {id:'source',tab:'quota',title:'DeepSeek · 数据源失效',detail:'连续 2 次采集失败，当前显示上次成功的数据。',level:'warn',canSnooze:true},
+ {id:'process',tab:'system',title:'示例进程 · CPU 持续偏高',detail:'占用 96% CPU，已持续 12 分钟。建议用 AI 诊断。',level:'warn',canSnooze:false}
+ ].map(x=>({...x,active:true,until:null}));}
+function known(x){return x.canSnooze && x.level!=='severe' && x.until>now;}
+function active(){return issues.filter(x=>x.active);}
+function pending(){return active().filter(x=>!known(x)).sort((a,b)=>(b.level==='severe')-(a.level==='severe'));}
+function dateText(time){return new Date(time).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});}
+function cat(tone){const color=tone==='severe'?'var(--red)':tone==='warn'?'var(--orange)':'var(--ink)';return `<svg aria-label="${tone==='severe'?'严重':tone==='warn'?'提醒':'正常'}状态的猫" viewBox="0 0 40 26" style="color:${color}"><g fill="currentColor" stroke="currentColor" stroke-linecap="round"><path d="M9 13 C9 8.5 14 7 20 7.5 C25 8 28 8.5 29.5 10 L30 15 C28 17.5 23 18 18 17.8 C12.5 17.6 9 16.5 9 13 Z" stroke="none"/><circle cx="31.5" cy="9.5" r="4.6" stroke="none"/><path d="M28.4 6.6 L29.2 2 L32 5.2 Z M32.2 5 L35 1.8 L35.6 6.8 Z" stroke="none"/><path d="M9.5 11.5 C6 10.5 3.8 8.2 4.4 4.2 M27 16 L32 21 M25 16.5 L29 22 M13 16.5 L7 20 M15.5 17 L10 21.5" fill="none" stroke-width="2.4"/></g></svg>`;}
+function make(tag,cls,text){const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el;}
+function render(){
+ const all=active(), waiting=pending(), snoozed=all.filter(known), tone=waiting[0]?.level||'normal';
+ $('menu-cat').innerHTML=cat(tone);$('status-cat').innerHTML=cat(tone);$('status-text').textContent=waiting.length?(tone==='severe'?'严重':'提醒')+' · '+waiting[0].title:snoozed.length?'当前无待关注提醒':'一切正常';
+ $('status-text').className='text tone-'+tone;$('open-list').textContent='全部提醒 · '+all.length+' 项 ›';$('known-count').textContent=snoozed.length?'已知晓 '+snoozed.length+' 项':'';$('list-count').textContent=waiting.length+' 项待关注';
+ const list=$('rows');list.replaceChildren();
+ const matches=x=>filter==='all'||x.tab===filter;
+ for(const [title,rows] of [['待关注',waiting.filter(matches)],['已知晓',snoozed.filter(matches)]]){
+  if(!rows.length)continue;const heading=make('div','grouphead',title);heading.append(make('span','minor',rows.length+' 项'));list.append(heading);
+  for(const x of rows){const row=make('article','row');row.dataset.issue=x.id;const head=make('div','rowtitle');head.append(make('span','dot tone-'+x.level),make('span','',x.title),make('span','badge tone-'+x.level,x.level==='severe'?'严重':labels[x.tab]));row.append(head,make('p','detail',x.detail));
+   if(known(x))row.append(make('p','detail','已知晓 · '+dateText(x.until)+' 再提醒'));
+   const actions=make('div','actions');const detail=make('button','link','查看'+labels[x.tab]+' ›');detail.onclick=()=>{tab=x.tab;showHome();render();};actions.append(detail);
+   if(x.canSnooze && x.level!=='severe'){const action=make('button','snooze',known(x)?'恢复提醒':'我已知道…');action.onclick=()=>{if(known(x)){x.until=null;render();}else openDuration(x,action);};actions.append(action);}else actions.append(make('span','readonly',x.level==='severe'?'严重故障持续提醒':'检测恢复后消除'));
+   row.append(actions);list.append(row);
+  }
+ }
+ if(!list.children.length)list.append(make('div','empty',all.length?'这一类当前没有提醒。':'当前没有提醒。\n检测确认恢复的问题会自动移出列表。'));
+ document.querySelectorAll('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filter===filter)));
+ document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));renderDetail();
+}
+function renderDetail(){
+ const body=$('detail-body');body.replaceChildren();
+ if(tab==='system'){
+  if(issues.find(x=>x.id==='process'&&x.active)){const d=make('div','diagnosis');d.append(make('div','heading','能耗诊断'),make('div','','示例进程 · CPU 持续偏高'),make('div','minor','96% · 已持续 12 分钟'));body.append(d);}
+  const s=make('div','section');s.append(make('div','heading','系统趋势'));s.insertAdjacentHTML('beforeend','<svg class="chart" viewBox="0 0 328 70" aria-label="合成 CPU 趋势"><path d="M0 63 H328 M0 35 H328" stroke="var(--line)"/><path d="M0 54 L22 51 L44 37 L66 44 L88 41 L110 18 L132 24 L154 48 L176 49 L198 36 L220 41 L242 51 L264 48 L286 39 L306 47 L328 43" fill="none" stroke="#0a84ff" stroke-width="2"/></svg>');s.append(make('div','minor','13:45　　　　　　　　　　　14:00'));body.append(s);
+  const disk=make('div','section');disk.append(make('div','heading','磁盘'),make('div','table-row','36 GB 可用 · 共 512 GB'));body.append(disk);
+ }else if(tab==='quota'){
+  body.append(make('div','heading','Claude · 示例套餐'));const s=make('div','section');s.append(make('div','heading','5 小时窗口'),make('div','table-row','剩余 14%'),make('div','minor','今天 18:00 重置'));body.append(s);const err=make('div','section');err.append(make('div','heading','DeepSeek 采集失败'),make('p','minor','暂缓提醒后，这条数据失效说明仍然保留。'));body.append(err);
+ }else{body.append(make('div','heading',issues.some(x=>x.id==='network'&&x.active)?'网络异常':'网络正常'),make('p','minor','这里保留网络实际检测结论。'));}
+}
+function showHome(){$('list').hidden=true;$('home').hidden=false;}
+function closeDuration(){$('overlay').hidden=true;editing=null;opener?.focus();}
+function updateDeadline(){
+ let end=now+selectedSeconds*1000;
+ if(selectedSeconds==='reset')end=editing?.reset;
+ const valid=Number.isFinite(end)&&end>now&&(selectedSeconds==='reset'||end-now<=30*86400000);
+ $('confirm').disabled=!valid;$('deadline').className='deadline'+(valid?'':' error');$('deadline').textContent=valid?'到期时间：'+dateText(end):'请输入 1 分钟至 30 天的整数时长。';
+ document.querySelectorAll('[data-hours]').forEach(b=>b.classList.toggle('selected',selectedSeconds===Number(b.dataset.hours)*3600));$('until-reset').classList.toggle('selected',selectedSeconds==='reset');
+}
+function openDuration(x,button){editing=x;opener=button;selectedSeconds=3600;$('custom-value').value='1';$('custom-unit').value='3600';$('duration-context').textContent=x.title+'。暂缓期间不影响猫状态，到期仍存在时重新提醒。';$('until-reset').hidden=!(x.reset>now);$('overlay').hidden=false;updateDeadline();$('cancel').focus();}
+$('open-list').onclick=()=>{$('home').hidden=true;$('list').hidden=false;};$('back').onclick=showHome;
+document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;render();});document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
+document.querySelectorAll('[data-hours]').forEach(b=>b.onclick=()=>{const hours=Number(b.dataset.hours);selectedSeconds=hours*3600;$('custom-value').value=String(hours>=24?hours/24:hours<1?hours*60:hours);$('custom-unit').value=String(hours>=24?86400:hours<1?60:3600);updateDeadline();});
+$('until-reset').onclick=()=>{selectedSeconds='reset';updateDeadline();};
+function custom(){const n=Number($('custom-value').value);selectedSeconds=Number.isInteger(n)&&n>0?n*Number($('custom-unit').value):NaN;updateDeadline();}$('custom-value').oninput=custom;$('custom-unit').onchange=custom;
+$('cancel').onclick=closeDuration;$('confirm').onclick=()=>{if($('confirm').disabled)return;editing.until=selectedSeconds==='reset'?editing.reset:now+selectedSeconds*1000;closeDuration();render();};
+document.addEventListener('keydown',e=>{if($('overlay').hidden)return;if(e.key==='Escape'){closeDuration();return;}if(e.key==='Tab'){const focusable=Array.from($('overlay').querySelectorAll('button,input,select')).filter(el=>!el.hidden&&!el.disabled&&el.getClientRects().length);const first=focusable[0],last=focusable.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
+$('theme').onclick=()=>document.body.classList.toggle('dark');
+$('severe').onclick=()=>{const x=issues.find(x=>x.id==='network');if(x)x.active=!x.active;else issues.push({id:'network',tab:'network',title:'网络检测失败',detail:'示例站点组连续检测失败，需排查连接。',level:'severe',canSnooze:false,active:true});render();};
+$('advance').onclick=()=>{now+=3600000;render();};$('resolve').onclick=()=>{issues.forEach(x=>{x.active=false;x.until=null;});render();};$('restart').onclick=()=>{issues=JSON.parse(JSON.stringify(issues));closeDuration();showHome();render();};
+function reset(){now=base.getTime();issues=fixtures();filter='all';tab='system';closeDuration();showHome();render();}$('reset').onclick=reset;$('refresh').onclick=render;reset();
+</script>
+</body>
+</html>
