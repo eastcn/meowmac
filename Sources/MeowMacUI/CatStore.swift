@@ -175,6 +175,7 @@ public final class CatStore {
         if let cats = try catsFD(root: root, create: false) { close(cats) }
         try saveSelection(id, root: root)
         state.selectedCat = selected
+        state.loadLayoutForSelectedCat()
         return selected
     }
 
@@ -255,6 +256,7 @@ public final class CatStore {
             throw invalid("已导入，切换未保存：\(error.localizedDescription)")
         }
         state.selectedCat = copied
+        state.loadLayoutForSelectedCat()
         return copied
     }
 }

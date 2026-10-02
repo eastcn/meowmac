@@ -57,6 +57,9 @@ public final class PanelState: ObservableObject {
     @Published public var lastCleaning: CleaningRecord?
     @Published public var selectedCat: LoadedCat? = CatPackageLoader.defaultCat
     public var catStore: CatStore?
+    public var layoutStore: PanelLayoutStore?
+    @Published public private(set) var panelLayout: PanelLayout = .default
+    @Published public private(set) var layoutRecoveryReason: String?
     @Published public var catLevelOverride: HealthLevel?
     public var effectiveCatLevel: HealthLevel {
         catLevelOverride ?? health.level
@@ -72,6 +75,22 @@ public final class PanelState: ObservableObject {
     public var onSelectCat: (String) -> Void = { _ in }
     public var onImportCat: () -> Void = {}
     public var onShowCats: () -> Void = {}
+    public var onShowLayoutSettings: () -> Void = {}
+
+    public func loadLayoutForSelectedCat() {
+        let loaded = layoutStore?.load(cat: selectedCat) ?? PanelLayoutLoad(layout: selectedCat?.package.panel ?? .default, recoveryReason: nil)
+        panelLayout = loaded.layout
+        layoutRecoveryReason = loaded.recoveryReason
+    }
+
+    public func saveLayout(_ layout: PanelLayout, for catID: String) throws {
+        guard let cat = selectedCat, cat.id == catID, let layoutStore else {
+            throw PanelLayoutError.invalid("当前猫已改变，未保存草稿")
+        }
+        try layoutStore.save(layout, cat: cat)
+        panelLayout = layout
+        layoutRecoveryReason = nil
+    }
 
     public init(configResult: ConfigLoadResult = ConfigStore.load()) {
         self.configResult = configResult
