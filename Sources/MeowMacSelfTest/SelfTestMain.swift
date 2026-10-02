@@ -74,6 +74,8 @@ enum SelfTestMain {
             ("Core.System/mo 清理历史", { SelfTestMain.moHistory() }),
         ]
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }
+        for test in ReminderTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
+        tests.append(("UI.ReminderStore/重载坏文件与安全写入", { (try? ReminderTests.storage()) ?? false }))
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }
         tests.append(("UI.System/两类诊断与持续时间", { DiagnosisTests.rows() }))
         tests.append(("UI.Snapshot/七部分与关键字段编码", { @MainActor in

@@ -42,50 +42,27 @@ public struct HealthInputs {
     public let fairSince: Date?
     public let now: Date
     public let quotaSnapshots: [QuotaSnapshot]
+    public let networkSignals: [NetworkReminderSignal]?
+    public let networkConfirmed: Bool
+    public let networkCheckedAt: Date?
+    public let energyUpdatedAt: Date?
 
     public init(system: SystemSnapshot?, energy: EnergyDiagnosis?, quotaUsedPercent: [Double], network: NetworkTone,
-                failedSources: [String: Int], fairSince: Date?, now: Date, quotaSnapshots: [QuotaSnapshot] = []) {
+                failedSources: [String: Int], fairSince: Date?, now: Date, quotaSnapshots: [QuotaSnapshot] = [],
+                networkSignals: [NetworkReminderSignal]? = nil, networkConfirmed: Bool = true,
+                networkCheckedAt: Date? = nil, energyUpdatedAt: Date? = nil) {
         self.system = system; self.energy = energy; self.quotaUsedPercent = quotaUsedPercent
         self.network = network; self.failedSources = failedSources; self.fairSince = fairSince; self.now = now
         self.quotaSnapshots = quotaSnapshots
+        self.networkSignals = networkSignals; self.networkConfirmed = networkConfirmed
+        self.networkCheckedAt = networkCheckedAt; self.energyUpdatedAt = energyUpdatedAt
     }
 }
 
 public enum HealthEvaluator {
     public static func evaluate(_ input: HealthInputs, config: LocalConfig) -> HealthSummary {
-        var issues: [HealthIssue] = []
-        func add(_ level: HealthLevel, _ tab: PanelTab, _ message: String) {
-            issues.append(HealthIssue(level: level, tab: tab, message: message))
-        }
-        switch input.network {
-        case .red: add(.severe, .network, "网络检测失败")
-        case .yellow: add(.warn, .network, "网络状态待确认")
-        case .green, .gray: break
-        }
-        if input.quotaUsedPercent.contains(where: { 1 - $0 / 100 < config.quotaRemainingWarn }) {
-            add(.warn, .quota, "额度剩余不足")
-        }
-        for snapshot in input.quotaSnapshots.sorted(by: { $0.provider.rawValue < $1.provider.rawValue }) {
-            for window in snapshot.windows where QuotaPace.calculate(window: window, now: input.now)?.exhaustsBeforeReset == true {
-                add(.warn, .quota, "\(snapshot.provider.displayName) \(window.displayName.replacingOccurrences(of: "窗口", with: ""))额度偏快")
-            }
-        }
-        if let remaining = input.system?.diskRemainingFraction, remaining < config.diskRemainingWarn {
-            add(.warn, .system, "磁盘剩余不足")
-        }
-        let runaway = input.energy?.runaway ?? []
-        if !runaway.isEmpty { add(.warn, .system, "进程 CPU 持续偏高") }
-        if input.energy?.prolongedMemoryPressure == true { add(.warn, .system, "内存压力持续偏高") }
-        if let system = input.system, system.thermal == .serious || system.thermal == .critical {
-            let message = runaway.isEmpty ? "温度偏高，未发现异常进程，建议降温或用 AI 诊断" : "系统已降频，建议用 AI 诊断"
-            add(.warn, .system, message)
-        }
-        for (source, failures) in input.failedSources.sorted(by: { $0.key < $1.key }) where failures >= config.sourceFailureCount {
-            add(.warn, source.hasPrefix("network") ? .network : source.hasPrefix("quota") ? .quota : .system,
-                "数据源失效：\(source)")
-        }
-        let cooling = input.system?.thermal == .fair && input.fairSince.map { input.now.timeIntervalSince($0) >= config.fairThermalSeconds } == true
-        issues.sort { $0.level > $1.level }
-        return HealthSummary(level: issues.first?.level ?? .normal, issues: issues, coolingHint: cooling)
+        var tracker = ReminderTracker()
+        tracker.reconcile(ReminderCollector.collect(input, config: config), now: input.now)
+        return tracker.health(now: input.now)
     }
 }
