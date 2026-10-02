@@ -21,8 +21,7 @@ struct ReminderHeader: View {
                 Spacer()
                 Text("全部提醒 · \(state.allReminders.count) 项").font(Design.title)
             }
-            CapsuleSelector(titles: ["全部", "系统", "额度", "网络"], selected: state.reminderFilter.map { PanelTab.allCases.firstIndex(of: $0)! + 1 } ?? 0,
-                            levels: [.normal, .normal, .normal, .normal]) { index in
+            CapsuleSelector(titles: ["全部", "系统", "额度", "网络"], selected: state.reminderFilter.map { PanelTab.allCases.firstIndex(of: $0)! + 1 } ?? 0) { index in
                 state.reminderFilter = index == 0 ? nil : PanelTab.allCases[index - 1]
             }
         }.padding(Design.inset)
@@ -55,14 +54,18 @@ private struct ReminderRow: View {
     @ObservedObject var state: PanelState
     let reminder: Reminder
     var body: some View {
-        GlassCard(warning: reminder.level > .normal && state.snoozeDeadline(reminder) == nil) {
+        VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: Design.gap) {
                 HStack(alignment: .top, spacing: Design.rowGap) {
                     Circle().fill(Design.state(reminder.level)).frame(width: Design.dot, height: Design.dot).padding(.top, 5)
                     Text(reminder.title).font(Design.title).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Text(reminder.level == .severe ? "严重" : reminder.tab.title).font(Design.tiny)
+                        .foregroundStyle(Design.stateText(reminder.level)).padding(.horizontal, 3).padding(.vertical, 1)
+                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Design.state(reminder.level)))
                 }
                 if !reminder.detail.isEmpty { Text(reminder.detail).font(Design.body).fixedSize(horizontal: false, vertical: true) }
-                Text(reminder.confirmed ? "数据：" + DisplayDate.age(reminder.sampledAt, now: state.now()) : "待确认 · 保留上次问题")
+                Text(reminder.confirmed ? reminder.sampledAt.map { "数据：" + DisplayDate.age($0, now: state.now()) } ?? "采集时间不可用" : "待确认 · 保留上次问题")
                     .font(Design.caption).foregroundStyle(Design.secondary)
                 if let end = state.snoozeDeadline(reminder) {
                     Text("暂缓至 " + DisplayDate.format(end, pattern: "M 月 d 日 HH:mm")).font(Design.caption).foregroundStyle(Design.secondary)
@@ -81,7 +84,8 @@ private struct ReminderRow: View {
                         Button("我已知道…") { state.activeSnoozeID = reminder.id }.accessibilityIdentifier("reminder.snooze.\(reminder.id)")
                     }
                 }.buttonStyle(.plain).font(Design.button).foregroundStyle(Design.blue)
-            }
+            }.padding(.vertical, Design.sectionGap)
+            SectionRule()
         }
     }
 }

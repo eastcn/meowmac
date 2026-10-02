@@ -15,6 +15,13 @@ public struct PanelLayoutSnapshot: Codable {
     public let effective: PanelLayout
     public let fallback: Bool
 }
+public struct RemindersSnapshot: Codable {
+    public let current: [Reminder]
+    public let snoozed: [SnoozeRecord]
+    public let pendingIDs: [String]
+    public let showingList: Bool
+    public let filter: PanelTab?
+}
 public struct SystemPanelSnapshot: Codable {
     public let latest: SystemSnapshot?
     public let diagnosis: [DiagnosisRow]
@@ -53,6 +60,7 @@ public struct PanelSnapshot: Codable {
     public let network: NetworkDisplay?
     public let cat: CatDisplay
     public let layout: PanelLayoutSnapshot
+    public let reminders: RemindersSnapshot
     @MainActor public init(state: PanelState) {
         overview = OverviewSnapshot(capturedAt: state.now(), health: state.health, metrics: state.overviewMetrics, quotaUpdatedAt: state.quotaUpdatedAt)
         tabs = TabsSnapshot(levels: Dictionary(uniqueKeysWithValues: zip(PanelTab.allCases.map(\.rawValue), state.tabLevels)), defaultTab: DefaultPanelLayout.openingTab(summary: state.health, lastViewed: state.selectedTab))
@@ -64,6 +72,8 @@ public struct PanelSnapshot: Codable {
         network = networkDisplay
         cat = state.catDisplay()
         layout = PanelLayoutSnapshot(effective: state.panelLayout, fallback: state.layoutRecoveryReason != nil || state.selectedCat == nil)
+        reminders = RemindersSnapshot(current: state.allReminders, snoozed: state.projectedReminders.records,
+            pendingIDs: state.pendingReminders.map(\.id), showingList: state.showingReminders, filter: state.reminderFilter)
     }
 }
 public extension PanelState {

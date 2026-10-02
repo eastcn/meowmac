@@ -85,18 +85,26 @@ enum ReminderUITests {
             try capture(hosting.controller.view, name: "list")
             guard state.showingReminders, list.width == 360, list.height <= 820,
                   let disk = state.allReminders.first(where: { $0.kind == .disk }) else { return false }
-            let rowAction = hosting.measurements.headerHeight + 121
-            guard click(window, x: 285, fromTop: rowAction) else { return false }
+            let rowAction = hosting.measurements.headerHeight + 123
+            guard click(window, x: 315, fromTop: rowAction) else { return false }
             let form = try await PanelPreviewRenderer.settleLayout(hosting.controller)
             try capture(hosting.controller.view, name: "duration")
             guard state.activeSnoozeID == disk.id, state.snoozedReminders.isEmpty, form.width == 360, form.height <= 820 else {
                 print("时长按钮未打开：header \(hosting.measurements.headerHeight)，点击 \(rowAction)"); return false
             }
+            guard click(window, x: 55, fromTop: form.height - hosting.measurements.footerHeight - 23) else { return false }
+            _ = try await PanelPreviewRenderer.settleLayout(hosting.controller)
+            guard state.activeSnoozeID == nil, state.snoozedReminders.isEmpty else { print("取消选择改变了暂缓状态"); return false }
+            guard click(window, x: 315, fromTop: hosting.measurements.headerHeight + 123) else { return false }
+            _ = try await PanelPreviewRenderer.settleLayout(hosting.controller)
+            guard click(window, x: 180, fromTop: hosting.measurements.headerHeight + 125) else { return false }
             guard click(window, x: 295, fromTop: form.height - hosting.measurements.footerHeight - 23) else { return false }
             let known = try await PanelPreviewRenderer.settleLayout(hosting.controller)
             try capture(hosting.controller.view, name: "known")
-            guard state.activeSnoozeID == nil, state.health.level == .normal else { print("暂缓按钮未保存"); return false }
-            guard click(window, x: 285, fromTop: hosting.measurements.headerHeight + 140) else { return false }
+            guard state.activeSnoozeID == nil, state.health.level == .normal, state.snoozeDeadline(disk) == state.now().addingTimeInterval(2 * 86400) else {
+                print("两天暂缓按钮未正确保存：\(String(describing: state.snoozeDeadline(disk)))"); return false
+            }
+            guard click(window, x: 305, fromTop: hosting.measurements.headerHeight + 142) else { return false }
             _ = try await PanelPreviewRenderer.settleLayout(hosting.controller)
             guard state.health.level == .warn else { print("恢复按钮未生效"); return false }
             state.networkModel = PanelPreviewRenderer.networkModel(failure: true, now: state.now()); state.networkTone = .red

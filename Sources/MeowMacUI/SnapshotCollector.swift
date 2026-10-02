@@ -42,6 +42,7 @@ public enum SnapshotCollector {
             var tracker = EnergyTracker()
             return tracker.evaluate(processes: processes, pressure: latest.memoryPressure, now: Date(), config: config)
         }.value
+        state.energyUpdatedAt = Date()
         state.energy = energy
         for provider in QuotaProvider.allCases {
             do {

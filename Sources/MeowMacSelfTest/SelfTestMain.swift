@@ -78,16 +78,18 @@ enum SelfTestMain {
         tests.append(("UI.ReminderStore/重载坏文件与安全写入", { (try? ReminderTests.storage()) ?? false }))
         tests.append(("UI.Reminders/动作重载到期与详情定位", { ReminderUITests.lifecycle() }))
         tests.append(("UI.Reminders/原生入口暂缓恢复与容器", { await ReminderUITests.nativeControls() }))
+        tests.append(("UI.Reminders/启动到期切猫与快照", { ReminderIntegrationTests.runtime() }))
+        tests.append(("UI.Reminders/真实弹出面板与超高筛选", { await ReminderIntegrationTests.popover() }))
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }
         tests.append(("UI.System/两类诊断与持续时间", { DiagnosisTests.rows() }))
-        tests.append(("UI.Snapshot/七部分与关键字段编码", { @MainActor in
+        tests.append(("UI.Snapshot/八部分与关键字段编码", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(quotaAlert: true)
             do {
                 let data = try JSONEncoder().encode(PanelSnapshot(state: state))
-                guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], object.count == 7,
+                guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], object.count == 8,
                     let quota = object["quota"] as? [[String: Any]], let codex = quota.first(where: { $0["provider"] as? String == "codex" }),
                     let windows = codex["windows"] as? [[String: Any]] else { return false }
-                return Set(object.keys) == Set(["overview", "tabs", "system", "quota", "network", "cat", "layout"]) && windows.count == 2
+                return Set(object.keys) == Set(["overview", "tabs", "system", "quota", "network", "cat", "layout", "reminders"]) && windows.count == 2
                     && windows[1]["remainingPercent"] as? Double == 30 && windows[1]["pace"] != nil && codex["resetCredits"] != nil && codex["storage"] != nil && codex["cost"] != nil
             } catch { print("快照编码失败：\(error)"); return false }
         }))

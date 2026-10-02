@@ -100,7 +100,14 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.screenSleeping = false }
+            Task { @MainActor [weak self] in
+                self?.screenSleeping = false
+                self?.panelState.refreshReminders()
+            }
+        })
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
+                                                                            object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.panelState.refreshReminders(); self?.sample(); self?.sampleEnergy() }
         })
     }
 
@@ -134,8 +141,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
                 let processes = try EnergySampler.processes()
                 await MainActor.run { [weak self] in
                     guard let self else { return }
+                    let sampledAt = Date()
+                    self.panelState.energyUpdatedAt = sampledAt
                     self.panelState.energy = self.energyTracker.evaluate(processes: processes,
-                        pressure: self.snapshot?.memoryPressure ?? .unavailable, now: Date(), config: self.configResult.config)
+                        pressure: self.snapshot?.memoryPressure ?? .unavailable, now: sampledAt, config: self.configResult.config)
                     self.panelState.failures["energy"] = 0
                 }
             } catch {

@@ -36,7 +36,8 @@ public extension PanelState {
         let titles: [ReminderKind: String] = [.quotaLow: "额度剩余不足", .quotaPace: "额度偏快", .disk: "磁盘剩余不足", .source: "数据源失效"]
         let placeholders = loaded.records.map { record -> Reminder in
             let object = String(record.key.dropFirst(record.kind.rawValue.count + 1))
-            let provider = object.split(separator: ".").first.flatMap { QuotaProvider(rawValue: String($0)) }
+            let providerObject = object.hasPrefix("quota.") ? String(object.dropFirst(6)) : object
+            let provider = providerObject.split(separator: ".").first.flatMap { QuotaProvider(rawValue: String($0)) }
             let tab: PanelTab = record.kind == .quotaLow || record.kind == .quotaPace || object.hasPrefix("quota") ? .quota : object == "network" ? .network : .system
             return Reminder(kind: record.kind, object: object, tab: tab,
                             title: (provider.map { $0.displayName + " · " } ?? "") + (titles[record.kind] ?? "待确认问题"),
@@ -46,13 +47,16 @@ public extension PanelState {
         reminderTracker = value
         reminderError = loaded.recoveryReason.map { "暂缓记录未恢复：" + $0 }
         reminderPersistenceDirty = value.records != loaded.records
+        reminderSaveAttempt = nil
         refreshReminders()
     }
     func refreshReminders() {
         let before = reminderTracker.records
         var value = reminderTracker; value.reconcile(reminderBatch, now: now())
         reminderTracker = value
-        if let id = activeSnoozeID, value.current[id] == nil { activeSnoozeID = nil }
+        if let id = activeSnoozeID, value.current[id]?.canSnooze != true || value.current[id].map({ value.isSnoozed($0, now: now()) }) == true {
+            activeSnoozeID = nil
+        }
         if before != value.records { reminderPersistenceDirty = true }
         guard reminderPersistenceDirty, let store = reminderStore,
               reminderSaveAttempt.map({ now().timeIntervalSince($0) >= 60 }) ?? true else { return }
@@ -60,6 +64,7 @@ public extension PanelState {
         do {
             try store.save(value.records)
             reminderPersistenceDirty = false
+            if reminderError?.hasPrefix("暂缓记录未同步：") == true { reminderError = nil }
         } catch {
             let message = "暂缓记录未同步：" + error.localizedDescription
             if reminderError != message {

@@ -10,6 +10,7 @@ public enum CatRuntime {
         state.layoutStore = layoutStore ?? PanelLayoutStore(rootURL: store.rootURL)
         state.selectedCat = store.loadSelection()
         state.loadLayoutForSelectedCat()
+        state.initializeReminders(store: ReminderStore(rootURL: store.rootURL))
         switch environment["MEOWMAC_FORCE_LEVEL"] {
         case "normal": state.catLevelOverride = .normal
         case "warn": state.catLevelOverride = .warn
