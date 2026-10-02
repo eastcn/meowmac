@@ -91,4 +91,42 @@ enum PanelLayoutUITests {
             return quota.height <= 820 && network.height <= 820 && quota.width == 360 && network.width == 360
         } catch { print("面板布局尺寸测试失败：\(error)"); return false }
     }
+
+    static func hiddenNetworkIssueClick() async -> Bool {
+        do {
+            let state = try prepare()
+            var layout = PanelLayout.default
+            layout.cards["network"]?[0].visible = false
+            try state.saveLayout(layout, for: "builtin.slim")
+            state.networkModel = PanelPreviewRenderer.networkModel(failure: true, now: state.now())
+            state.networkTone = .red
+            state.selectedTab = .system
+            guard state.health.worst?.tab == .network,
+                  !state.renderedCardIDs(for: .network).contains("network.checks") else { return false }
+            let hosting = PanelHosting.make(state: state)
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: 1),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentViewController = hosting.controller
+            defer { window.contentViewController = nil; window.close() }
+            let size = try await PanelPreviewRenderer.settleLayout(hosting.controller)
+            window.setContentSize(size)
+            window.makeKeyAndOrderFront(nil)
+            window.contentView?.layoutSubtreeIfNeeded()
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let point = NSPoint(x: 170, y: size.height - 24)
+            for kind in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                guard let event = NSEvent.mouseEvent(with: kind, location: point, modifierFlags: [],
+                                                    timestamp: ProcessInfo.processInfo.systemUptime,
+                                                    windowNumber: window.windowNumber, context: nil,
+                                                    eventNumber: 1, clickCount: 1, pressure: 1) else { return false }
+                window.sendEvent(event)
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+            if state.selectedTab != .network {
+                print("隐藏网络告警未跳转：当前 \(state.selectedTab)，hit \(String(describing: window.contentView?.hitTest(point)))")
+            }
+            return state.selectedTab == .network && state.health.worst?.tab == .network
+        } catch { print("隐藏网络告警点击失败：\(error)"); return false }
+    }
 }

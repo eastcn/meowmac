@@ -89,7 +89,9 @@ enum PanelLayoutStoreTests {
                 try contents.write(to: bad)
                 panel.loadLayoutForSelectedCat()
                 guard panel.selectedCat?.id == "builtin.round", panel.panelLayout == .default,
-                      panel.layoutRecoveryReason != nil, (try Data(contentsOf: bad)) == contents else { return false }
+                      panel.layoutRecoveryReason != nil, (try Data(contentsOf: bad)) == contents,
+                      PanelSnapshot(state: panel).layout.fallback,
+                      PanelSnapshot(state: panel).layout.effective == .default else { return false }
                 var draft = PanelLayout.default; draft.tabs.reverse()
                 guard (try? panel.saveLayout(draft, for: "builtin.round")) == nil,
                       panel.panelLayout == .default, (try Data(contentsOf: bad)) == contents else { return false }

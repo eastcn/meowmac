@@ -173,11 +173,13 @@ enum SelfTestMain {
         tests.append(("UI.Panel/真实容器的自然高度与切换", { await PanelLayoutTests.heights() }))
         tests.append(("UI.PanelLayout/渲染顺序固定区与快照", { PanelLayoutUITests.renderingAndSnapshot() }))
         tests.append(("UI.PanelLayout/默认与极端容器尺寸", { await PanelLayoutUITests.sizes() }))
+        tests.append(("UI.PanelLayout/隐藏网络检查后点击总览告警", { await PanelLayoutUITests.hiddenNetworkIssueClick() }))
         tests.append(("UI.LayoutSettings/原生菜单与草稿", { LayoutSettingsTests.menuAndDraft() }))
         tests.append(("UI.LayoutSettings/保存失败与切猫", { LayoutSettingsTests.saveAndFailure() }))
         tests.append(("UI.LayoutSettings/拖动回调与坏文件提示", { await LayoutSettingsTests.dropAndRecovery() }))
         tests.append(("UI.LayoutSettings/真实控件操作", { LayoutSettingsTests.actualControls() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
+            tests.append(("UI.LayoutAcceptance/真实容器合成对照", { await LayoutAcceptanceTests.render() }))
             tests.append(("UI.RenderPreview/三个标签页", { await SelfTestMain.renderPanel() }))
             tests.append(("UI.RenderComponents/基础组件", { SelfTestMain.renderComponents() }))
             tests.append(("UI.RenderOverview/总览与设置", { SelfTestMain.renderOverview() }))

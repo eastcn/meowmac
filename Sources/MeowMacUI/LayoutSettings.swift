@@ -92,7 +92,7 @@ public final class LayoutSettingsController: NSObject, NSWindowDelegate {
         guard let model = LayoutSettingsModel(state: state) else { return }
         model.onClose = { [weak self] in self?.window?.close() }
         model.onContentChange = { [weak self] in
-            DispatchQueue.main.async { [weak self] in self?.resizeToFit() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.resizeToFit() }
         }
         let controller = NSHostingController(rootView: LayoutSettingsView(model: model))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 500),
