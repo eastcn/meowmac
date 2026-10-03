@@ -189,6 +189,7 @@ enum SelfTestMain {
         tests.append(("UI.PanelLayout/渲染顺序固定区与快照", { PanelLayoutUITests.renderingAndSnapshot() }))
         tests.append(("UI.PanelLayout/默认与极端容器尺寸", { await PanelLayoutUITests.sizes() }))
         tests.append(("UI.PanelLayout/隐藏网络检查后点击总览告警", { await PanelLayoutUITests.hiddenNetworkIssueClick() }))
+        tests.append(("UI.StyleIntegration/启动切猫包默认与坏文件", { StyleIntegrationTests.lifecycle() }))
         tests.append(("UI.StyleSettings/原生菜单与保存生命周期", { StyleSettingsTests.lifecycle() }))
         tests.append(("UI.StyleSettings/真实控件与色板", { StyleSettingsTests.controls() }))
         tests.append(("UI.LayoutSettings/原生菜单与草稿", { LayoutSettingsTests.menuAndDraft() }))
