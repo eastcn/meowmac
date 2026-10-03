@@ -1,5 +1,6 @@
 import Foundation
 import MeowMacCore
+import MeowMacQuota
 import MeowMacUI
 
 @MainActor
@@ -10,6 +11,7 @@ enum CodexBarImportTests {
         ("Core.History/导入版本与重复条目", versionAndDuplicates),
         ("Core.History/导入写入保留原字节并只执行一次", writeOnce),
         ("Core.History/导入失败回滚与符号链接", failureAndSymlinks),
+        ("Core.History/导入标记写入失败与版本不支持重试", markerFailureAndUnsupported),
         ("UI.Quota/导入提示与趋势数据刷新", coordinatorAndMessages),
         ("Core.History.Live/真实文件只读干跑", liveDryRun),
     ]
@@ -179,6 +181,37 @@ enum CodexBarImportTests {
                 && unsafeFile && sentinelKept && linkedClaudeKept
                 && unsafeDir && realEmpty && !FileManager.default.fileExists(atPath: dirLinked.marker.path)
         } catch { print("导入失败夹具失败：\(error)"); return false }
+    }
+
+    private static func markerFailureAndUnsupported() -> Bool {
+        do {
+            // 旧行没有 windowMinutes 时，缺口边界仍只看 sampledAt。
+            let original = #"{"sampledAt":"2030-04-05T00:00:00Z","provider":"claude","usedPercent":50,"resetsAt":"2030-04-05T03:00:00Z"}"# + "\n"
+            let (base, src, history) = try prepare("marker-failure", existing: original)
+            var calls = 0
+            let failing = CodexBarHistoryImport(source: src, store: base.store, write: { data, url in
+                calls += 1
+                if calls == 3 { throw CocoaError(.fileWriteNoPermission) }
+                try data.write(to: url, options: .atomic)
+            })
+            var failed = false
+            do { _ = try failing.run(now: now, retentionDays: 90) } catch is CodexBarImportFailure { failed = true }
+            let restored = try Data(contentsOf: history.appendingPathComponent("claude.jsonl")) == Data(original.utf8)
+                && !FileManager.default.fileExists(atPath: history.appendingPathComponent("codex.jsonl").path)
+                && !FileManager.default.fileExists(atPath: failing.marker.path)
+
+            let (mixed, mixedSrc, mixedHistory) = try prepare("unsupported")
+            try source(version: 9).write(to: mixedSrc.appendingPathComponent("opencodego.json"))
+            let first = try mixed.run(now: now, retentionDays: 90)
+            let afterFirst = try Data(contentsOf: mixedHistory.appendingPathComponent("claude.jsonl"))
+            let second = try mixed.run(now: now, retentionDays: 90)
+            let afterSecond = try Data(contentsOf: mixedHistory.appendingPathComponent("claude.jsonl"))
+            return failed && restored
+                && first.outcome == .imported && first.unsupported == [.opencodego] && first.totalImported == 3
+                && !FileManager.default.fileExists(atPath: mixed.marker.path)
+                && second.outcome == .imported && second.totalImported == 0 && afterSecond == afterFirst
+                && first.message.contains("无法读取或版本不支持：OpenCode Go")
+        } catch { print("标记失败夹具失败：\(error)"); return false }
     }
 
     private static func coordinatorAndMessages() -> Bool {
