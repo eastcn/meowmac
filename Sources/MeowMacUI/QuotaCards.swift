@@ -113,8 +113,8 @@ struct QuotaPage: View {
                             ProviderLogo(provider: item)
                             Text(item.displayName).font(Design.caption).fontWeight(provider == item ? .semibold : .regular).lineLimit(1).minimumScaleFactor(0.75)
                             let window = state.providerWindow(item)
-                            LineBar(fraction: (window?.remainingPercent ?? 0) / 100, color: Design.provider(item), height: Design.miniBar)
-                            Text(window.map { "\(Int($0.remainingPercent.rounded()))%" } ?? (state.quotaErrors[item] == nil ? "—" : "出错"))
+                            LineBar(fraction: window.map { state.quotaPercent($0) / 100 } ?? 0, color: Design.provider(item, style: state.style), height: Design.miniBar)
+                            Text(window.map { "\(Int(state.quotaPercent($0).rounded()))% · \(state.quotaBasisLabel)" } ?? (state.quotaErrors[item] == nil ? "—" : "出错"))
                                 .font(Design.caption).fontWeight(.semibold).foregroundStyle(window.map { Design.stateText(Design.quotaLevel($0.remainingPercent)) } ?? Design.secondary)
                         }.padding(Design.gap).frame(maxWidth: .infinity).frame(height: Design.providerHeight)
                             .modifier(GlassSurface()).overlay(RoundedRectangle(cornerRadius: Design.cardRadius).stroke(provider == item ? Design.blue.opacity(Design.peakFill) : .clear, lineWidth: Design.rule))
@@ -132,12 +132,13 @@ struct QuotaPage: View {
                         if let plan = quota.planName { Text(plan).font(Design.tiny).padding(.horizontal, Design.gap).padding(.vertical, Design.tightGap).background(Design.track, in: Capsule()) }
                         Spacer(); Text(DisplayDate.format(quota.updatedAt, pattern: "HH:mm") + " 更新").font(Design.caption).foregroundStyle(Design.secondary)
                     }
-                    HStack {
-                        if let email = quota.accountEmail { Text(email) }; Spacer(); Text("来源 " + quota.source)
-                    }.font(Design.caption).foregroundStyle(Design.secondary)
+                    if let email = state.style.email.display(quota.accountEmail) {
+                        HStack { Text(email); Spacer(); Text("来源 " + quota.source) }
+                            .font(Design.caption).foregroundStyle(Design.secondary)
+                    }
                 }
                 ForEach(state.displayedWindows(provider).indices, id: \.self) { index in
-                    QuotaWindowView(value: state.displayedWindows(provider)[index], provider: provider)
+                    QuotaWindowView(state: state, value: state.displayedWindows(provider)[index], provider: provider)
                 }
                 if let credits = quota.codexResetCredits, credits.availableCount > 0 {
                     GlassCard { VStack(alignment: .leading, spacing: Design.gap) {
@@ -155,20 +156,21 @@ struct QuotaPage: View {
     }
 }
 struct QuotaWindowView: View {
+    @ObservedObject var state: PanelState
     let value: QuotaWindowDisplay
     let provider: QuotaProvider
     var body: some View {
         VStack(alignment: .leading, spacing: Design.gap) {
             HStack(alignment: .firstTextBaseline, spacing: Design.gap) {
                 Text(value.window.displayName).font(Design.title); Spacer()
-                Text("剩余").font(Design.caption).foregroundStyle(Design.secondary)
-                Text("\(Int(value.window.remainingPercent.rounded()))%").font(Design.status).foregroundStyle(value.level == .normal ? Design.label : Design.stateText(value.level))
+                Text(state.quotaBasisLabel).font(Design.caption).foregroundStyle(Design.secondary)
+                Text("\(Int(state.quotaPercent(value.window).rounded()))%").font(Design.status).foregroundStyle(value.level == .normal ? Design.label : Design.stateText(value.level))
             }
-            LineBar(fraction: value.window.remainingPercent / 100, color: Design.provider(provider), marker: value.pace?.expectedRemainingFraction)
+            LineBar(fraction: state.quotaPercent(value.window) / 100, color: Design.provider(provider, style: state.style), marker: state.quotaPaceMarker(value.pace))
             HStack(spacing: Design.smallGap) {
                 if let pace = value.pace {
                     Rectangle().fill(Design.red).frame(width: Design.tickWidth, height: Design.legendDot)
-                    Text("按节奏应剩 \(Int((pace.expectedRemainingFraction * 100).rounded()))%")
+                    Text("按节奏应\(state.quotaBasisLabel) \(Int(((state.quotaPaceMarker(pace) ?? 0) * 100).rounded()))%")
                 }
                 Spacer(minLength: 0)
                 if let text = value.resetText { Text(text) }
@@ -187,14 +189,14 @@ struct QuotaTrendView: View {
                     let window = cycle.window, reset = cycle.reset, start = cycle.start
                     let history = cycle.points
                     HStack { Text("\(window.displayName) · 从重置到重置，累计已用"); Spacer(minLength: 0); Text("已用 \(Int(window.usedPercent.rounded()))%") }.font(Design.caption).foregroundStyle(Design.secondary)
-                    MiniLineGraph(points: history.map { GraphValue(date: $0.sampledAt, value: $0.usedPercent) }, domain: start...reset, range: 0...100, color: Design.provider(provider), fill: true, fillOpacity: Design.quotaCurveFill, pace: true, now: state.now(), height: Design.cycleHeight)
+                    MiniLineGraph(points: history.map { GraphValue(date: $0.sampledAt, value: $0.usedPercent) }, domain: start...reset, range: 0...100, color: Design.provider(provider, style: state.style), fill: true, fillOpacity: Design.quotaCurveFill, pace: true, now: state.now(), height: Design.cycleHeight)
                     HStack { Text(DisplayDate.format(start, pattern: "M/d") + " 重置"); Spacer(); Text("现在"); Spacer(); Text(DisplayDate.format(reset, pattern: "M/d") + " 重置") }.font(Design.tiny).foregroundStyle(Design.secondary)
                     Text("匀速用完的节奏：曲线在虚线上方就是用得偏快").font(Design.tiny).foregroundStyle(Design.secondary)
             }
             if state.quotas[provider]?.windows.contains(where: { $0.effectiveWindowMinutes == 300 }) == true {
                 let peaks = state.quotaPeaks(provider)
                 Text("5 小时窗口 · 每个窗口的最高已用").font(Design.caption).foregroundStyle(Design.secondary)
-                MiniColumns(values: peaks.map(\.usedPercent), colors: peaks.map { Design.provider(provider).opacity(QuotaPalette.peakOpacity(usedPercent: $0.usedPercent, isCurrent: $0.isCurrent)) }, maximum: 100)
+                MiniColumns(values: peaks.map(\.usedPercent), colors: peaks.map { Design.provider(provider, style: state.style).opacity(QuotaPalette.peakOpacity(usedPercent: $0.usedPercent, isCurrent: $0.isCurrent)) }, maximum: 100)
                 HStack { Text(DisplayDate.format(state.now().addingTimeInterval(-6 * 86400), pattern: "M/d")); Spacer(); Text(DisplayDate.format(state.now().addingTimeInterval(-3 * 86400), pattern: "M/d")); Spacer(); Text("今天") }.font(Design.tiny).foregroundStyle(Design.secondary)
                 Text("实色：超过 80% · 浅色：进行中").font(Design.tiny).foregroundStyle(Design.secondary)
             }
@@ -223,7 +225,7 @@ struct CostCard: View {
             let dates = state.costChartDates
             let days = dates.map { state.costDayDisplay(provider, date: $0) }
             MiniColumns(values: days.map(\.totalCost), colors: days.map {
-                Design.provider(provider).opacity($0.date == state.displayedCostDate ? 1 : Design.costFill)
+                Design.provider(provider, style: state.style).opacity($0.date == state.displayedCostDate ? 1 : Design.costFill)
             }, action: { state.selectCostDay(dates[$0]) })
             HStack { Text(days.first?.detailText.components(separatedBy: " · ").first ?? ""); Spacer(); Text("今天") }
                 .font(Design.tiny).foregroundStyle(Design.secondary)

@@ -49,6 +49,7 @@ enum SelfTestMain {
             ("Core.Style/默认与色板", { StyleTests.core() }),
             ("Core.Style/总览 v2 与选择器", { StyleTests.layout() }),
             ("UI.StyleStore/文件边界与恢复", { StyleStoreTests.boundaries() }),
+            ("UI.Style/总览与额度显示", { StyleUITests.rendering() }),
             ("UI.PanelLayoutStore/四猫独立保存与重载", { PanelLayoutStoreTests.lifecycle() }),
             ("UI.PanelLayoutStore/坏文件与链接恢复", { PanelLayoutStoreTests.recovery() }),
             ("UI.PanelLayoutStore/发布前后与迟到保存", { PanelLayoutStoreTests.transactions() }),

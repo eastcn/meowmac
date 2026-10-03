@@ -92,6 +92,9 @@ public final class PanelState: ObservableObject {
     @Published public var selectedCat: LoadedCat? = CatPackageLoader.defaultCat
     public var catStore: CatStore?
     public var layoutStore: PanelLayoutStore?
+    public var styleStore: StyleStore?
+    @Published public private(set) var style: StyleSettings = .default
+    @Published public private(set) var styleRecoveryReason: String?
     @Published public private(set) var panelLayout: PanelLayout = .default
     @Published public private(set) var layoutRecoveryReason: String?
     @Published public var catLevelOverride: HealthLevel?
@@ -141,6 +144,24 @@ public final class PanelState: ObservableObject {
         try layoutStore.save(layout, cat: cat)
         panelLayout = layout
         layoutRecoveryReason = nil
+    }
+
+    public func loadStyle() {
+        let loaded = styleStore?.load() ?? StyleLoad(settings: .default, recoveryReason: nil)
+        applyStyle(loaded.settings)
+        styleRecoveryReason = loaded.recoveryReason
+    }
+
+    public func applyStyle(_ settings: StyleSettings) {
+        style = settings
+        chartMinutes = settings.chartMinutes
+    }
+
+    public func saveStyle(_ settings: StyleSettings) throws {
+        guard let styleStore else { throw StyleError.invalid("样式存储不可用") }
+        try styleStore.save(settings)
+        applyStyle(settings)
+        styleRecoveryReason = nil
     }
 
     public func renderedCardIDs(for tab: PanelTab) -> [String] {
@@ -193,6 +214,7 @@ public final class PanelState: ObservableObject {
 }
 
 public struct OverviewMetric: Codable {
+    public let item: OverviewItem
     public let title: String
     public let value: String
     public let detail: String
@@ -215,14 +237,23 @@ public extension PanelState {
         let totalGB = snapshot?.memoryTotalBytes.map { Int((Double($0) / 1_073_741_824).rounded()) }
         let memoryDetail = usedGB.flatMap { used in totalGB.map { "已用 \(used) / \($0) GB" } } ?? "内存用量不可用"
         let memoryLevel: HealthLevel = snapshot?.memoryPressure == .critical ? .severe : snapshot?.memoryPressure == .warn ? .warn : .normal
-        let quota = quotas[.claude]?.windows.first(where: { $0.effectiveWindowMinutes == 300 })
+        let quotaConfig = panelLayout.overview.quota
+        let quota = quotaConfig.selectedWindow(in: quotas[quotaConfig.provider])
         let remaining = quota?.remainingPercent
-        return [
-            OverviewMetric(title: "CPU", value: cpu.map { "\(Int(($0 * 100).rounded()))%" } ?? "—", detail: "整机负载", fraction: cpu ?? 0, level: .normal, numericValue: cpu.map { $0 * 100 }),
-            OverviewMetric(title: "内存", value: memory.map { "\(Int($0.rounded()))%" } ?? "—", detail: memoryDetail, fraction: (memory ?? 0) / 100, level: memoryLevel, numericValue: memory),
-            OverviewMetric(title: "Claude", value: remaining.map { "\(Int($0.rounded()))%" } ?? "—", detail: "5 小时 · 剩余", fraction: (remaining ?? 0) / 100, level: Design.quotaLevel(remaining ?? 0), numericValue: remaining),
-            OverviewMetric(title: "网络", value: snapshot?.networkReceivedBytesPerSecond.map { "↓" + MetricFormat.rate($0) } ?? "—", detail: snapshot?.networkSentBytesPerSecond.map { "↑" + MetricFormat.rate($0) } ?? "—", fraction: 1, level: networkTone == .red ? .severe : networkTone == .yellow ? .warn : .normal, numericValue: snapshot?.networkReceivedBytesPerSecond),
+        let shown = quota.map { quotaPercent($0) }
+        let quotaName = quota?.effectiveWindowMinutes == 300 ? "5 小时" : quota?.effectiveWindowMinutes == 10080 ? "7 天" : quota?.displayName.replacingOccurrences(of: "窗口", with: "") ?? "额度"
+        let metrics: [OverviewItem: OverviewMetric] = [
+            .cpu: OverviewMetric(item: .cpu, title: "CPU", value: cpu.map { "\(Int(($0 * 100).rounded()))%" } ?? "—", detail: "整机负载", fraction: cpu ?? 0, level: .normal, numericValue: cpu.map { $0 * 100 }),
+            .memory: OverviewMetric(item: .memory, title: "内存", value: memory.map { "\(Int($0.rounded()))%" } ?? "—", detail: memoryDetail, fraction: (memory ?? 0) / 100, level: memoryLevel, numericValue: memory),
+            .quota: OverviewMetric(item: .quota, title: quotaConfig.provider.displayName, value: shown.map { "\(Int($0.rounded()))%" } ?? "—", detail: quotaName + " · " + quotaBasisLabel, fraction: (shown ?? 0) / 100, level: Design.quotaLevel(remaining ?? 0), numericValue: shown),
+            .network: OverviewMetric(item: .network, title: "网络", value: snapshot?.networkReceivedBytesPerSecond.map { "↓" + MetricFormat.rate($0) } ?? "—", detail: snapshot?.networkSentBytesPerSecond.map { "↑" + MetricFormat.rate($0) } ?? "—", fraction: 1, level: networkTone == .red ? .severe : networkTone == .yellow ? .warn : .normal, numericValue: snapshot?.networkReceivedBytesPerSecond),
         ]
+        return panelLayout.overview.visible.compactMap { metrics[$0] }
+    }
+    var quotaBasisLabel: String { style.quotaBasis == .remaining ? "剩余" : "已用" }
+    func quotaPercent(_ window: QuotaWindow) -> Double { style.quotaBasis == .remaining ? window.remainingPercent : window.usedPercent }
+    func quotaPaceMarker(_ pace: QuotaPace?) -> Double? {
+        pace.map { style.quotaBasis == .remaining ? $0.expectedRemainingFraction : 1 - $0.expectedRemainingFraction }
     }
     var quotaUpdatedAt: Date? { quotas.values.map(\.updatedAt).min() }
 }
@@ -408,7 +439,7 @@ struct OverviewView: View {
                 ForEach(state.overviewMetrics.indices, id: \.self) { index in
                     let metric = state.overviewMetrics[index]
                     FlatMetric(title: metric.title, value: metric.value, detail: metric.detail, fraction: metric.fraction,
-                               color: index == 0 ? Design.blue : index == 3 ? Design.networkColor(state.networkTone) : Design.state(metric.level))
+                               color: metric.item == .cpu ? Design.blue : metric.item == .network ? Design.networkColor(state.networkTone) : Design.state(metric.level))
                 }
             }
             if let error = state.configResult.error { Text(error).font(Design.caption).foregroundStyle(Design.stateText(.warn)) }

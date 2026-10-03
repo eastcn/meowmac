@@ -41,7 +41,7 @@ enum Design {
     static let gray = Color(nsColor: .systemGray)
     static let selection = Color(nsColor: .controlBackgroundColor)
     static let background = Color(nsColor: .windowBackgroundColor)
-    static func provider(_ provider: QuotaProvider) -> Color { Color(nsColor: QuotaPalette.color(provider)) }
+    static func provider(_ provider: QuotaProvider, style: StyleSettings = .default) -> Color { Color(nsColor: QuotaPalette.color(provider, style: style)) }
     static func state(_ level: HealthLevel) -> Color {
         switch level { case .normal: return Color(nsColor: .systemGreen); case .warn: return orange; case .severe: return red }
     }
@@ -338,7 +338,16 @@ struct DesignComponentPreview: View {
 
 /// 额度页的渠道色。状态色由 Design 单独提供。
 public enum QuotaPalette {
-    public static func color(_ provider: QuotaProvider) -> NSColor {
+    public static func color(_ provider: QuotaProvider, style: StyleSettings = .default) -> NSColor {
+        if let pair = style.color(for: provider).hexPair {
+            return NSColor(name: nil) { appearance in
+                let hex = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? pair.dark : pair.light
+                let value = Int(hex.dropFirst(), radix: 16)!
+                return NSColor(srgbRed: CGFloat((value >> 16) & 255) / 255,
+                               green: CGFloat((value >> 8) & 255) / 255,
+                               blue: CGFloat(value & 255) / 255, alpha: 1)
+            }
+        }
         switch provider {
         case .codex: return .labelColor
         case .claude: return NSColor(srgbRed: 217 / 255, green: 119 / 255, blue: 87 / 255, alpha: 1)
