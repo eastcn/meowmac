@@ -12,6 +12,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var popover: NSPopover?
     private var networkBridge: NetworkBridge?
     private var quotaCoordinator: QuotaCoordinator?
+    private var resetCoordinator: CodexResetCoordinator?
     private let panelState = PanelState()
     private let catStore = CatStore()
     private lazy var layoutSettings = LayoutSettingsController(state: panelState)
@@ -56,8 +57,12 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         let quota = QuotaCoordinator(state: panelState, config: configResult.config)
         quotaCoordinator = quota
         quota.start()
+        let reset = CodexResetCoordinator(state: panelState)
+        resetCoordinator = reset
+        reset.start()
         panelState.onRefresh = { [weak self] in
             self?.sample(); self?.sampleEnergy(); self?.networkBridge?.recheck(); self?.quotaCoordinator?.manualRefresh()
+            self?.resetCoordinator?.refresh()
         }
         panelState.onShowStorage = { provider in
             let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".\(provider.rawValue)")
@@ -284,6 +289,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         energyTimer?.invalidate()
         networkBridge?.stop()
         quotaCoordinator?.stop()
+        resetCoordinator?.stop()
         frameTimer?.invalidate()
         observers.forEach {
             NSWorkspace.shared.notificationCenter.removeObserver($0)

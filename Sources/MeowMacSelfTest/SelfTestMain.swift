@@ -80,6 +80,8 @@ enum SelfTestMain {
         tests.append(("UI.Reminders/原生入口暂缓恢复与容器", { await ReminderUITests.nativeControls() }))
         tests.append(("UI.Reminders/启动到期切猫与快照", { ReminderIntegrationTests.runtime() }))
         tests.append(("UI.Reminders/真实弹出面板与超高筛选", { await ReminderIntegrationTests.popover() }))
+        tests.append(contentsOf: CodexResetTests.tests)
+        tests.append(contentsOf: CodexResetUITests.tests)
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }
         for test in CodexBarImportTests.tests { tests.append((test.0, { test.1() })) }
         tests.append(("UI.System/两类诊断与持续时间", { DiagnosisTests.rows() }))
