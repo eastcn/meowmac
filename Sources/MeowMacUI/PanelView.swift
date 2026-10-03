@@ -120,6 +120,8 @@ public final class PanelState: ObservableObject {
     public var onShowCats: () -> Void = {}
     public var onShowLayoutSettings: () -> Void = {}
     public var onImportCodexBarHistory: () -> Void = {}
+    /// 历史导入是一次性功能，导入完成后菜单不再显示入口。
+    @Published public var showsCodexBarImport = true
     public var onCatChanged: () -> Void = {}
     public var readLastTab: () -> PanelTab = {
         UserDefaults.standard.string(forKey: "lastPanelTab").flatMap(PanelTab.init(rawValue:)) ?? .system

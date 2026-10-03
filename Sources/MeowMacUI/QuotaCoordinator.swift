@@ -27,6 +27,7 @@ public final class QuotaCoordinator {
     }
 
     public func start() {
+        state.showsCodexBarImport = !codexBarImportDone
         do { try history.prune(before: Date().addingTimeInterval(Double(-config.quotaHistoryDays) * 86400)); lastPrunedAt = Date() }
         catch { logger.error("额度历史清理失败：\(error.localizedDescription, privacy: .private)") }
         for provider in QuotaProvider.allCases {
@@ -62,9 +63,14 @@ public final class QuotaCoordinator {
     }
 
     /// 一次性导入 CodexBar 额度历史。在主 Actor 上执行，与定时追加串行。
+    public var codexBarImportDone: Bool {
+        FileManager.default.fileExists(atPath: CodexBarHistoryImport(source: importSource, store: history).marker.path)
+    }
+
     public func importCodexBarHistory(now: Date = Date()) throws -> CodexBarImportReport {
         let report = try CodexBarHistoryImport(source: importSource, store: history)
             .run(now: now, retentionDays: config.quotaHistoryDays)
+        state.showsCodexBarImport = !codexBarImportDone
         if report.totalImported > 0 {
             for provider in QuotaProvider.allCases {
                 do { state.quotaHistory[provider] = try history.read(provider) }

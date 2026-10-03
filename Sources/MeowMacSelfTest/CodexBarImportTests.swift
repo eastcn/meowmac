@@ -220,13 +220,16 @@ enum CodexBarImportTests {
             let state = PanelPreviewRenderer.syntheticState()
             state.quotaHistory = [:]
             let coordinator = QuotaCoordinator(state: state, config: LocalConfig(), history: importer.store, importSource: src)
+            let before = coordinator.codexBarImportDone, shownBefore = SettingsMenu.make(state: state).items.contains { $0.title == "导入 CodexBar 历史…" }
             let first = try coordinator.importCodexBarHistory(now: now)
+            let hidden = coordinator.codexBarImportDone && !state.showsCodexBarImport
+                && !SettingsMenu.make(state: state).items.contains { $0.title == "导入 CodexBar 历史…" }
             let refreshed = state.quotaHistory[.claude]?.count == 2 && state.quotaHistory[.codex]?.count == 1
             let second = try coordinator.importCodexBarHistory(now: now)
             let missing = CodexBarImportReport(outcome: .sourceMissing).message
             let nothing = CodexBarImportReport(outcome: .imported).message
             _ = history
-            return first.totalImported == 3 && refreshed && second.outcome == .alreadyImported
+            return !before && shownBefore && hidden && first.totalImported == 3 && refreshed && second.outcome == .alreadyImported
                 && first.message.contains("已补充 3 条") && first.message.contains("Claude：2 条") && first.message.contains("Codex：1 条")
                 && second.message.contains("已导入过") && missing.contains("没有找到") && nothing.contains("没有需要补充")
         } catch { print("导入协调器夹具失败：\(error)"); return false }

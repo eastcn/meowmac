@@ -39,7 +39,7 @@ public enum SettingsMenu {
         catItem.submenu = catMenu
         menu.addItem(catItem)
         add("布局与显示…", enabled: state.selectedCat != nil, action: state.onShowLayoutSettings)
-        add("导入 CodexBar 历史…", action: state.onImportCodexBarHistory)
+        if state.showsCodexBarImport { add("导入 CodexBar 历史…", action: state.onImportCodexBarHistory) }
         add("开机启动", checked: state.loginEnabled) { state.onToggleLogin(!state.loginEnabled) }
         menu.addItem(.separator())
         add("关于 MeowMac") { NSApplication.shared.orderFrontStandardAboutPanel(nil) }
