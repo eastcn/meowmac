@@ -72,6 +72,14 @@ public enum PanelPreviewRenderer {
     public static func overviewPNG(alert: Bool, dark: Bool) -> Data? {
         renderPNG(OverviewView(state: syntheticState(alert: alert)), width: Design.panelWidth, height: alert ? 160 : 140, dark: dark)
     }
+    /// 分节自身没有材质层；仅作补充对照，原生弹出面板单独测量。
+    public static func resetMonitorPNG(state: PanelState, dark: Bool) -> Data? {
+        let view = CodexResetMonitorView(display: state.codexResetState.display)
+            .padding(16).frame(width: Design.panelWidth)
+        let measure = NSHostingView(rootView: view)
+        let height = ceil(measure.fittingSize.height)
+        return renderPNG(view, width: Design.panelWidth, height: height, dark: dark)
+    }
     public static func settingsPNG(dark: Bool) -> Data? {
         let state = syntheticState(); state.loginEnabled = true
         return renderPNG(SettingsMenuPreview(state: state), width: Design.menuWidth, height: 210, dark: dark)

@@ -146,6 +146,10 @@ struct QuotaPage: View {
                     } }
                 }
             }
+            if provider == .codex {
+                SectionRule()
+                CodexResetMonitorView(display: state.codexResetState.display)
+            }
             let ids = state.renderedCardIDs(for: .quota)
             ForEach(ids, id: \.self) { id in
                 SectionRule()

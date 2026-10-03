@@ -3,6 +3,7 @@ import Charts
 import SwiftUI
 import MeowMacCore
 import MeowMacSystem
+import MeowMacQuota
 import os
 import TunCanaryUI
 
@@ -70,6 +71,7 @@ public final class PanelState: ObservableObject {
     @Published public var quotas: [QuotaProvider: QuotaSnapshot] = [:] { didSet { refreshReminders() } }
     @Published public var quotaHistory: [QuotaProvider: [QuotaHistoryLine]] = [:]
     @Published public var quotaErrors: [QuotaProvider: String] = [:]
+    @Published public var codexResetState = CodexResetState()
     @Published public var localStorage: [QuotaProvider: LocalStorageSnapshot] = [:]
     private var storageLoading: Set<QuotaProvider> = []
     public var now: () -> Date = Date.init
