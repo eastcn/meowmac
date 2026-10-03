@@ -109,7 +109,7 @@ public final class CodexResetClient {
             cache.error = error.localizedDescription
             state.failures = cache.failures; state.error = cache.error
             let backoff = serverFailure ? min(Self.interval * pow(2, Double(min(cache.failures, 3))), 3600) : Self.interval
-            setNext(max(started.addingTimeInterval(backoff), retryAfter ?? .distantPast))
+            setNext(max(now().addingTimeInterval(backoff), retryAfter ?? .distantPast))
             logger.error("重置监控采集失败：\(error.localizedDescription, privacy: .private)")
         }
         persist()

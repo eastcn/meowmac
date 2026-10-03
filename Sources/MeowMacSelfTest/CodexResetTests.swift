@@ -3,7 +3,7 @@ import MeowMacCore
 import MeowMacQuota
 
 final class ResetTestProtocol: URLProtocol {
-    struct Reply { let status: Int; var headers: [String: String] = [:]; var data = Data() }
+    struct Reply { let status: Int; var headers: [String: String] = [:]; var data = Data(); var delay: TimeInterval = 0 }
     private static let lock = NSLock()
     private static var replies: [Reply] = []
     private static var recorded: [URLRequest] = []
@@ -16,10 +16,14 @@ final class ResetTestProtocol: URLProtocol {
         Self.recorded.append(request)
         let reply = Self.replies.isEmpty ? Reply(status: 500) : Self.replies.removeFirst()
         Self.lock.unlock()
-        let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: "HTTP/1.1", headerFields: reply.headers)!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: reply.data)
-        client?.urlProtocolDidFinishLoading(self)
+        func deliver() {
+            let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: "HTTP/1.1", headerFields: reply.headers)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: reply.data)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        if reply.delay > 0 { DispatchQueue.global().asyncAfter(deadline: .now() + reply.delay) { deliver() } }
+        else { deliver() }
     }
     override func stopLoading() {}
 }
@@ -34,6 +38,7 @@ enum CodexResetTests {
         ("Quota.Reset/空缓存 304 坏响应与撤回", { await replacement() }),
         ("Quota.Reset/手动并发合并与600秒边界", { await coalescing() }),
         ("Quota.Reset/429 Retry-After 与5xx退避", { await backoff() }),
+        ("Quota.Reset/慢失败从返回时起至少等待600秒", { await slowFailure() }),
         ("Quota.Reset/缓存损坏符号链接与写入失败", { await damagedCache() })
     ] }
     static func event(id: String = "example-pending", status: String = "announced", phase: String = "announced",
@@ -193,5 +198,23 @@ enum CodexResetTests {
             let preserved = try Data(contentsOf: badRoot)
             return failure.state.cacheError != nil && preserved == original
         } catch { print("重置缓存测试：\(error)"); return false }
+    }
+    static func slowFailure() async -> Bool {
+        do {
+            let root = try root("slow-failure"), session = session(); var time = clock
+            defer { session.invalidateAndCancel(); try? FileManager.default.removeItem(at: root) }
+            ResetTestProtocol.prepare([.init(status: 429, delay: 0.1), .init(status: 200, data: data())])
+            let client = CodexResetClient(root: root, session: session, now: { time })
+            let request = Task { await client.refresh() }
+            for _ in 0..<100 where !client.requesting { await Task.yield() }
+            guard client.requesting else { return false }
+            time.addTimeInterval(30)
+            _ = await request.value
+            guard client.state.failures == 1, client.state.nextAttemptAt == time.addingTimeInterval(600) else { return false }
+            time.addTimeInterval(599)
+            guard !(await client.refresh()), ResetTestProtocol.requests.count == 1 else { return false }
+            time.addTimeInterval(1)
+            return await client.refresh() && ResetTestProtocol.requests.count == 2
+        } catch { return false }
     }
 }
