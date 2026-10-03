@@ -7,7 +7,8 @@ import os
 @MainActor
 public final class QuotaCoordinator {
     private let client: CodexBarClient
-    private let history = QuotaHistoryStore()
+    private let history: QuotaHistoryStore
+    private let importSource: URL
     private let config: LocalConfig
     private let state: PanelState
     private let logger = Logger(subsystem: AppIdentity.bundleID, category: "quota-schedule")
@@ -19,8 +20,9 @@ public final class QuotaCoordinator {
     private var sleeping = false
     private var observers: [NSObjectProtocol] = []
 
-    public init(state: PanelState, config: LocalConfig) {
-        self.state = state; self.config = config
+    public init(state: PanelState, config: LocalConfig, history: QuotaHistoryStore = QuotaHistoryStore(),
+                importSource: URL = CodexBarHistoryImport.defaultSource) {
+        self.state = state; self.config = config; self.history = history; self.importSource = importSource
         self.client = CodexBarClient(path: config.codexBarCLIPath)
     }
 
@@ -57,6 +59,19 @@ public final class QuotaCoordinator {
         refreshTimer?.invalidate(); sessionTimer?.invalidate()
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers.removeAll()
+    }
+
+    /// 一次性导入 CodexBar 额度历史。在主 Actor 上执行，与定时追加串行。
+    public func importCodexBarHistory(now: Date = Date()) throws -> CodexBarImportReport {
+        let report = try CodexBarHistoryImport(source: importSource, store: history)
+            .run(now: now, retentionDays: config.quotaHistoryDays)
+        if report.totalImported > 0 {
+            for provider in QuotaProvider.allCases {
+                do { state.quotaHistory[provider] = try history.read(provider) }
+                catch { logger.error("额度历史读取失败：\(error.localizedDescription, privacy: .private)") }
+            }
+        }
+        return report
     }
 
     public func manualRefresh() {

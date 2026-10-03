@@ -70,6 +70,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         panelState.onImportCat = { [weak self] in self?.importCat() }
         panelState.onShowCats = { [weak self] in self?.showCats() }
         panelState.onShowLayoutSettings = { [weak self] in self?.layoutSettings.present() }
+        panelState.onImportCodexBarHistory = { [weak self] in self?.importCodexBarHistory() }
         panelState.onCatChanged = { [weak self] in self?.layoutSettings.catDidChange() }
         panelState.onQuit = { NSApplication.shared.terminate(nil) }
         panelState.loginEnabled = loginItem.status == .enabled
@@ -206,6 +207,20 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
                 NSWorkspace.shared.activateFileViewerSelecting([folder])
             } else { showCatError("尚未导入猫配置。") }
         } catch { showCatError(error.localizedDescription) }
+    }
+
+    private func importCodexBarHistory() {
+        let alert = NSAlert()
+        alert.messageText = "导入 CodexBar 历史"
+        do {
+            guard let quotaCoordinator else { return }
+            alert.informativeText = try quotaCoordinator.importCodexBarHistory().message
+        } catch {
+            logger.error("CodexBar 历史导入失败：\(error.localizedDescription, privacy: .private)")
+            alert.alertStyle = .warning
+            alert.informativeText = "导入失败，已有数据未改动。"
+        }
+        alert.runModal()
     }
 
     private func showCatError(_ message: String) {

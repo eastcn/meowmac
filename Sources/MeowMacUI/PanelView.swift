@@ -119,6 +119,7 @@ public final class PanelState: ObservableObject {
     public var onImportCat: () -> Void = {}
     public var onShowCats: () -> Void = {}
     public var onShowLayoutSettings: () -> Void = {}
+    public var onImportCodexBarHistory: () -> Void = {}
     public var onCatChanged: () -> Void = {}
     public var readLastTab: () -> PanelTab = {
         UserDefaults.standard.string(forKey: "lastPanelTab").flatMap(PanelTab.init(rawValue:)) ?? .system
