@@ -174,12 +174,12 @@ enum SelfTestMain {
                 let item = cats.items[index]
                 guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
             }
-            let historyItem = menu.items[5]
+            let historyItem = menu.items[6]
             guard historyItem.title == "导入 CodexBar 历史…", let historyAction = historyItem.action,
                   NSApplication.shared.sendAction(historyAction, to: historyItem.target, from: historyItem) else { return false }
-            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "导入 CodexBar 历史…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
-                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].isEnabled && menu.items[6].state == .on
-                && menu.items[2].isSeparatorItem && menu.items[7].isSeparatorItem && menu.items[9].keyEquivalent == "q"
+            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "样式…", "导入 CodexBar 历史…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
+                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].isEnabled && menu.items[7].state == .on
+                && menu.items[2].isSeparatorItem && menu.items[8].isSeparatorItem && menu.items[10].keyEquivalent == "q"
                 && selected == "builtin.round" && imported && shown && importedHistory
                 && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
@@ -189,6 +189,8 @@ enum SelfTestMain {
         tests.append(("UI.PanelLayout/渲染顺序固定区与快照", { PanelLayoutUITests.renderingAndSnapshot() }))
         tests.append(("UI.PanelLayout/默认与极端容器尺寸", { await PanelLayoutUITests.sizes() }))
         tests.append(("UI.PanelLayout/隐藏网络检查后点击总览告警", { await PanelLayoutUITests.hiddenNetworkIssueClick() }))
+        tests.append(("UI.StyleSettings/原生菜单与保存生命周期", { StyleSettingsTests.lifecycle() }))
+        tests.append(("UI.StyleSettings/真实控件与色板", { StyleSettingsTests.controls() }))
         tests.append(("UI.LayoutSettings/原生菜单与草稿", { LayoutSettingsTests.menuAndDraft() }))
         tests.append(("UI.LayoutSettings/保存失败与切猫", { LayoutSettingsTests.saveAndFailure() }))
         tests.append(("UI.LayoutSettings/拖动回调与坏文件提示", { await LayoutSettingsTests.dropAndRecovery() }))
