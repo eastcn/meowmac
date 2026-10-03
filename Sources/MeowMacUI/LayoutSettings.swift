@@ -28,6 +28,9 @@ public final class LayoutSettingsModel: ObservableObject {
 
     public var isDirty: Bool { draft != saved }
     public var overviewPreview: [OverviewMetric] { state.overviewMetrics(for: draft.overview) }
+    public func overviewColor(for metric: OverviewMetric) -> Color {
+        state.overviewColor(for: metric)
+    }
     public func moveOverview(_ source: OverviewItem, to target: OverviewItem) {
         guard let from = draft.overview.order.firstIndex(of: source),
               let to = draft.overview.order.firstIndex(of: target), from != to else { return }
@@ -231,7 +234,7 @@ struct LayoutSettingsView: View {
                     HStack(alignment: .top, spacing: Design.metricGap) {
                         ForEach(model.overviewPreview, id: \.item) { metric in
                             FlatMetric(title: metric.title, value: metric.value, detail: metric.detail,
-                                       fraction: metric.fraction, color: metric.item == .cpu ? Design.blue : Design.state(metric.level))
+                                       fraction: metric.fraction, color: model.overviewColor(for: metric))
                         }
                     }.padding(8).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
                         .accessibilityIdentifier("overview.preview")

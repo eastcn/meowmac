@@ -232,6 +232,13 @@ public extension PanelState {
         allReminders.filter { $0.tab == tab }.map(\.level).max() ?? .normal
     }
     var overviewMetrics: [OverviewMetric] { overviewMetrics(for: panelLayout.overview) }
+    func overviewColor(for metric: OverviewMetric) -> Color {
+        switch metric.item {
+        case .cpu: return Design.blue
+        case .network: return Design.networkColor(networkTone)
+        case .memory, .quota: return Design.state(metric.level)
+        }
+    }
     func overviewMetrics(for overview: PanelOverview) -> [OverviewMetric] {
         let cpu = snapshot?.cpuUsage
         let memory = snapshot?.memoryPressurePercent
@@ -441,7 +448,7 @@ struct OverviewView: View {
                 ForEach(state.overviewMetrics.indices, id: \.self) { index in
                     let metric = state.overviewMetrics[index]
                     FlatMetric(title: metric.title, value: metric.value, detail: metric.detail, fraction: metric.fraction,
-                               color: metric.item == .cpu ? Design.blue : metric.item == .network ? Design.networkColor(state.networkTone) : Design.state(metric.level))
+                               color: state.overviewColor(for: metric))
                 }
             }
             if let error = state.configResult.error { Text(error).font(Design.caption).foregroundStyle(Design.stateText(.warn)) }

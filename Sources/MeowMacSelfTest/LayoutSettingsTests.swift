@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import MeowMacCore
 import MeowMacUI
 
@@ -325,5 +326,42 @@ enum LayoutSettingsTests {
             support.settle(window)
             return model.draft.overview.quota.window == "auto" && state.panelLayout == saved
         } catch { print("快照到达测试失败：\(error)"); return false }
+    }
+
+    static func overviewColors() -> Bool {
+        do {
+            let (state, _, controller) = try prepare()
+            controller.present()
+            defer { controller.window?.close() }
+            guard let model = controller.model else { return false }
+            for (tone, expected) in [(NetworkTone.gray, NSColor.systemGray), (.green, .systemGreen),
+                                     (.yellow, .systemOrange), (.red, .systemRed)] {
+                state.networkTone = tone
+                guard let metric = model.overviewPreview.first(where: { $0.item == .network }),
+                      model.overviewColor(for: metric) == Color(nsColor: expected),
+                      state.overviewColor(for: metric) == Color(nsColor: expected) else {
+                    print("网络预览与面板色不一致：\(tone)"); return false
+                }
+            }
+            state.networkTone = .gray
+            model.moveOverview(.network, to: .cpu)
+            model.setOverviewVisible(false, item: .memory)
+            guard model.overviewPreview.map(\.item) == [.network, .cpu, .quota] else { return false }
+            for metric in model.overviewPreview {
+                let expected: NSColor = metric.item == .network ? .systemGray
+                    : metric.item == .cpu ? .systemBlue : .systemGreen
+                guard model.overviewColor(for: metric) == Color(nsColor: expected),
+                      state.overviewColor(for: metric) == Color(nsColor: expected) else { return false }
+            }
+            model.setOverviewVisible(true, item: .memory)
+            state.snapshot = SystemSnapshot(timestamp: state.now(), cpuUsage: 0.24, memoryPressure: .warn,
+                swapUsedBytes: nil, diskAvailableBytes: nil, diskTotalBytes: nil,
+                networkReceivedBytesPerSecond: nil, networkSentBytesPerSecond: nil,
+                battery: BatteryMetrics(temperatureCelsius: nil, systemPowerWatts: nil), thermal: .nominal)
+            guard let memory = model.overviewPreview.first(where: { $0.item == .memory }) else { return false }
+            return model.overviewColor(for: memory) == Color(nsColor: .systemOrange)
+                && state.overviewColor(for: memory) == Color(nsColor: .systemOrange)
+                && state.panelLayout == .default
+        } catch { print("总览颜色测试失败：\(error)"); return false }
     }
 }
