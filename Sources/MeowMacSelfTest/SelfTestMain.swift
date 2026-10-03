@@ -46,6 +46,10 @@ enum SelfTestMain {
             ("Core.Panel/默认标签页", { SelfTestMain.openingTab() }),
             ("Core.PanelLayout/完整排列与严格校验", { PanelLayoutCoreTests.validation() }),
             ("Core.PanelLayout/v1 v2 包兼容", { PanelLayoutCoreTests.packageCompatibility() }),
+            ("Core.Style/默认与色板", { StyleTests.core() }),
+            ("Core.Style/总览 v2 与选择器", { StyleTests.layout() }),
+            ("UI.StyleStore/文件边界与恢复", { StyleStoreTests.boundaries() }),
+            ("UI.Style/总览与额度显示", { StyleUITests.rendering() }),
             ("UI.PanelLayoutStore/四猫独立保存与重载", { PanelLayoutStoreTests.lifecycle() }),
             ("UI.PanelLayoutStore/坏文件与链接恢复", { PanelLayoutStoreTests.recovery() }),
             ("UI.PanelLayoutStore/发布前后与迟到保存", { PanelLayoutStoreTests.transactions() }),
@@ -172,12 +176,12 @@ enum SelfTestMain {
                 let item = cats.items[index]
                 guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
             }
-            let historyItem = menu.items[5]
+            let historyItem = menu.items[6]
             guard historyItem.title == "导入 CodexBar 历史…", let historyAction = historyItem.action,
                   NSApplication.shared.sendAction(historyAction, to: historyItem.target, from: historyItem) else { return false }
-            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "导入 CodexBar 历史…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
-                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].isEnabled && menu.items[6].state == .on
-                && menu.items[2].isSeparatorItem && menu.items[7].isSeparatorItem && menu.items[9].keyEquivalent == "q"
+            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "样式…", "导入 CodexBar 历史…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
+                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].isEnabled && menu.items[7].state == .on
+                && menu.items[2].isSeparatorItem && menu.items[8].isSeparatorItem && menu.items[10].keyEquivalent == "q"
                 && selected == "builtin.round" && imported && shown && importedHistory
                 && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
@@ -187,10 +191,17 @@ enum SelfTestMain {
         tests.append(("UI.PanelLayout/渲染顺序固定区与快照", { PanelLayoutUITests.renderingAndSnapshot() }))
         tests.append(("UI.PanelLayout/默认与极端容器尺寸", { await PanelLayoutUITests.sizes() }))
         tests.append(("UI.PanelLayout/隐藏网络检查后点击总览告警", { await PanelLayoutUITests.hiddenNetworkIssueClick() }))
+        tests.append(("UI.StyleIntegration/启动切猫包默认与坏文件", { StyleIntegrationTests.lifecycle() }))
+        tests.append(("UI.StyleSettings/原生菜单与保存生命周期", { StyleSettingsTests.lifecycle() }))
+        tests.append(("UI.StyleSettings/真实控件与色板", { StyleSettingsTests.controls() }))
+        tests.append(("UI.StyleSettings/渠道预览条与草稿颜色", { StyleSettingsTests.colorPreviews() }))
         tests.append(("UI.LayoutSettings/原生菜单与草稿", { LayoutSettingsTests.menuAndDraft() }))
         tests.append(("UI.LayoutSettings/保存失败与切猫", { LayoutSettingsTests.saveAndFailure() }))
         tests.append(("UI.LayoutSettings/拖动回调与坏文件提示", { await LayoutSettingsTests.dropAndRecovery() }))
+        tests.append(("UI.LayoutSettings/总览拖动与缺失窗口", { await LayoutSettingsTests.overview() }))
         tests.append(("UI.LayoutSettings/真实控件操作", { LayoutSettingsTests.actualControls() }))
+        tests.append(("UI.LayoutSettings/快照到达刷新与选择保留", { LayoutSettingsTests.snapshotArrival() }))
+        tests.append(("UI.LayoutSettings/总览指标共用颜色", { LayoutSettingsTests.overviewColors() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.LayoutAcceptance/真实容器合成对照", { await LayoutAcceptanceTests.render() }))
             tests.append(("UI.RenderPreview/三个标签页", { await SelfTestMain.renderPanel() }))

@@ -30,7 +30,7 @@ enum PanelLayoutCoreTests {
         bad = original; bad.tabs = [.system, .system, .network]
         guard (try? bad.validated()) == nil else { return false }
         let base = try! JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as! [String: Any]
-        for change in [("schemaVersion", true as Any), ("schemaVersion", 2 as Any), ("extra", 1 as Any)] {
+        for change in [("schemaVersion", true as Any), ("schemaVersion", 3 as Any), ("extra", 1 as Any)] {
             var object = base; object[change.0] = change.1
             guard (try? PanelLayout.parse(try! JSONSerialization.data(withJSONObject: object))) == nil else { return false }
         }
@@ -56,6 +56,19 @@ enum PanelLayoutCoreTests {
         v2["panel"] = try? JSONSerialization.jsonObject(with: JSONEncoder().encode(panel))
         guard let data = try? JSONSerialization.data(withJSONObject: v2),
               (try? CatPackage.parse(data, builtin: true))?.panel == panel else { return false }
+        var legacy = v2
+        var legacyPanel = v2["panel"] as! [String: Any]
+        legacyPanel["schemaVersion"] = 1
+        legacyPanel.removeValue(forKey: "overview")
+        legacy["panel"] = legacyPanel
+        guard let legacyData = try? JSONSerialization.data(withJSONObject: legacy),
+              (try? CatPackage.parse(legacyData, builtin: true))?.panel.overview == .default else { return false }
+        var invalidOverview = v2
+        var brokenPanel = v2["panel"] as! [String: Any]
+        brokenPanel["overview"] = ["order": ["cpu"], "hidden": [], "quota": ["provider": "claude", "window": "auto"]]
+        invalidOverview["panel"] = brokenPanel
+        guard let invalidData = try? JSONSerialization.data(withJSONObject: invalidOverview),
+              (try? CatPackage.parse(invalidData, builtin: true)) == nil else { return false }
         let directory = URL(fileURLWithPath: "build/acceptance/v0-2-layout/tests/v2.cat", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         do {

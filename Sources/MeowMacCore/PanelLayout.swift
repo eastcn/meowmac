@@ -23,6 +23,62 @@ public struct PanelCardPlacement: Codable, Equatable {
     public init(id: String, visible: Bool = true) { self.id = id; self.visible = visible }
 }
 
+public enum OverviewItem: String, CaseIterable, Codable {
+    case cpu, memory, quota, network
+    public var title: String {
+        switch self { case .cpu: return "CPU"; case .memory: return "内存"; case .quota: return "额度"; case .network: return "网络" }
+    }
+}
+
+public struct OverviewQuota: Codable, Equatable {
+    public var provider: QuotaProvider
+    public var window: String
+    public init(provider: QuotaProvider = .claude, window: String = "minutes:300") {
+        self.provider = provider; self.window = window
+    }
+    public func selectedWindow(in snapshot: QuotaSnapshot?) -> QuotaWindow? {
+        guard let windows = snapshot?.windows else { return nil }
+        if window == "auto" { return windows.first }
+        if window.hasPrefix("id:") { return windows.first { $0.identifier == String(window.dropFirst(3)) } }
+        guard let minutes = Int(window.dropFirst(8)) else { return nil }
+        let matches = windows.filter { $0.effectiveWindowMinutes == minutes }
+        return matches.count == 1 ? matches.first : nil
+    }
+    public static func selector(for window: QuotaWindow, among windows: [QuotaWindow]) -> String {
+        if let minutes = window.effectiveWindowMinutes,
+           windows.filter({ $0.effectiveWindowMinutes == minutes }).count == 1 { return "minutes:\(minutes)" }
+        return "id:" + window.identifier
+    }
+}
+
+public struct PanelOverview: Codable, Equatable {
+    public var order: [OverviewItem]
+    public var hidden: [OverviewItem]
+    public var quota: OverviewQuota
+    public init(order: [OverviewItem] = OverviewItem.allCases, hidden: [OverviewItem] = [], quota: OverviewQuota = .init()) {
+        self.order = order; self.hidden = hidden; self.quota = quota
+    }
+    public static let `default` = PanelOverview()
+    public var visible: [OverviewItem] { order.filter { !hidden.contains($0) } }
+    public func validated() throws {
+        guard order.count == 4, Set(order) == Set(OverviewItem.allCases),
+              hidden.count < 4, hidden.count == Set(hidden).count,
+              Set(hidden).isSubset(of: Set(OverviewItem.allCases)) else { throw PanelLayoutError.invalid("总览格子不完整或全部隐藏") }
+        let selector = quota.window
+        if selector != "auto" {
+            if selector.hasPrefix("minutes:") {
+                let text = String(selector.dropFirst(8))
+                guard let minutes = Int(text), minutes > 0, String(minutes) == text else { throw PanelLayoutError.invalid("额度窗口选择无效") }
+            } else {
+                guard selector.hasPrefix("id:"), selector.count > 3,
+                      selector.count <= 131, selector.unicodeScalars.allSatisfy({ $0.value >= 32 && $0.value != 127 }) else {
+                    throw PanelLayoutError.invalid("额度窗口选择无效")
+                }
+            }
+        }
+    }
+}
+
 public enum PanelLayoutError: Error, LocalizedError {
     case invalid(String)
     public var errorDescription: String? {
@@ -32,12 +88,15 @@ public enum PanelLayoutError: Error, LocalizedError {
 }
 
 public struct PanelLayout: Codable, Equatable {
-    public var schemaVersion: Int = 1
+    public var schemaVersion: Int = 2
     public var tabs: [PanelTab]
     public var cards: [String: [PanelCardPlacement]]
+    public var overview: PanelOverview
 
-    public init(tabs: [PanelTab] = PanelTab.allCases, cards: [String: [PanelCardPlacement]]? = nil) {
+    public init(tabs: [PanelTab] = PanelTab.allCases, cards: [String: [PanelCardPlacement]]? = nil,
+                overview: PanelOverview = .default) {
         self.tabs = tabs
+        self.overview = overview
         self.cards = cards ?? Dictionary(uniqueKeysWithValues: PanelTab.allCases.map { tab in
             (tab.rawValue, (PanelLayoutCatalog.definitions[tab] ?? []).map { PanelCardPlacement(id: $0.id) })
         })
@@ -48,8 +107,9 @@ public struct PanelLayout: Codable, Equatable {
     public func visibleIDs(for tab: PanelTab) -> [String] { placements(for: tab).filter(\.visible).map(\.id) }
 
     public func validated() throws -> PanelLayout {
-        guard schemaVersion == 1, tabs.count == 3, Set(tabs) == Set(PanelTab.allCases),
+        guard schemaVersion == 2, tabs.count == 3, Set(tabs) == Set(PanelTab.allCases),
               Set(cards.keys) == Set(PanelTab.allCases.map(\.rawValue)) else { throw PanelLayoutError.invalid("版本或标签页不完整") }
+        try overview.validated()
         for tab in PanelTab.allCases {
             let expected = PanelLayoutCatalog.definitions[tab] ?? []
             let placements = self.placements(for: tab)
@@ -68,10 +128,10 @@ public struct PanelLayout: Codable, Equatable {
     public static func parse(_ data: Data) throws -> PanelLayout {
         func fail(_ text: String) -> PanelLayoutError { .invalid(text) }
         guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              Set(root.keys) == ["schemaVersion", "tabs", "cards"],
               let version = root["schemaVersion"] as? NSNumber,
               CFGetTypeID(version) != CFBooleanGetTypeID(), version.doubleValue.isFinite,
-              version.doubleValue == 1,
+              [1.0, 2.0].contains(version.doubleValue),
+              Set(root.keys) == (version.intValue == 1 ? Set(["schemaVersion", "tabs", "cards"]) : Set(["schemaVersion", "tabs", "cards", "overview"])),
               let tabNames = root["tabs"] as? [String],
               let cardRoot = root["cards"] as? [String: Any],
               Set(cardRoot.keys) == Set(PanelTab.allCases.map(\.rawValue)) else { throw fail("字段或类型错误") }
@@ -88,7 +148,20 @@ public struct PanelLayout: Codable, Equatable {
                 return PanelCardPlacement(id: id, visible: visible.boolValue)
             }
         }
-        return try PanelLayout(tabs: tabs, cards: cards).validated()
+        var overview = PanelOverview.default
+        if version.intValue == 2 {
+            guard let object = root["overview"] as? [String: Any], Set(object.keys) == ["order", "hidden", "quota"],
+                  let orderNames = object["order"] as? [String], let hiddenNames = object["hidden"] as? [String],
+                  let quota = object["quota"] as? [String: Any], Set(quota.keys) == ["provider", "window"],
+                  let providerName = quota["provider"] as? String, let provider = QuotaProvider(rawValue: providerName),
+                  let selector = quota["window"] as? String,
+                  orderNames.allSatisfy({ OverviewItem(rawValue: $0) != nil }),
+                  hiddenNames.allSatisfy({ OverviewItem(rawValue: $0) != nil }) else { throw fail("总览字段或类型错误") }
+            overview = PanelOverview(order: orderNames.compactMap(OverviewItem.init(rawValue:)),
+                                     hidden: hiddenNames.compactMap(OverviewItem.init(rawValue:)),
+                                     quota: OverviewQuota(provider: provider, window: selector))
+        }
+        return try PanelLayout(tabs: tabs, cards: cards, overview: overview).validated()
     }
 }
 

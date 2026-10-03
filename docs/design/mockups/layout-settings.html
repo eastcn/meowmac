@@ -64,6 +64,15 @@
     #meowmac-layout-draft input { width: 15px; height: 15px; accent-color: var(--mm-blue); }
     #meowmac-layout-draft .mm-locked { color: var(--mm-muted); font-size: 11px; }
     #meowmac-layout-draft .mm-row[data-visible="false"] .mm-name { color: var(--mm-muted); }
+    #meowmac-layout-draft .mm-row { flex-wrap: wrap; }
+    #meowmac-layout-draft .mm-pick { flex: 1 0 100%; display: flex; gap: 8px; padding: 0 14px 10px 46px; }
+    #meowmac-layout-draft .mm-pick select { flex: 1; min-width: 0; min-height: 30px; border: 1px solid var(--mm-rule); border-radius: 6px; background: var(--mm-field); padding: 3px 6px; font: inherit; color: inherit; }
+    #meowmac-layout-draft .mm-ovp { display: flex; gap: 10px; padding: 10px 12px; margin: 8px 0 24px; border: 1px solid var(--mm-rule); border-radius: 8px; background: var(--mm-field); }
+    #meowmac-layout-draft .mm-ovp div { flex: 1; min-width: 0; }
+    #meowmac-layout-draft .mm-ovp b { display: block; font-size: 15px; font-weight: 600; }
+    #meowmac-layout-draft .mm-ovp small { display: block; color: var(--mm-muted); font-size: 10px; }
+    #meowmac-layout-draft .mm-ovp i { display: block; height: 4px; border-radius: 2px; margin-top: 5px; background: var(--mm-rule); overflow: hidden; }
+    #meowmac-layout-draft .mm-ovp u { display: block; height: 100%; background: var(--mm-blue); }
     #meowmac-layout-draft .mm-note { margin: 10px 0 0; color: var(--mm-muted); font-size: 11px; }
     #meowmac-layout-draft .mm-footer {
       border-top: 1px solid var(--mm-rule); padding: 14px 20px;
@@ -97,6 +106,9 @@
     </header>
     <div class="mm-content">
       <div class="mm-cat"><span>当前猫</span><strong>标准瘦身</strong></div>
+      <div class="mm-section-label">总览条<small>拖动排序 · ⌥↑ / ↓ · 至少显示一格</small></div>
+      <div class="mm-list" id="mm-overview-list" role="group" aria-label="总览条格子排序与显示"></div>
+      <div class="mm-ovp" id="mm-overview-preview" aria-label="总览条预览"></div>
       <div class="mm-section-label">标签页顺序<small>拖动排序 · ⌥← / →</small></div>
       <div class="mm-tabs" role="tablist" aria-label="选择标签页并调整顺序"></div>
       <div class="mm-section-label"><span class="mm-page-title">系统页功能</span><small>拖动排序 · ⌥↑ / ↓</small></div>
@@ -129,11 +141,15 @@
       { id: 'network.egress', name: '出口 IP' }
     ] }
   };
+  const cellNames = { cpu: 'CPU', memory: '内存', quota: '额度', network: '网络' };
+  const providers = { claude: 'Claude', codex: 'Codex', deepseek: 'DeepSeek', opencodego: 'OpenCode Go' };
+  const windows = { claude: ['自动', '5 小时', '7 天'], codex: ['自动', '5 小时', '7 天'], deepseek: ['自动', '余额'], opencodego: ['自动', '5 小时', '7 天'] };
   const copy = value => JSON.parse(JSON.stringify(value));
   const defaults = () => ({
     tabs: Object.keys(definitions),
     order: Object.fromEntries(Object.entries(definitions).map(([id, def]) => [id, def.items.map(item => item.id)])),
-    hidden: []
+    hidden: [],
+    overview: { order: ['cpu', 'memory', 'quota', 'network'], hidden: [], provider: 'claude', window: '5 小时' }
   });
   const isPermutation = (value, expected) => Array.isArray(value) && value.length === expected.length &&
     new Set(value).size === expected.length && expected.every(id => value.includes(id));
@@ -142,10 +158,13 @@
     const hideable = Object.values(definitions).flatMap(def => def.items.filter(item => !item.fixed).map(item => item.id));
     return value && isPermutation(value.tabs, base.tabs) && value.order &&
       base.tabs.every(id => isPermutation(value.order[id], base.order[id])) && Array.isArray(value.hidden) &&
-      new Set(value.hidden).size === value.hidden.length && value.hidden.every(id => hideable.includes(id));
+      new Set(value.hidden).size === value.hidden.length && value.hidden.every(id => hideable.includes(id)) &&
+      value.overview && isPermutation(value.overview.order, base.overview.order) && Array.isArray(value.overview.hidden) &&
+      value.overview.hidden.length < 4 && value.overview.hidden.every(id => base.overview.order.includes(id)) &&
+      windows[value.overview.provider] && windows[value.overview.provider].includes(value.overview.window);
   }
   let saved = defaults(), draft = copy(saved), selected = 'system', gesture = null, suppressClick = false;
-  const tabs = root.querySelector('.mm-tabs'), list = root.querySelector('.mm-list');
+  const tabs = root.querySelector('.mm-tabs'), list = root.querySelector('#mm-feature-list');
   const status = root.querySelector('.mm-status'), saveButton = root.querySelector('[data-action="save"]');
   const dirty = () => JSON.stringify(draft) !== JSON.stringify(saved);
   function restore(state) {
@@ -167,7 +186,50 @@
     saveButton.disabled = !dirty();
     status.textContent = message || (dirty() ? '有未保存的更改' : '尚未修改');
   }
+  const ovList = root.querySelector('#mm-overview-list'), ovPreview = root.querySelector('#mm-overview-preview');
+  function renderOverview() {
+    const ov = draft.overview, visible = ov.order.filter(id => !ov.hidden.includes(id));
+    ovList.replaceChildren(); ovPreview.replaceChildren();
+    for (const id of ov.order) {
+      const on = !ov.hidden.includes(id);
+      const row = document.createElement('div'); row.className = 'mm-row';
+      row.dataset.kind = 'cells'; row.dataset.key = id; row.dataset.visible = String(on);
+      const handle = document.createElement('button'); handle.type = 'button'; handle.className = 'mm-grip';
+      handle.dataset.kind = 'cells'; handle.dataset.key = id;
+      handle.setAttribute('aria-label', '排序' + cellNames[id] + '格，拖动或按 Option 加上下键');
+      handle.innerHTML = '<i data-lucide="grip-vertical" aria-hidden="true"></i>';
+      const name = document.createElement('span'); name.className = 'mm-name'; name.textContent = cellNames[id] + '格';
+      const label = document.createElement('label'); label.className = 'mm-toggle cursor-interaction';
+      const box = document.createElement('input'); box.type = 'checkbox'; box.checked = on;
+      box.disabled = on && visible.length === 1; box.setAttribute('aria-label', '显示' + cellNames[id] + '格');
+      box.addEventListener('change', () => {
+        ov.hidden = box.checked ? ov.hidden.filter(x => x !== id) : [...ov.hidden, id];
+        render(); remember();
+      });
+      const text = document.createElement('span'); text.textContent = '显示'; label.append(box, text);
+      row.append(handle, name, label);
+      if (id === 'quota') {
+        const pick = document.createElement('div'); pick.className = 'mm-pick';
+        const sp = document.createElement('select'); sp.setAttribute('aria-label', '额度渠道');
+        for (const [k, v] of Object.entries(providers)) sp.add(new Option(v, k, false, k === ov.provider));
+        const sw = document.createElement('select'); sw.setAttribute('aria-label', '额度窗口');
+        for (const w of windows[ov.provider]) sw.add(new Option(w, w, false, w === ov.window));
+        sp.addEventListener('change', () => { ov.provider = sp.value; ov.window = '自动'; render(); remember(); });
+        sw.addEventListener('change', () => { ov.window = sw.value; render(); remember(); });
+        pick.append(sp, sw); row.append(pick);
+      }
+      ovList.append(row);
+      if (on) {
+        const sample = { cpu: ['CPU', '32%', '整机负载', 32], memory: ['内存', '58%', '已用 18 / 32 GB', 58], network: ['网络', '↓2.4M', '↑128.0K', 100],
+          quota: [providers[ov.provider], '72%', (ov.window === '自动' ? windows[ov.provider][1] : ov.window) + ' · 剩余', 72] }[id];
+        const cell = document.createElement('div');
+        cell.innerHTML = '<small>' + sample[0] + '</small><b>' + sample[1] + '</b><small>' + sample[2] + '</small><i><u style="width:' + sample[3] + '%"></u></i>';
+        ovPreview.append(cell);
+      }
+    }
+  }
   function render(message) {
+    renderOverview();
     tabs.replaceChildren();
     for (const id of draft.tabs) {
       const button = document.createElement('button');
@@ -212,11 +274,11 @@
     if (globalThis.lucide) lucide.createIcons({ attrs: { width: 16, height: 16 } });
   }
   function move(kind, source, target) {
-    const order = kind === 'tabs' ? draft.tabs : draft.order[selected];
+    const order = kind === 'tabs' ? draft.tabs : kind === 'cells' ? draft.overview.order : draft.order[selected];
     const from = order.indexOf(source), to = order.indexOf(target);
     if (from < 0 || to < 0 || from === to) return;
     order.splice(from, 1); order.splice(to, 0, source); render(); remember();
-    const focus = kind === 'tabs' ? tabs.querySelector('[data-key="' + source + '"]') : list.querySelector('button[data-key="' + source + '"]');
+    const focus = kind === 'tabs' ? tabs.querySelector('[data-key="' + source + '"]') : (kind === 'cells' ? ovList : list).querySelector('button[data-key="' + source + '"]');
     if (focus) focus.focus();
   }
   const clearDrop = () => root.querySelectorAll('.mm-drop').forEach(el => el.classList.remove('mm-drop'));
@@ -253,7 +315,7 @@
     const kind = source.dataset.kind;
     const delta = kind === 'tabs' ? ({ ArrowLeft: -1, ArrowRight: 1 })[event.key] : ({ ArrowUp: -1, ArrowDown: 1 })[event.key];
     if (!delta) return; event.preventDefault();
-    const order = kind === 'tabs' ? draft.tabs : draft.order[selected];
+    const order = kind === 'tabs' ? draft.tabs : kind === 'cells' ? draft.overview.order : draft.order[selected];
     const target = order[order.indexOf(source.dataset.key) + delta];
     if (target) move(kind, source.dataset.key, target);
   });

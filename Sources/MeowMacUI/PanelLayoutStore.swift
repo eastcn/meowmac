@@ -122,6 +122,7 @@ public final class PanelLayoutStore {
         }
         guard count == data.count, fsync(fd) == 0 else { throw invalid("本机布局写入失败") }
         try beforePublish?()
+        _ = try read(catID: cat.id, directory: directory)
         guard renameat(directory, temporary, directory, cat.id + ".json") == 0 else {
             throw invalid("本机布局原子替换失败")
         }

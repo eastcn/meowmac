@@ -1,0 +1,125 @@
+<div id="meowmac-style-draft">
+  <style>
+    #meowmac-style-draft {
+      --mm-surface: light-dark(#f7f7f9, #252527);
+      --mm-titlebar: light-dark(#ececef, #303033);
+      --mm-field: light-dark(#fff, #202022);
+      --mm-text: light-dark(#1d1d1f, #f2f2f7);
+      --mm-muted: light-dark(#66666c, #aaaab0);
+      --mm-rule: light-dark(#dcdce0, #434348);
+      --mm-blue: light-dark(#0069df, #70b0ff);
+      --mm-selected: light-dark(#e6effc, #2b405d);
+      --mm-shadow: light-dark(#0000001c, #00000055);
+      padding: 24px 12px; color: var(--mm-text);
+      font: 13px/1.5 -apple-system, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+    }
+    #meowmac-style-draft * { box-sizing: border-box; }
+    #meowmac-style-draft button, #meowmac-style-draft select { font: inherit; color: inherit; }
+    #meowmac-style-draft .w { width: 100%; max-width: 520px; margin: auto; background: var(--mm-surface); border: 1px solid var(--mm-rule); border-radius: 12px; box-shadow: 0 12px 28px var(--mm-shadow); overflow: hidden; }
+    #meowmac-style-draft .bar { padding: 14px 20px; background: var(--mm-titlebar); border-bottom: 1px solid var(--mm-rule); display: flex; gap: 10px; }
+    #meowmac-style-draft .bar span { margin-left: auto; color: var(--mm-muted); font-size: 11px; }
+    #meowmac-style-draft .c { padding: 18px 24px 8px; }
+    #meowmac-style-draft h3 { margin: 18px 0 2px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    #meowmac-style-draft h3:first-child { margin-top: 0; }
+    #meowmac-style-draft h3 small { color: var(--mm-muted); font-size: 11px; font-weight: 400; }
+    #meowmac-style-draft .list { border: 1px solid var(--mm-rule); border-radius: 8px; background: var(--mm-field); margin-top: 8px; }
+    #meowmac-style-draft .row { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 6px 12px; }
+    #meowmac-style-draft .row + .row { border-top: 1px solid var(--mm-rule); }
+    #meowmac-style-draft .row { flex-wrap: wrap; }
+    #meowmac-style-draft .row .n { flex: 1; min-width: 0; white-space: nowrap; }
+    #meowmac-style-draft .row .pick { flex: 1 0 100%; display: flex; gap: 8px; padding: 0 0 4px 64px; }
+    #meowmac-style-draft .row .pick select { flex: 1; min-width: 0; }
+    #meowmac-style-draft .row[data-off="true"] .n { color: var(--mm-muted); }
+    #meowmac-style-draft .mv { border: 0; background: transparent; color: var(--mm-muted); width: 28px; min-height: 28px; cursor: pointer; border-radius: 4px; }
+    #meowmac-style-draft .mv:disabled { opacity: .3; cursor: default; }
+    #meowmac-style-draft .seg { display: inline-flex; border: 1px solid var(--mm-rule); border-radius: 7px; overflow: hidden; background: var(--mm-field); }
+    #meowmac-style-draft .seg button { border: 0; background: transparent; padding: 4px 12px; min-height: 28px; cursor: pointer; }
+    #meowmac-style-draft .seg button + button { border-left: 1px solid var(--mm-rule); }
+    #meowmac-style-draft .seg button[aria-pressed="true"] { background: var(--mm-selected); color: var(--mm-blue); font-weight: 600; }
+    #meowmac-style-draft select { border: 1px solid var(--mm-rule); border-radius: 6px; background: var(--mm-field); padding: 3px 6px; min-height: 28px; }
+    #meowmac-style-draft input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--mm-blue); }
+    #meowmac-style-draft .sw { display: flex; gap: 6px; flex-wrap: wrap; }
+    #meowmac-style-draft .sw button { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--mm-rule); cursor: pointer; padding: 0; }
+    #meowmac-style-draft .sw button[aria-pressed="true"] { outline: 2px solid var(--mm-blue); outline-offset: 2px; }
+    #meowmac-style-draft .pv { width: 56px; height: 6px; border-radius: 3px; flex: none; }
+    #meowmac-style-draft .cprow { align-items: center; padding: 10px 12px; }
+    #meowmac-style-draft .cprow .n { flex: 1; }
+    #meowmac-style-draft .cprow .sw { flex: 1 0 100%; }
+    #meowmac-style-draft .note { margin: 6px 0 0; color: var(--mm-muted); font-size: 11px; }
+    #meowmac-style-draft .ft { border-top: 1px solid var(--mm-rule); padding: 14px 20px; display: flex; gap: 8px; align-items: center; margin-top: 14px; }
+    #meowmac-style-draft .ft .sp { flex: 1; }
+    #meowmac-style-draft .act { border: 1px solid var(--mm-rule); border-radius: 6px; padding: 5px 14px; min-height: 30px; background: var(--mm-field); cursor: pointer; }
+    #meowmac-style-draft .pri { background: var(--mm-blue); color: light-dark(#fff, #071c35); border-color: var(--mm-blue); }
+    #meowmac-style-draft .act:disabled { opacity: .4; cursor: default; }
+    #meowmac-style-draft .st { padding: 0 20px 12px; color: var(--mm-muted); font-size: 11px; }
+    #meowmac-style-draft .ov { display: flex; gap: 10px; padding: 10px 12px; }
+    #meowmac-style-draft .ov div { flex: 1; min-width: 0; }
+    #meowmac-style-draft .ov b { display: block; font-size: 15px; font-weight: 600; }
+    #meowmac-style-draft .ov small { color: var(--mm-muted); font-size: 10px; display: block; }
+    #meowmac-style-draft .ov i { display: block; height: 4px; border-radius: 2px; margin-top: 5px; background: var(--mm-rule); position: relative; overflow: hidden; }
+    #meowmac-style-draft .ov i u { position: absolute; inset: 0 auto 0 0; }
+  </style>
+  <section class="w" aria-label="MeowMac 样式设计草稿">
+    <header class="bar"><strong>样式</strong><span>MeowMac</span></header>
+    <div class="c">
+      <h3 style="margin-top:0">本机设置<small>所有猫共用 · 总览条在“布局与显示…”里调</small></h3>
+      <div class="list">
+        <div class="row"><span class="n">额度数字显示</span>
+          <span class="seg" data-key="basis"><button type="button" data-v="remaining">剩余</button><button type="button" data-v="used">已用</button></span></div>
+        <div class="row"><span class="n">账号邮箱</span>
+          <span class="seg" data-key="email"><button type="button" data-v="full">完整</button><button type="button" data-v="masked">部分遮罩</button><button type="button" data-v="hidden">隐藏</button></span></div>
+        <div class="row"><span class="n">系统趋势默认范围</span>
+          <span class="seg" data-key="range"><button type="button" data-v="15">15 分钟</button><button type="button" data-v="60">1 小时</button></span></div>
+      </div>
+      <p class="note" id="email-demo"></p>
+
+      <h3>渠道颜色<small>用于进度条、趋势线和渠道标记</small></h3>
+      <div class="list" id="colors"></div>
+    </div>
+    <footer class="ft">
+      <button type="button" class="act" data-action="reset">恢复默认样式</button><span class="sp"></span>
+      <button type="button" class="act" data-action="cancel">取消</button>
+      <button type="button" class="act pri" data-action="save" disabled>保存</button>
+    </footer>
+    <div class="st" role="status" aria-live="polite">尚未修改</div>
+  </section>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('meowmac-style-draft');
+  const providers = [['claude','Claude','#D97757'],['codex','Codex','#1d1d1f'],['deepseek','DeepSeek','#4D6BFE'],['opencodego','OpenCode Go','#8e8e93']];
+  const palette = [['default','默认',null],['orange','橙','#D97757'],['blue','蓝','#4D6BFE'],['teal','青','#1E9E8F'],['green','绿','#3F9B4A'],['purple','紫','#8B5CC6'],['pink','粉','#D6528A'],['gray','灰','#8E8E93']];
+  const windows = {claude:['5 小时','7 天'],codex:['5 小时','7 天'],deepseek:['余额'],opencodego:['5 小时','7 天']};
+  const defaults = () => ({
+    basis:'remaining', email:'full', range:'60', colors:{claude:'default',codex:'default',deepseek:'default',opencodego:'default'}
+  });
+  const copy = v => JSON.parse(JSON.stringify(v));
+  let saved = defaults(), draft = copy(saved);
+  const q = s => root.querySelector(s), status = q('.st'), save = q('[data-action=save]');
+  const dirty = () => JSON.stringify(draft) !== JSON.stringify(saved);
+  const colorOf = p => { const [,,def] = providers.find(x => x[0]===p); const pick = palette.find(x => x[0]===draft.colors[p]); return pick[2] || def; };
+  const maskEmail = e => e.replace(/^(.).*(@.)(.*)$/, (m,a,b,c) => a + '***' + b + '***');
+  function render() {
+    root.querySelectorAll('.seg').forEach(s => s.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(draft[s.dataset.key] === b.dataset.v))));
+    q('#email-demo').textContent = '账号邮箱示例：' + ({full:'name@example.com',masked:maskEmail('name@example.com'),hidden:'（不显示）'})[draft.email];
+    const cl = q('#colors'); cl.innerHTML = '';
+    providers.forEach(([id,name]) => {
+      const row = document.createElement('div'); row.className = 'row cprow';
+      row.innerHTML = `<span class="n">${name}</span><span class="pv" style="background:${colorOf(id)}"></span><span class="sw">${palette.map(([k,label,hex]) => `<button type="button" data-color="${id}:${k}" aria-label="${name} ${label}" aria-pressed="${draft.colors[id]===k}" title="${label}" style="background:${hex || providers.find(p=>p[0]===id)[2]};${k==='default'?'box-shadow: inset 0 0 0 3px var(--mm-field)':''}"></button>`).join('')}</span>`;
+      cl.append(row);
+    });
+    save.disabled = !dirty();
+    status.textContent = dirty() ? '有未保存的修改' : '尚未修改';
+  }
+  root.addEventListener('click', e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.color) { const [p,k] = t.dataset.color.split(':'); draft.colors[p] = k; }
+    else if (t.closest('.seg')) { draft[t.closest('.seg').dataset.key] = t.dataset.v; }
+    else if (t.dataset.action === 'reset') draft = defaults();
+    else if (t.dataset.action === 'cancel') draft = copy(saved);
+    else if (t.dataset.action === 'save' && dirty()) { saved = copy(draft); render(); status.textContent = '已保存并应用'; return; }
+    render();
+  });
+  render();
+})();
+</script>
