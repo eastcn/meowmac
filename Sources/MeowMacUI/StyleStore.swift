@@ -91,6 +91,7 @@ public final class StyleStore {
         }
         guard count == data.count, fsync(fd) == 0 else { throw invalid("样式文件写入失败") }
         try beforePublish?()
+        _ = try read(directory: root)
         guard renameat(root, temporary, root, "style.json") == 0 else { throw invalid("样式文件原子替换失败") }
         published = true
         if directorySync(root) != 0 { logger.error("样式已发布，但目录同步失败") }

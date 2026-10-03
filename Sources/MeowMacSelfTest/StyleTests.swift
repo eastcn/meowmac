@@ -84,6 +84,7 @@ enum StyleStoreTests {
     private static let manager = FileManager.default
     private static let sentinel = Data("合成哨兵".utf8)
     static func boundaries() -> Bool {
+        guard transactions() else { return false }
         do {
             try manager.createDirectory(at: base, withIntermediateDirectories: true)
             let root = base.appendingPathComponent("app", isDirectory: true)
@@ -143,4 +144,54 @@ enum StyleStoreTests {
                 && markerUnchanged
         } catch { print("样式存储边界失败：\(error)"); return false }
     }
+    private static func transactions() -> Bool {
+        do {
+            let folder = base.appendingPathComponent("transactions", isDirectory: true)
+            if manager.fileExists(atPath: folder.path) { try manager.removeItem(at: folder) }
+            try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+            let root = folder.appendingPathComponent("app", isDirectory: true)
+            let outside = folder.appendingPathComponent("outside", isDirectory: true)
+            try manager.createDirectory(at: outside, withIntermediateDirectories: true)
+            let marker = outside.appendingPathComponent("marker")
+            try sentinel.write(to: marker)
+            let store = StyleStore(rootURL: root)
+            try store.save(.default)
+            let file = root.appendingPathComponent("style.json")
+            let race = StyleStore(rootURL: root, beforePublish: {
+                try manager.removeItem(at: file)
+                try manager.createSymbolicLink(at: file, withDestinationURL: marker)
+            })
+            var changed = StyleSettings.default; changed.chartMinutes = 15
+            guard (try? race.save(changed)) == nil, (try Data(contentsOf: marker)) == sentinel,
+                  try manager.destinationOfSymbolicLink(atPath: file.path) == marker.path,
+                  !(try manager.contentsOfDirectory(atPath: root.path)).contains(where: { $0.hasPrefix(".style-") }) else {
+                print("发布前符号链接竞态未拒绝"); return false
+            }
+            try manager.removeItem(at: file)
+            try manager.createDirectory(at: file, withIntermediateDirectories: false)
+            guard store.load().recoveryReason != nil, (try? store.save(changed)) == nil else { return false }
+            try manager.removeItem(at: file)
+            try StyleStore(rootURL: root, directorySync: { _ in -1 }).save(changed)
+            guard store.load().settings == changed else { return false }
+            // 中间父目录为链接时，也不得写到外部目标。
+            let link = folder.appendingPathComponent("link")
+            try manager.createSymbolicLink(at: link, withDestinationURL: outside)
+            let nested = StyleStore(rootURL: link.appendingPathComponent("app"))
+            guard nested.load().recoveryReason != nil, (try? nested.save(changed)) == nil,
+                  !manager.fileExists(atPath: outside.appendingPathComponent("app").path),
+                  (try Data(contentsOf: marker)) == sentinel else { return false }
+            let state = PanelPreviewRenderer.syntheticState()
+            CatRuntime.initialize(state: state, store: CatStore(rootURL: root))
+            let layouts = root.appendingPathComponent("PanelLayouts")
+            try manager.createDirectory(at: layouts, withIntermediateDirectories: false)
+            let layoutFile = layouts.appendingPathComponent("builtin.slim.json")
+            let layoutStore = PanelLayoutStore(rootURL: root, beforePublish: {
+                try manager.createSymbolicLink(at: layoutFile, withDestinationURL: marker)
+            })
+            guard let cat = state.selectedCat, (try? layoutStore.save(.default, cat: cat)) == nil,
+                  (try Data(contentsOf: marker)) == sentinel else { return false }
+            return !(try manager.contentsOfDirectory(atPath: layouts.path)).contains(where: { $0.hasPrefix(".layout-") })
+        } catch { print("样式发布边界失败：\(error)"); return false }
+    }
+
 }
