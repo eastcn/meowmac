@@ -30,7 +30,7 @@ public struct CodexResetState {
 @MainActor
 public final class CodexResetClient {
     public nonisolated static let endpoint = URL(string: "https://aihot.news/api/v1/codex-resets/recent")!
-    public nonisolated static let interval: TimeInterval = 600
+    public nonisolated static let interval: TimeInterval = 6 * 60 * 60
     public private(set) var state = CodexResetState()
     public private(set) var requesting = false
     private let session: URLSession
@@ -53,6 +53,10 @@ public final class CodexResetClient {
         }
         do {
             if let saved = try store.load() { cache = saved }
+            // 旧版成功缓存也遵守新的采集间隔，保留更长的服务端退避。
+            if let fetchedAt = cache.fetchedAt {
+                cache.nextAttemptAt = max(cache.nextAttemptAt ?? .distantPast, fetchedAt.addingTimeInterval(Self.interval))
+            }
             state = CodexResetState(feed: try cache.body.map(CodexResetFeed.parse), fetchedAt: cache.fetchedAt,
                 error: cache.error, failures: cache.failures, nextAttemptAt: cache.nextAttemptAt)
         } catch {
@@ -69,7 +73,7 @@ public final class CodexResetClient {
     }
     private func setNext(_ date: Date) { cache.nextAttemptAt = date; state.nextAttemptAt = date }
 
-    /// 所有入口共用 10 分钟下限，包含手动刷新与重启后的首次刷新。
+    /// 所有入口共用 6 小时下限，包含手动刷新与重启后的首次刷新。
     @discardableResult public func refresh() async -> Bool {
         guard !requesting, cache.nextAttemptAt.map({ now() >= $0 }) ?? true else { return false }
         requesting = true
@@ -108,7 +112,7 @@ public final class CodexResetClient {
             cache.failures = min(cache.failures + 1, 1_000_000)
             cache.error = error.localizedDescription
             state.failures = cache.failures; state.error = cache.error
-            let backoff = serverFailure ? min(Self.interval * pow(2, Double(min(cache.failures, 3))), 3600) : Self.interval
+            let backoff = serverFailure ? min(Self.interval * pow(2, Double(min(cache.failures, 3))), 24 * 60 * 60) : Self.interval
             setNext(max(now().addingTimeInterval(backoff), retryAfter ?? .distantPast))
             logger.error("重置监控采集失败：\(error.localizedDescription, privacy: .private)")
         }

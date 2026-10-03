@@ -6,7 +6,7 @@ struct CodexResetMonitorView: View {
     let display: CodexResetDisplay
     var body: some View {
         VStack(alignment: .leading, spacing: Design.rowGap) {
-            SectionHeading(title: "额外重置监控", detail: "每 10 分钟")
+            SectionHeading(title: "额外重置监控", detail: "每 6 小时")
             Text(display.headline).font(Design.title)
                 .foregroundStyle(display.error == nil ? Design.label : Design.stateText(.warn))
             ForEach(display.pending) { row in

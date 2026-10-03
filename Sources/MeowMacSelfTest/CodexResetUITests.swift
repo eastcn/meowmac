@@ -105,17 +105,17 @@ enum CodexResetUITests {
             coordinator.refresh(); coordinator.refresh()
             try await Task.sleep(nanoseconds: 20_000_000)
             guard ResetTestProtocol.requests.count == 1 else { return false }
-            coordinator.setSleeping(true); time.addTimeInterval(600); coordinator.refresh()
+            coordinator.setSleeping(true); time.addTimeInterval(21_600); coordinator.refresh()
             try await Task.sleep(nanoseconds: 20_000_000)
             guard ResetTestProtocol.requests.count == 1 else { return false }
             coordinator.setSleeping(false)
             for _ in 0..<100 where state.codexResetState.feed?.events.isEmpty != true { try await Task.sleep(nanoseconds: 5_000_000) }
             guard ResetTestProtocol.requests.count == 2, state.failures["quota.codex-resets"] == 0 else { return false }
-            coordinator.stop(); time.addTimeInterval(600); coordinator.refresh()
+            coordinator.stop(); time.addTimeInterval(21_600); coordinator.refresh()
             try await Task.sleep(nanoseconds: 20_000_000)
             // 启动读取旧的成功缓存不能作为新检测恢复证据。
             let restart = PanelState(); restart.failures["quota.codex-resets"] = 2
-            time.addTimeInterval(-600)
+            time.addTimeInterval(-21_600)
             let restored = CodexResetCoordinator(state: restart, client: CodexResetClient(root: root, session: session, now: { time }))
             restored.start(); defer { restored.stop() }
             try await Task.sleep(nanoseconds: 20_000_000)
