@@ -165,46 +165,98 @@ enum LayoutSettingsTests {
             let (state, _, controller) = try prepare()
             controller.present()
             guard let window = controller.window, let model = controller.model, let view = window.contentView else { return false }
-            view.layoutSubtreeIfNeeded()
-            RunLoop.main.run(until: Date().addingTimeInterval(0.08))
-            let checks = buttons(view)
-            guard checks.count == 2 else { print("布局复选框数量：\(checks.count)"); return false }
-            let height = view.bounds.height
-            click(window, x: 450, fromBottom: height - 262)
-            print("复选框后：\(model.draft.placements(for: .system).map(\.visible))，dirty \(model.isDirty)")
-            guard model.draft.placements(for: .system)[1].visible == false, model.isDirty else { return false }
-            click(window, x: 75, fromBottom: height - 413)
-            print("恢复按钮后 dirty \(model.isDirty)")
-            guard !model.isDirty else { print("恢复默认按钮未触发"); return false }
-            click(window, x: 425, fromBottom: height - 113)
-            print("标签页后 \(model.selectedTab)")
-            guard model.selectedTab == .network else { print("标签页按钮未触发"); return false }
-            optionArrow(window, code: 123, character: "\u{F702}")
-            print("快捷键排序后 \(model.draft.tabs)")
-            guard model.draft.tabs == [.system, .network, .quota] else { return false }
-            let networkChecks = buttons(view)
-            print("网络复选框数量 \(networkChecks.count)")
-            guard networkChecks.count == 3 else { return false }
-            click(window, x: 450, fromBottom: height - 209)
-            print("网络显示值 \(model.draft.placements(for: .network).map(\.visible))")
-            guard model.draft.placements(for: .network)[0].visible == false else { return false }
-            click(window, x: 45, fromBottom: height - 209)
+            defer { controller.window?.close() }
+            func checks() -> [NSButton] { buttons(view).filter { !($0 is NSPopUpButton) } }
+            func point(_ button: NSButton) -> NSPoint {
+                button.scrollToVisible(button.bounds)
+                SettingsControlTestSupport.settle(window)
+                return button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.midY), to: nil)
+            }
+            func check(_ index: Int) {
+                let p = point(checks()[index]); click(window, x: p.x, fromBottom: p.y)
+            }
+            SettingsControlTestSupport.settle(window)
+            try SettingsControlTestSupport.capture(window, name: "layout-default")
+            guard checks().count == 6 else { print("布局复选框数量：\(checks().count)"); return false }
+            let pickers = buttons(view).compactMap { $0 as? NSPopUpButton }
+            guard pickers.count == 2, let provider = pickers.first(where: { $0.title == "Claude" }) else { return false }
+            guard let providerItem = provider.item(withTitle: "Codex"), let providerAction = providerItem.action,
+                  NSApplication.shared.sendAction(providerAction, to: providerItem.target, from: providerItem) else {
+                print("渠道菜单动作未发送"); return false
+            }
+            SettingsControlTestSupport.settle(window)
+            guard model.draft.overview.quota.provider == .codex, state.panelLayout.overview.quota.provider == .claude else { print("渠道未应用：\(model.draft.overview.quota.provider)"); return false }
+            guard let quotaWindow = buttons(view).compactMap({ $0 as? NSPopUpButton }).first(where: { $0.title != "Codex" }),
+                  quotaWindow.itemTitles.contains("自动") else { return false }
+            guard let windowItem = quotaWindow.item(withTitle: "自动"), let windowAction = windowItem.action,
+                  NSApplication.shared.sendAction(windowAction, to: windowItem.target, from: windowItem) else {
+                print("窗口菜单动作未发送"); return false
+            }
+            SettingsControlTestSupport.settle(window)
+            guard model.draft.overview.quota.window == "auto" else { print("窗口未应用：\(model.draft.overview.quota.window)"); return false }
+            model.restoreDefault()
+            SettingsControlTestSupport.settle(window)
+            check(0); check(1); check(2)
+            guard model.draft.overview.visible == [.network], !checks()[3].isEnabled,
+                  state.panelLayout == .default else { return false }
+            click(window, x: 75, fromBottom: 49)
+            guard !model.isDirty else { print("默认按钮未触发"); return false }
+            let cpu = point(checks()[0])
+            click(window, x: 45, fromBottom: cpu.y)
             optionArrow(window, code: 125, character: "\u{F701}")
-            guard model.draft.placements(for: .network).map(\.id) == ["network.sites", "network.checks", "network.egress"] else {
-                print("功能块快捷键排序未触发：\(model.draft.placements(for: .network).map(\.id))")
-                return false
+            guard model.draft.overview.order == [.memory, .cpu, .quota, .network] else {
+                print("总览快捷键未触发：\(model.draft.overview.order)"); return false
             }
-            click(window, x: 475, fromBottom: height - 413)
-            guard controller.window == nil, state.panelLayout.placements(for: .network).map(\.id) == ["network.sites", "network.checks", "network.egress"],
-                  !state.panelLayout.placements(for: .network)[1].visible else {
-                print("保存按钮未触发")
-                return false
-            }
+            let energy = point(checks()[4])
+            check(4)
+            guard !model.draft.placements(for: .system)[1].visible else { return false }
+            click(window, x: 425, fromBottom: energy.y + 149)
+            guard model.selectedTab == .network else { print("网络标签未触发"); return false }
+            optionArrow(window, code: 123, character: "\u{F702}")
+            guard model.draft.tabs == [.system, .network, .quota], checks().count == 7 else { return false }
+            check(4)
+            let network = point(checks()[4])
+            click(window, x: 45, fromBottom: network.y)
+            optionArrow(window, code: 125, character: "\u{F701}")
+            guard model.draft.placements(for: .network).map(\.id) == ["network.sites", "network.checks", "network.egress"] else { return false }
+            click(window, x: 475, fromBottom: 49)
+            guard controller.window == nil, state.panelLayout.overview.order == [.memory, .cpu, .quota, .network],
+                  !state.panelLayout.placements(for: .network)[1].visible else { return false }
             controller.present()
-            guard let cancelWindow = controller.window, let cancelModel = controller.model, let cancelView = cancelWindow.contentView else { return false }
+            guard let cancelWindow = controller.window, let cancelModel = controller.model else { return false }
             cancelModel.setVisible(false, id: "quota.trend", in: .quota)
-            click(cancelWindow, x: 420, fromBottom: cancelView.bounds.height - 413)
+            click(cancelWindow, x: 420, fromBottom: 49)
             return controller.window == nil && state.panelLayout.placements(for: .quota)[0].visible
         } catch { print("布局真实控件测试失败：\(error)"); return false }
+    }
+
+    static func overview() async -> Bool {
+        do {
+            let (state, _, controller) = try prepare()
+            controller.present()
+            defer { controller.window?.close() }
+            guard let model = controller.model else { return false }
+            let drop = NSItemProvider(object: NSString(string: "overview:network"))
+            guard model.acceptDrop([drop], kind: "overview", target: "cpu") else { return false }
+            for _ in 0..<50 where model.draft.overview.order.first != .network {
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            guard model.draft.overview.order.first == .network else { return false }
+            model.setOverviewProvider(.codex)
+            guard model.quotaWindowOptions.contains(where: { $0.selector == "minutes:10080" }) else { return false }
+            model.setOverviewWindow("minutes:10080")
+            model.setOverviewProvider(.deepseek)
+            guard model.draft.overview.quota.window == "minutes:10080",
+                  model.quotaWindowOptions.contains(where: { $0.selector == "minutes:10080" }) else { return false }
+            state.quotas.removeAll()
+            guard model.quotaWindowOptions.map(\.selector) == ["auto", "minutes:10080"],
+                  model.overviewPreview.first(where: { $0.item == .quota })?.value == "—",
+                  state.panelLayout == .default else { return false }
+            model.save()
+            let file = root.appendingPathComponent("PanelLayouts/builtin.slim.json")
+            let object = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as! [String: Any]
+            return controller.window == nil && state.panelLayout.overview.quota.window == "minutes:10080"
+                && (object["layout"] as? [String: Any])?["schemaVersion"] as? Int == 2
+        } catch { print("总览窗口测试失败：\(error)"); return false }
     }
 }

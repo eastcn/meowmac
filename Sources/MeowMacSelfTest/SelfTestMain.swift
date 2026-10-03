@@ -192,6 +192,7 @@ enum SelfTestMain {
         tests.append(("UI.LayoutSettings/原生菜单与草稿", { LayoutSettingsTests.menuAndDraft() }))
         tests.append(("UI.LayoutSettings/保存失败与切猫", { LayoutSettingsTests.saveAndFailure() }))
         tests.append(("UI.LayoutSettings/拖动回调与坏文件提示", { await LayoutSettingsTests.dropAndRecovery() }))
+        tests.append(("UI.LayoutSettings/总览拖动与缺失窗口", { await LayoutSettingsTests.overview() }))
         tests.append(("UI.LayoutSettings/真实控件操作", { LayoutSettingsTests.actualControls() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.LayoutAcceptance/真实容器合成对照", { await LayoutAcceptanceTests.render() }))

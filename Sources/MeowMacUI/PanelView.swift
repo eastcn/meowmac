@@ -230,14 +230,15 @@ public extension PanelState {
     func level(for tab: PanelTab) -> HealthLevel {
         allReminders.filter { $0.tab == tab }.map(\.level).max() ?? .normal
     }
-    var overviewMetrics: [OverviewMetric] {
+    var overviewMetrics: [OverviewMetric] { overviewMetrics(for: panelLayout.overview) }
+    func overviewMetrics(for overview: PanelOverview) -> [OverviewMetric] {
         let cpu = snapshot?.cpuUsage
         let memory = snapshot?.memoryPressurePercent
         let usedGB = snapshot?.memoryUsedBytes.map { Int((Double($0) / 1_073_741_824).rounded()) }
         let totalGB = snapshot?.memoryTotalBytes.map { Int((Double($0) / 1_073_741_824).rounded()) }
         let memoryDetail = usedGB.flatMap { used in totalGB.map { "已用 \(used) / \($0) GB" } } ?? "内存用量不可用"
         let memoryLevel: HealthLevel = snapshot?.memoryPressure == .critical ? .severe : snapshot?.memoryPressure == .warn ? .warn : .normal
-        let quotaConfig = panelLayout.overview.quota
+        let quotaConfig = overview.quota
         let quota = quotaConfig.selectedWindow(in: quotas[quotaConfig.provider])
         let remaining = quota?.remainingPercent
         let shown = quota.map { quotaPercent($0) }
@@ -248,7 +249,7 @@ public extension PanelState {
             .quota: OverviewMetric(item: .quota, title: quotaConfig.provider.displayName, value: shown.map { "\(Int($0.rounded()))%" } ?? "—", detail: quotaName + " · " + quotaBasisLabel, fraction: (shown ?? 0) / 100, level: Design.quotaLevel(remaining ?? 0), numericValue: shown),
             .network: OverviewMetric(item: .network, title: "网络", value: snapshot?.networkReceivedBytesPerSecond.map { "↓" + MetricFormat.rate($0) } ?? "—", detail: snapshot?.networkSentBytesPerSecond.map { "↑" + MetricFormat.rate($0) } ?? "—", fraction: 1, level: networkTone == .red ? .severe : networkTone == .yellow ? .warn : .normal, numericValue: snapshot?.networkReceivedBytesPerSecond),
         ]
-        return panelLayout.overview.visible.compactMap { metrics[$0] }
+        return overview.visible.compactMap { metrics[$0] }
     }
     var quotaBasisLabel: String { style.quotaBasis == .remaining ? "剩余" : "已用" }
     func quotaPercent(_ window: QuotaWindow) -> Double { style.quotaBasis == .remaining ? window.remainingPercent : window.usedPercent }
