@@ -197,6 +197,7 @@ enum SelfTestMain {
         tests.append(("UI.LayoutSettings/拖动回调与坏文件提示", { await LayoutSettingsTests.dropAndRecovery() }))
         tests.append(("UI.LayoutSettings/总览拖动与缺失窗口", { await LayoutSettingsTests.overview() }))
         tests.append(("UI.LayoutSettings/真实控件操作", { LayoutSettingsTests.actualControls() }))
+        tests.append(("UI.LayoutSettings/快照到达刷新与选择保留", { LayoutSettingsTests.snapshotArrival() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.LayoutAcceptance/真实容器合成对照", { await LayoutAcceptanceTests.render() }))
             tests.append(("UI.RenderPreview/三个标签页", { await SelfTestMain.renderPanel() }))

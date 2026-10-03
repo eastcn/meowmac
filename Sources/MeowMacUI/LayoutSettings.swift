@@ -43,7 +43,10 @@ public final class LayoutSettingsModel: ObservableObject {
         if visible { draft.overview.hidden.removeAll { $0 == item } }
         else if draft.overview.visible.count > 1 && !draft.overview.hidden.contains(item) { draft.overview.hidden.append(item) }
     }
-    public func setOverviewProvider(_ provider: QuotaProvider) { draft.overview.quota.provider = provider }
+    public func setOverviewProvider(_ provider: QuotaProvider) {
+        guard provider != draft.overview.quota.provider else { return }
+        draft.overview.quota = OverviewQuota(provider: provider, window: "auto")
+    }
     public func setOverviewWindow(_ selector: String) { draft.overview.quota.window = selector }
     public var quotaWindowOptions: [(selector: String, title: String)] {
         let windows = state.quotas[draft.overview.quota.provider]?.windows ?? []
@@ -124,7 +127,7 @@ public final class LayoutSettingsController: NSObject, NSWindowDelegate {
         model.onContentChange = { [weak self] in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.resizeToFit() }
         }
-        let controller = NSHostingController(rootView: LayoutSettingsView(model: model))
+        let controller = NSHostingController(rootView: LayoutSettingsView(model: model, state: state))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 500),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -160,6 +163,7 @@ public final class LayoutSettingsController: NSObject, NSWindowDelegate {
 
 struct LayoutSettingsView: View {
     @ObservedObject var model: LayoutSettingsModel
+    @ObservedObject var state: PanelState
     private var definitions: [PanelCardDefinition] { PanelLayoutCatalog.definitions[model.selectedTab] ?? [] }
     private var note: String {
         switch model.selectedTab {

@@ -246,6 +246,9 @@ enum LayoutSettingsTests {
             guard model.quotaWindowOptions.contains(where: { $0.selector == "minutes:10080" }) else { return false }
             model.setOverviewWindow("minutes:10080")
             model.setOverviewProvider(.deepseek)
+            guard model.draft.overview.quota.window == "auto" else { return false }
+            model.setOverviewWindow("minutes:10080")
+            model.setOverviewProvider(.deepseek)
             guard model.draft.overview.quota.window == "minutes:10080",
                   model.quotaWindowOptions.contains(where: { $0.selector == "minutes:10080" }) else { return false }
             state.quotas.removeAll()
@@ -258,5 +261,69 @@ enum LayoutSettingsTests {
             return controller.window == nil && state.panelLayout.overview.quota.window == "minutes:10080"
                 && (object["layout"] as? [String: Any])?["schemaVersion"] as? Int == 2
         } catch { print("总览窗口测试失败：\(error)"); return false }
+    }
+
+    static func snapshotArrival() -> Bool {
+        do {
+            let (state, _, controller) = try prepare()
+            let snapshot = state.snapshot
+            let quotas = state.quotas
+            state.snapshot = nil; state.quotas = [:]
+            var saved = PanelLayout.default
+            saved.overview.quota.window = "minutes:10080"
+            try state.saveLayout(saved, for: "builtin.slim")
+            controller.present()
+            defer { controller.window?.close() }
+            guard let window = controller.window, let model = controller.model,
+                  let view = window.contentView else { return false }
+            let support = SettingsControlTestSupport.self
+            support.settle(window)
+            func picker() -> NSPopUpButton? {
+                buttons(view).compactMap { $0 as? NSPopUpButton }.first { $0.title != "Claude" }
+            }
+            func renderedContent() -> Data? {
+                guard let image = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
+                view.cacheDisplay(in: view.bounds, to: image)
+                return image.representation(using: .png, properties: [:])
+            }
+            guard picker()?.itemTitles == ["自动", "已保存 · minutes:10080"],
+                  model.overviewPreview.first(where: { $0.item == .quota })?.value == "—" else { return false }
+            model.moveOverview(.network, to: .cpu)
+            model.setOverviewVisible(false, item: .memory)
+            support.settle(window)
+            let draft = model.draft
+            guard let before = renderedContent() else { return false }
+            // 此时下拉与草稿不变，系统快照只能改变总览预览。
+            state.snapshot = snapshot
+            support.settle(window)
+            guard let after = renderedContent(), after != before,
+                  model.overviewPreview.first(where: { $0.item == .cpu })?.value == "24%" else {
+                print("系统快照到达后预览渲染未更新"); return false
+            }
+            state.quotas = quotas
+            support.settle(window)
+            guard picker()?.itemTitles == ["自动", "5 小时窗口", "7 天窗口"],
+                  picker()?.title == "7 天窗口",
+                  model.overviewPreview.first(where: { $0.item == .quota })?.value == "62%",
+                  model.draft == draft, state.panelLayout == saved else {
+                print("额度到达后未刷新：\(picker()?.itemTitles ?? [])")
+                return false
+            }
+            state.quotas = [:]; state.snapshot = nil
+            support.settle(window)
+            guard picker()?.title == "已保存 · minutes:10080",
+                  model.overviewPreview.first(where: { $0.item == .quota })?.value == "—",
+                  model.draft == draft else { print("快照暂缺未保留：\(picker()?.title ?? "nil")"); return false }
+            // 渠道切换走原生菜单动作；同渠道数据暂缺继续保留选择。
+            guard let provider = buttons(view).compactMap({ $0 as? NSPopUpButton }).first(where: { $0.title == "Claude" }),
+                  let item = provider.item(withTitle: "Codex"), let action = item.action,
+                  NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
+            support.settle(window)
+            guard model.draft.overview.quota.provider == .codex,
+                  model.draft.overview.quota.window == "auto" else { return false }
+            state.quotas = quotas
+            support.settle(window)
+            return model.draft.overview.quota.window == "auto" && state.panelLayout == saved
+        } catch { print("快照到达测试失败：\(error)"); return false }
     }
 }
