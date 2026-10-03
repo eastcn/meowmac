@@ -75,6 +75,7 @@ public final class StyleSettingsController: NSObject, NSWindowDelegate {
     private var status: NSTextField!
     private var saveButton: NSButton!
     private var swatches: [StyleSwatch] = []
+    private var colorPreviews: [QuotaProvider: NSBox] = [:]
     public init(state: PanelState) { self.state = state }
     public func present() {
         if let window { window.makeKeyAndOrderFront(nil); NSApplication.shared.activate(ignoringOtherApps: true); return }
@@ -156,7 +157,18 @@ public final class StyleSettingsController: NSObject, NSWindowDelegate {
                 button.heightAnchor.constraint(equalToConstant: 28).isActive = true
                 swatches.append(button); return button
             }
-            colorRows.append(stack([text(provider.displayName), stack(picks)], vertical: true, spacing: 6))
+            let preview = NSBox()
+            preview.boxType = .custom; preview.borderWidth = 0; preview.cornerRadius = 3
+            preview.contentViewMargins = .zero
+            preview.setAccessibilityIdentifier("style.preview." + provider.rawValue)
+            preview.setAccessibilityLabel(provider.displayName + "当前颜色")
+            preview.widthAnchor.constraint(equalToConstant: 56).isActive = true
+            preview.heightAnchor.constraint(equalToConstant: 6).isActive = true
+            colorPreviews[provider] = preview
+            let header = stack([text(provider.displayName), NSView(), preview])
+            let row = stack([header, stack(picks)], vertical: true, spacing: 6)
+            header.widthAnchor.constraint(equalTo: row.widthAnchor).isActive = true
+            colorRows.append(row)
         }
         let form = stack([heading, text("所有猫共用 · 总览条在“布局与显示…”里调", small: true),
             group(settingsRows), example, colors, text("用于进度条、趋势线和渠道标记", small: true), group(colorRows)],
@@ -208,6 +220,9 @@ public final class StyleSettingsController: NSObject, NSWindowDelegate {
             button.state = model.draft.color(for: button.provider) == button.color ? .on : .off
             button.needsDisplay = true
         }
+        for (provider, preview) in colorPreviews {
+            preview.fillColor = QuotaPalette.color(provider, style: model.draft)
+        }
     }
     @objc private func changeBasis() { model?.setBasis(basis.selectedSegment == 0 ? .remaining : .used) }
     @objc private func changeEmail() { model?.setEmail(EmailDisplay.allCases[email.selectedSegment]) }
@@ -217,6 +232,7 @@ public final class StyleSettingsController: NSObject, NSWindowDelegate {
     @objc private func cancelDraft() { model?.cancel() }
     @objc private func saveDraft() { model?.save() }
     public func windowWillClose(_ notification: Notification) {
-        window?.delegate = nil; window = nil; model = nil; openedCatID = nil; swatches.removeAll()
+        window?.delegate = nil; window = nil; model = nil; openedCatID = nil
+        swatches.removeAll(); colorPreviews.removeAll()
     }
 }

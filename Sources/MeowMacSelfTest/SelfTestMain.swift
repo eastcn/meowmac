@@ -192,6 +192,7 @@ enum SelfTestMain {
         tests.append(("UI.StyleIntegration/启动切猫包默认与坏文件", { StyleIntegrationTests.lifecycle() }))
         tests.append(("UI.StyleSettings/原生菜单与保存生命周期", { StyleSettingsTests.lifecycle() }))
         tests.append(("UI.StyleSettings/真实控件与色板", { StyleSettingsTests.controls() }))
+        tests.append(("UI.StyleSettings/渠道预览条与草稿颜色", { StyleSettingsTests.colorPreviews() }))
         tests.append(("UI.LayoutSettings/原生菜单与草稿", { LayoutSettingsTests.menuAndDraft() }))
         tests.append(("UI.LayoutSettings/保存失败与切猫", { LayoutSettingsTests.saveAndFailure() }))
         tests.append(("UI.LayoutSettings/拖动回调与坏文件提示", { await LayoutSettingsTests.dropAndRecovery() }))

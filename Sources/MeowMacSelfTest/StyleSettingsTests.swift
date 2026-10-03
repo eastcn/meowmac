@@ -90,4 +90,52 @@ enum StyleSettingsTests {
             return support.click(cancelWindow, id: "style.cancel") && controller.window == nil && state.style.email == .full
         } catch { print("样式真实控件失败：\(error)"); return false }
     }
+
+    static func colorPreviews() -> Bool {
+        do {
+            let (state, _, controller) = try prepare()
+            controller.present()
+            defer { controller.window?.close() }
+            guard let window = controller.window, let model = controller.model else { return false }
+            let support = SettingsControlTestSupport.self
+            support.settle(window)
+            func matches(_ provider: QuotaProvider, style: StyleSettings) -> Bool {
+                guard let bar = support.element(window, id: "style.preview." + provider.rawValue) as? NSBox,
+                      abs(bar.frame.width - 56) < 0.5, abs(bar.frame.height - 6) < 0.5 else {
+                    print("渠道预览条缺失或尺寸错误：\(provider)"); return false
+                }
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    var valid = false
+                    NSAppearance(named: appearance)!.performAsCurrentDrawingAppearance {
+                        guard let actual = bar.fillColor.usingColorSpace(.sRGB),
+                              let expected = QuotaPalette.color(provider, style: style).usingColorSpace(.sRGB) else { return }
+                        valid = zip([actual.redComponent, actual.greenComponent, actual.blueComponent],
+                                    [expected.redComponent, expected.greenComponent, expected.blueComponent])
+                            .allSatisfy { abs($0 - $1) < 0.001 }
+                    }
+                    guard valid else { print("渠道预览条颜色错误：\(provider)，\(appearance)"); return false }
+                }
+                return true
+            }
+            let providers: [QuotaProvider] = [.claude, .codex, .deepseek, .opencodego]
+            guard providers.allSatisfy({ matches($0, style: .default) }) else { return false }
+            for (provider, color) in zip(providers, [ThemeColor.pink, .blue, .teal, .purple]) {
+                guard support.click(window, id: "style.color." + provider.rawValue + "." + color.rawValue) else { return false }
+                guard model.draft.color(for: provider) == color, matches(provider, style: model.draft),
+                      state.style == .default else { return false }
+            }
+            try support.capture(window, name: "style-selected-colors")
+            guard support.click(window, id: "style.reset"), !model.isDirty,
+                  providers.allSatisfy({ matches($0, style: .default) }) else { return false }
+            guard support.click(window, id: "style.color.claude.pink"), model.isDirty,
+                  support.click(window, id: "style.cancel"), controller.window == nil else { return false }
+            controller.present()
+            guard let reopened = controller.window else { return false }
+            support.settle(reopened)
+            return state.style == .default && providers.allSatisfy { provider in
+                guard let bar = support.element(reopened, id: "style.preview." + provider.rawValue) as? NSBox else { return false }
+                return bar.fillColor.usingColorSpace(.sRGB) == QuotaPalette.color(provider).usingColorSpace(.sRGB)
+            }
+        } catch { print("渠道预览条测试失败：\(error)"); return false }
+    }
 }
