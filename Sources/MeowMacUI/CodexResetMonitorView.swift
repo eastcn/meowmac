@@ -5,38 +5,51 @@ import MeowMacCore
 struct CodexResetMonitorView: View {
     let display: CodexResetDisplay
     var body: some View {
-        VStack(alignment: .leading, spacing: Design.rowGap) {
-            SectionHeading(title: "额外重置监控", detail: "每 6 小时")
-            Text(display.headline).font(Design.title)
-                .foregroundStyle(display.error == nil ? Design.label : Design.stateText(.warn))
-            ForEach(display.pending) { row in
-                VStack(alignment: .leading, spacing: Design.gap) {
-                    Text(row.label + " · " + row.status).font(Design.body)
-                    Text(row.scope).font(Design.caption).foregroundStyle(Design.secondary)
-                    if let text = row.announcement { Text(text).font(Design.caption).foregroundStyle(Design.secondary) }
-                    if let text = row.estimate { Text(text).font(Design.caption).foregroundStyle(Design.secondary) }
-                }.fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: Design.smallGap) {
+            if display.pending.isEmpty {
+                previewRow(nil)
+            } else {
+                ForEach(display.pending) { row in
+                    previewRow(row)
+                }
             }
-            if let latest = display.latest {
-                VStack(alignment: .leading, spacing: Design.gap) {
-                    Text("最近确认：" + latest.label).font(Design.body)
-                    if let text = latest.confirmation { Text(text).font(Design.caption).foregroundStyle(Design.secondary) }
-                    Text(latest.scope).font(Design.caption).foregroundStyle(Design.secondary)
-                }.fixedSize(horizontal: false, vertical: true)
-            } else if display.fetchedAt != nil {
-                Text("最近 7 天暂无确认记录").font(Design.caption).foregroundStyle(Design.secondary)
-            }
-            Text("公开消息不代表当前账号已到账。").font(Design.tiny).foregroundStyle(Design.secondary)
-            VStack(alignment: .leading, spacing: Design.smallGap) {
-                Text(display.fetchedAt.map { "获取：" + DisplayDate.format($0, pattern: "M/d HH:mm") } ?? "尚未成功获取")
-                Text(display.verifiedAt.map { "站点核验：" + DisplayDate.format($0, pattern: "M/d HH:mm") } ?? "站点核验时间未知")
-                if let status = display.siteStatus { Text(status) }
-            }.font(Design.tiny).foregroundStyle(Design.secondary)
-            if let error = display.error { Text(error).font(Design.caption).foregroundStyle(Design.stateText(.warn)) }
-            if let error = display.cacheError { Text(error).font(Design.caption).foregroundStyle(Design.stateText(.warn)) }
-            Button { NSWorkspace.shared.open(CodexResetDisplay.sourceURL) } label: {
-                Text("AIHOT · 查看来源 ↗").font(Design.caption).foregroundStyle(Design.blue)
-            }.buttonStyle(.plain)
         }.fixedSize(horizontal: false, vertical: true).monospacedDigit()
+    }
+    private var emptyText: String {
+        if display.error != nil { return display.fetchedAt == nil ? "获取失败" : "获取失败 · 暂无预告（缓存）" }
+        return display.fetchedAt == nil ? "等待采集" : "暂无"
+    }
+    private func previewRow(_ row: CodexResetRow?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Design.gap) {
+            ViewThatFits(in: .horizontal) {
+                if let row {
+                    (Text("重置预告：").font(Design.title)
+                     + Text((display.error != nil ? "缓存 · " : "") + row.preview).font(Design.caption))
+                        .fixedSize()
+                    VStack(alignment: .leading, spacing: Design.smallGap) {
+                        (Text("重置预告：").font(Design.title)
+                         + Text((display.error != nil ? "缓存 · " : "") + row.previewTime).font(Design.caption))
+                            .lineLimit(1)
+                        Text(row.label).font(Design.caption).lineLimit(1)
+                    }
+                } else {
+                    (Text("重置预告：").font(Design.title) + Text(emptyText).font(Design.caption))
+                        .lineLimit(2)
+                }
+            }
+            .foregroundStyle(display.error == nil && display.cacheError == nil ? Design.label : Design.stateText(.warn))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .help(details(row))
+            Button { NSWorkspace.shared.open(CodexResetDisplay.sourceURL) } label: {
+                Text("查看来源 ↗").font(Design.caption).foregroundStyle(Design.blue)
+            }.buttonStyle(.plain).fixedSize()
+        }
+    }
+    private func details(_ row: CodexResetRow?) -> String {
+        (["AIHOT 估算，非官方承诺。公开消息不代表当前账号已到账。", row?.preview, row?.status, row?.scope,
+          row?.announcement, row?.estimate, display.siteStatus, display.error, display.cacheError]
+            + [display.fetchedAt.map { "获取：" + DisplayDate.format($0, pattern: "M/d HH:mm") },
+               display.verifiedAt.map { "站点核验：" + DisplayDate.format($0, pattern: "M/d HH:mm") }])
+            .compactMap { $0 }.joined(separator: "\n")
     }
 }

@@ -69,24 +69,42 @@ enum CodexResetUITests {
             popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
             let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/acceptance/codex-reset-monitor/previews")
             try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-            for (name, body, error) in [
+            var noEstimate = CodexResetTests.event(); noEstimate.removeValue(forKey: "estimate")
+            var longType = CodexResetTests.event(); longType["displayLabel"] = String(repeating: "示例类型", count: 200)
+            var longDate = CodexResetTests.event()
+            longDate["estimate"] = ["from": "2026-10-08T00:00:00Z", "through": "2026-10-09T00:00:00Z",
+                "label": String(repeating: "示例日期", count: 200), "precision": "date"]
+            let cases: [(String, Data?, String?)] = [
                 ("pending", CodexResetTests.data(), nil as String?),
                 ("empty", CodexResetTests.data([]), nil),
                 ("confirmed", CodexResetTests.data([CodexResetTests.event(status: "confirmed", confirmed: "2026-10-07T20:00:00Z")]), nil),
                 ("overdue", CodexResetTests.data([CodexResetTests.event(phase: "expired_unconfirmed")]), nil),
-                ("failed", CodexResetTests.data(), "示例接口返回 HTTP 503")
-            ] {
-                state.codexResetState = CodexResetState(feed: try CodexResetFeed.parse(body), fetchedAt: CodexResetTests.clock, error: error)
+                ("failed", CodexResetTests.data(), "示例接口返回 HTTP 503"),
+                ("missing-estimate", CodexResetTests.data([noEstimate]), nil),
+                ("waiting", nil, nil),
+                ("failed-no-cache", nil, "示例接口返回 HTTP 503"),
+                ("long-type", CodexResetTests.data([longType]), nil),
+                ("long-date", CodexResetTests.data([longDate]), nil)
+            ]
+            for (name, body, error) in cases {
+                state.codexResetState = CodexResetState(feed: try body.map(CodexResetFeed.parse), fetchedAt: body == nil ? nil : CodexResetTests.clock, error: error)
                 for dark in [false, true] {
                     hosting.controller.view.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
                     let size = try await PanelPreviewRenderer.settleLayout(hosting.controller)
                     guard popover.isShown, size.width == 360, size.height <= 820,
                           hosting.measurements.contentHeight > hosting.measurements.viewportHeight else { return false }
-                    guard let image = PanelPreviewRenderer.resetMonitorPNG(state: state, dark: dark) else { return false }
+                    guard let image = PanelPreviewRenderer.resetMonitorPNG(state: state, dark: dark),
+                          let bitmap = NSBitmapImageRep(data: image) else { return false }
+                    // 设计约定：单条预告最多两行，分节本体不超过 40pt；预览另有上下各 16pt。
+                    let rowHeight = CGFloat(bitmap.pixelsHigh) / 2 - 32
+                    guard rowHeight <= 40 else {
+                        print("重置预告占用 \(rowHeight)pt，超过紧凑设计的 40pt")
+                        return false
+                    }
                     try image.write(to: output.appendingPathComponent(name + (dark ? "-dark.png" : "-light.png")))
                 }
             }
-            print("重置监控：真实 NSPopover 宽 360pt，最大高 820pt；10 张分节补充预览已生成")
+            print("重置监控：真实 NSPopover 宽 360pt，最大高 820pt；20 张紧凑预告补充预览已生成")
             return true
         } catch { print("重置容器测试：\(error)"); return false }
     }

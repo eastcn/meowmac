@@ -81,7 +81,7 @@ enum CodexResetTests {
                 event(id: "example-old", status: "confirmed", confirmed: "2026-10-05T23:20:00Z"),
                 event(id: "example-new", status: "confirmed", day: "2026-10-07")]))
             let display = CodexResetDisplay(feed: feed, fetchedAt: clock, error: nil, timezone: TimeZone(secondsFromGMT: 28800)!)
-            guard display.pending.count == 1, display.pending[0].status == "站点推测已落地 · 尚未确认",
+            guard display.pending.count == 1, display.pending[0].preview == "估算 10/8 20:00～23:00 · 额度重置", display.pending[0].status == "站点推测已落地 · 尚未确认",
                   display.pending[0].announcement?.contains("10/8 20:00") == true,
                   display.pending[0].announcement?.contains("推断") == true,
                   display.pending[0].estimate?.contains("非官方承诺") == true,
@@ -91,6 +91,16 @@ enum CodexResetTests {
                 let value = CodexResetDisplay(feed: try CodexResetFeed.parse(data([event(phase: phase)])), fetchedAt: clock, error: nil)
                 guard value.latest == nil, !value.pending.isEmpty, value.pending[0].confirmation == nil else { return false }
             }
+            var noEstimate = event(); noEstimate.removeValue(forKey: "estimate")
+            let missing = CodexResetDisplay(feed: try CodexResetFeed.parse(data([noEstimate])), fetchedAt: clock, error: nil)
+            guard missing.pending[0].preview == "时间待估算 · 额度重置" else { return false }
+            var crossDay = event()
+            crossDay["estimate"] = ["from": "2026-10-08T12:00:00Z", "through": "2026-10-09T15:00:00Z", "label": "跨日示例"]
+            let cross = CodexResetDisplay(feed: try CodexResetFeed.parse(data([crossDay])), fetchedAt: clock, error: nil, timezone: TimeZone(secondsFromGMT: 28800)!)
+            guard cross.pending[0].preview == "估算 10/8 20:00～10/9 23:00 · 额度重置" else { return false }
+            crossDay["estimate"] = ["from": "2026-10-08T00:00:00Z", "through": "2026-10-09T00:00:00Z", "label": "10/8 全天", "precision": "date"]
+            let dateOnly = CodexResetDisplay(feed: try CodexResetFeed.parse(data([crossDay])), fetchedAt: clock, error: nil)
+            guard dateOnly.pending[0].preview == "估算 10/8 全天 · 额度重置" else { return false }
             let empty = try CodexResetFeed.parse(data([]))
             return CodexResetDisplay(feed: nil, fetchedAt: nil, error: nil).headline == "等待首次采集"
                 && CodexResetDisplay(feed: empty, fetchedAt: clock, error: nil).headline == "暂无重置预告"

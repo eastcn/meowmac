@@ -114,6 +114,8 @@ public struct CodexResetRow: Codable, Identifiable {
     public let announcement: String?
     public let estimate: String?
     public let confirmation: String?
+    public let previewTime: String
+    public var preview: String { previewTime + " · " + label }
 }
 public struct CodexResetDisplay: Codable {
     public let headline: String
@@ -153,6 +155,15 @@ public struct CodexResetDisplay: Codable {
                 if value.precision == "date" { return value.label }
                 return ResetDate.text(value.from, timezone: timezone) + "～" + ResetDate.text(value.through, timezone: timezone)
             }
+            func previewRange(_ value: CodexResetEvent.TimeRange) -> String {
+                if value.precision == "date" { return value.label }
+                var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
+                let formatter = DateFormatter(); formatter.locale = Locale(identifier: "zh_CN")
+                formatter.timeZone = timezone; formatter.dateFormat = "HH:mm"
+                let end = calendar.isDate(value.from, inSameDayAs: value.through)
+                    ? formatter.string(from: value.through) : ResetDate.text(value.through, timezone: timezone)
+                return ResetDate.text(value.from, timezone: timezone) + "～" + end
+            }
             let label = event.presentation?.kindExplicit == false ? "额外重置（形式未说明）"
                 : event.displayLabel ?? "额外重置消息"
             let confirmation = event.confirmedAt.map { "确认消息：" + ResetDate.text($0, timezone: timezone) }
@@ -160,7 +171,8 @@ public struct CodexResetDisplay: Codable {
             return CodexResetRow(id: event.id, label: label, status: status, scope: scope,
                 announcement: event.schedule.map { "公告时间：" + range($0) + (event.presentation?.timeInferred == true ? "（时间为推断）" : "") },
                 estimate: event.isConfirmed ? nil : event.estimate.map { "AIHOT 估算：" + range($0) + "（非官方承诺）" },
-                confirmation: event.isConfirmed ? confirmation ?? "确认时间未说明" : nil)
+                confirmation: event.isConfirmed ? confirmation ?? "确认时间未说明" : nil,
+                previewTime: event.estimate.map { "估算 " + previewRange($0) } ?? "时间待估算")
         }
         pending = (feed?.events ?? []).filter { !$0.isConfirmed }.sorted { $0.updatedAt > $1.updatedAt }.map(row)
         latest = (feed?.events ?? []).filter(\.isConfirmed).sorted {
