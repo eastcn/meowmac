@@ -83,10 +83,11 @@ public final class NotificationCoordinator {
     public private(set) var recoveryReason: String?
     private let store: NotificationStore
     private let send: (SystemNotice) -> Void
+    private let startedAt: Date
     private let logger = Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "notifications")
 
-    public init(store: NotificationStore, send: @escaping (SystemNotice) -> Void) {
-        self.store = store; self.send = send
+    public init(store: NotificationStore, startedAt: Date = Date(), send: @escaping (SystemNotice) -> Void) {
+        self.store = store; self.send = send; self.startedAt = startedAt
         let loaded = store.load()
         settings = loaded.settings; records = loaded.records; recoveryReason = loaded.recoveryReason
     }
@@ -100,7 +101,7 @@ public final class NotificationCoordinator {
             guard let batch else { return true }
             guard let kind = key.split(separator: ".", maxSplits: 1).first.flatMap({ ReminderKind(rawValue: String($0)) }) else { return true }
             return batch.confirms(key, kind: kind)
-        })
+        }, observingSince: startedAt)
         if decision.records != records {
             records = decision.records
             persist()

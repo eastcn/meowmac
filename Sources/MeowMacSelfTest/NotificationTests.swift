@@ -116,7 +116,15 @@ enum NotificationTests {
             // 同样的过程，升严重时离恢复已满 10 分钟，发。
             let later = run([(0, [network(level: .severe)]), (60, []), (120, [network(level: .warn)]),
                              (660, [network(level: .severe)])], records: &records)
+            records = [:]
+            // 只通知过提醒档：恢复后直接以严重档重现，立即发。
+            let direct = run([(0, [network(level: .warn)]), (60, []), (120, [network(level: .severe)]), (7200, [network(level: .severe)])], records: &records)
+            records = [:]
+            // 只通知过提醒档：恢复后提醒档静默重现，再升严重，立即发。
+            let viaWarn = run([(0, [network(level: .warn)]), (60, []), (120, [network(level: .warn)]), (180, [network(level: .severe)])], records: &records)
             return flapping == [["network.group.overseas"], [], [], []] && later == [["network.group.overseas"], [], [], ["network.group.overseas"]]
+                && direct == [["network.group.overseas"], [], ["network.group.overseas"], []]
+                && viaWarn == [["network.group.overseas"], [], [], ["network.group.overseas"]]
         }),
         ("Core.Notifications/长期既不出现也未确认的记录按恢复处理", {
             var records: [String: NotifiedRecord] = [:]
@@ -126,7 +134,13 @@ enum NotificationTests {
                                            settings: NotificationSettings(), now: now.addingTimeInterval(offset),
                                            confirmsRecovery: { _ in false }).records
             }
+            // 应用关闭期间不计时：从本次启动算起不满 24 小时，仍保持进行中。
+            let reopened = NotificationDecider.decide(reminders: [], isSnoozed: { _ in false }, records: records,
+                                                      settings: NotificationSettings(), now: now.addingTimeInterval(3 * 86400),
+                                                      confirmsRecovery: { _ in false },
+                                                      observingSince: now.addingTimeInterval(3 * 86400 - 60)).records
             return absent(86399)["disk.system"]?.recoveredAt == nil && absent(86400)["disk.system"]?.recoveredAt != nil
+                && reopened["disk.system"]?.recoveredAt == nil
         }),
         ("Core.Notifications/没有检测结果时不算恢复", {
             var records: [String: NotifiedRecord] = [:]

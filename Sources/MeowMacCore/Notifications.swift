@@ -58,11 +58,14 @@ public struct NotifiedRecord: Codable, Equatable {
     public var silentSince: Date?
     /// 最近一次出现在提醒里的时刻。长期既不出现也得不到确认的记录按恢复处理。
     public var lastSeenAt: Date?
+    /// 上次通知时的档位。重现或升级时高于它，说明用户还没收到这一档的通知。旧记录缺省时用 `level`。
+    public var notifiedLevel: HealthLevel?
     public init(key: String, level: HealthLevel, notifiedAt: Date, cycleResetAt: Date? = nil,
-                recoveredAt: Date? = nil, pendingAfterSnooze: Bool = false, silentSince: Date? = nil, lastSeenAt: Date? = nil) {
+                recoveredAt: Date? = nil, pendingAfterSnooze: Bool = false, silentSince: Date? = nil, lastSeenAt: Date? = nil,
+                notifiedLevel: HealthLevel? = nil) {
         self.key = key; self.level = level; self.notifiedAt = notifiedAt; self.cycleResetAt = cycleResetAt
         self.recoveredAt = recoveredAt; self.pendingAfterSnooze = pendingAfterSnooze
-        self.silentSince = silentSince; self.lastSeenAt = lastSeenAt
+        self.silentSince = silentSince; self.lastSeenAt = lastSeenAt; self.notifiedLevel = notifiedLevel
     }
 }
 
@@ -83,13 +86,15 @@ public enum NotificationDecider {
     /// 输入是 reconcile 之后的全部提醒（含未确认的）。不在列表里、且 `confirmsRecovery` 认可的键才算恢复；
     /// 刚启动还没有检测结果时，不在列表里只表示未知，记录保持不变。
     /// 开关关闭时照样维护记录，只是不发送，重新打开时不会把已有问题一次补发出来。
+    /// `observingSince` 是本次开始观察的时刻（应用启动）。应用关闭期间不计入“长期未出现”。
     public static func decide(reminders: [Reminder], isSnoozed: (Reminder) -> Bool, records: [String: NotifiedRecord],
                               settings: NotificationSettings, now: Date,
-                              confirmsRecovery: (String) -> Bool = { _ in true }) -> NotificationDecision {
+                              confirmsRecovery: (String) -> Bool = { _ in true },
+                              observingSince: Date = .distantPast) -> NotificationDecision {
         var next = records
         let present = Set(reminders.map(\.id))
         for (key, var record) in next where !present.contains(key) && record.recoveredAt == nil {
-            let stale = now.timeIntervalSince(record.lastSeenAt ?? record.notifiedAt) >= unseenTimeout
+            let stale = now.timeIntervalSince(max(record.lastSeenAt ?? record.notifiedAt, observingSince)) >= unseenTimeout
             guard confirmsRecovery(key) || stale else { continue }
             record.recoveredAt = now; record.pendingAfterSnooze = false; record.silentSince = nil
             next[key] = record
@@ -105,8 +110,10 @@ public enum NotificationDecider {
             if let old {
                 let upgraded = reminder.level > old.level
                 let newCycle = quota && sameCycle(old.cycleResetAt, cycle) == false
-                // 静默重现后的升级，也要离那次恢复满新档位的冷却，避免来回波动时反复通知。
-                let upgradeAllowed = upgraded && (old.silentSince.map { now.timeIntervalSince($0) >= cooldown(for: reminder.level) } ?? true)
+                // 高于上次通知的档位：用户还没收到这一档，立即通知。
+                let aboveNotified = reminder.level > (old.notifiedLevel ?? old.level)
+                // 静默重现后回到已通知过的档位，要离那次恢复满该档的冷却，避免来回波动时反复通知。
+                let upgradeAllowed = upgraded && (aboveNotified || old.silentSince.map { now.timeIntervalSince($0) >= cooldown(for: reminder.level) } ?? true)
                 if old.recoveredAt == nil {
                     notify = upgradeAllowed || newCycle || old.pendingAfterSnooze
                 } else if quota && sameCycle(old.cycleResetAt, cycle) == true {
@@ -114,13 +121,13 @@ public enum NotificationDecider {
                 } else if newCycle {
                     notify = true
                 } else {
-                    notify = old.recoveredAt.map { now.timeIntervalSince($0) >= cooldown(for: reminder.level) } ?? true
+                    notify = aboveNotified || old.recoveredAt.map { now.timeIntervalSince($0) >= cooldown(for: reminder.level) } ?? true
                 }
             }
             if isSnoozed(reminder) {
                 next[key] = NotifiedRecord(key: key, level: max(old?.level ?? reminder.level, reminder.level),
                                            notifiedAt: old?.notifiedAt ?? now, cycleResetAt: cycle ?? old?.cycleResetAt,
-                                           pendingAfterSnooze: true, lastSeenAt: now)
+                                           pendingAfterSnooze: true, lastSeenAt: now, notifiedLevel: old?.notifiedLevel ?? old?.level)
                 continue
             }
             if notify && settings.allows(category) { out.append(reminder) }
@@ -129,7 +136,8 @@ public enum NotificationDecider {
             let silentSince = notify ? nil : old?.recoveredAt ?? old?.silentSince
             next[key] = NotifiedRecord(key: key, level: restart ? reminder.level : max(old?.level ?? reminder.level, reminder.level),
                                        notifiedAt: notify ? now : old?.notifiedAt ?? now,
-                                       cycleResetAt: cycle ?? old?.cycleResetAt, silentSince: silentSince, lastSeenAt: now)
+                                       cycleResetAt: cycle ?? old?.cycleResetAt, silentSince: silentSince, lastSeenAt: now,
+                                       notifiedLevel: notify ? reminder.level : old?.notifiedLevel ?? old?.level)
         }
         return NotificationDecision(reminders: out.sorted(by: order), records: prune(next, now: now))
     }
