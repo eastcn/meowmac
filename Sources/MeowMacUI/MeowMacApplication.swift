@@ -64,7 +64,13 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         popover.contentViewController = PanelHosting.make(state: panelState).controller
         self.popover = popover
-        let bridge = NetworkBridge { [weak panelState] tone in panelState?.networkTone = tone }
+        let bridge = NetworkBridge(notifier: notifier, root: catStore.rootURL,
+            onTone: { [weak panelState] tone in panelState?.networkTone = tone },
+            onEgressAlert: { [weak self] alert in
+                guard let self else { return }
+                let redactor = self.panelState.networkModel?.redactor
+                self.notificationCoordinator?.process(alert, redact: { redactor?.redact($0) ?? $0 })
+            })
         networkBridge = bridge
         panelState.networkModel = bridge.model
         let recorder = NetworkHistoryRecorder { [weak panelState] history in panelState?.networkHistory = history }

@@ -35,6 +35,14 @@ enum NotificationUITests {
             + observe("203.0.113.3", "JP", 900)
     }
 
+    /// 记录 TunCanary 经注入接口发起的调用。
+    final class SpyNotifier: UserNotifying {
+        var requests = 0, statusCalls = 0, delivered = 0
+        func requestAuthorization() async -> Bool { requests += 1; return true }
+        func authorizationStatus() async -> NotificationAuthorization { statusCalls += 1; return .authorized }
+        func deliver(_ notification: PendingNotification) async { delivered += 1 }
+    }
+
     static var tests: [(String, @MainActor () async -> Bool)] { [
         ("UI.Notifications/存储往返、权限与坏文件改名", {
             guard let root = try? temporaryRoot() else { return false }
@@ -109,6 +117,37 @@ enum NotificationUITests {
                 && subtitles == ["出口 IP 已变化", "出口地域超出允许范围", "出口 IP 已变化"]
                 && sent[1].sound && !sent[0].sound && sent.allSatisfy { $0.tab == .network }
                 && sent[1].body.hasSuffix("：美国") && sent[1].body.contains(EgressIPTarget.cloudflare.host)
+        }),
+        ("UI.Notifications/网络接管：注入通知器、出口告警改道、故障走提醒", {
+            guard let root = try? temporaryRoot() else { return false }
+            defer { try? FileManager.default.removeItem(at: root) }
+            let spy = SpyNotifier()
+            var received: [EgressAlert] = []
+            let bridge = NetworkBridge(notifier: spy, root: root, onTone: { _ in }, onEgressAlert: { received.append($0) })
+            // TunCanary 设置页的授权操作走注入的通知器。
+            let status = await bridge.model.actions.requestNotificationAuthorization()
+            guard spy.requests == 1, status == .authorized else { return false }
+            // 出口告警不再由 TunCanary 发，交给 MeowMac。
+            let alerts = egressAlerts()
+            for alert in alerts { await bridge.model.deliverEgressAlert(alert) }
+            guard received == alerts, spy.delivered == 0 else { return false }
+            // MeowMac 的通知器丢弃 TunCanary 的故障通知。
+            let mine = MeowMacNotifier(environment: AppBundleEnvironment(bundleIdentifier: nil, bundlePath: ""))
+            await mine.deliver(PendingNotification(key: "group.overseas", severity: .critical, title: "示例", body: "示例"))
+            // 故障经 MeowMac 的提醒变成通知：严重档出声，正文经过脱敏。
+            var sent: [SystemNotice] = []
+            let coordinator = NotificationCoordinator(store: NotificationStore(rootURL: root)) { sent.append($0) }
+            let state = PanelPreviewRenderer.syntheticState()
+            state.networkModel = bridge.model
+            state.onRemindersRefreshed = { tracker in
+                coordinator.process(tracker, now: state.now(), redact: { $0.replacingOccurrences(of: "example.test", with: "[站点]") })
+            }
+            bridge.model.apply(local: nil, connectivityFaults: [ConnectivityFault(key: "group.overseas", severity: .critical,
+                message: "海外站点 example.test 连续 3 轮探测失败", siteIDs: ["example"])], checkedAt: state.now())
+            state.refreshReminders(); state.refreshReminders()
+            let network = sent.filter { $0.key == "network.group.overseas" }
+            return network.count == 1 && network[0].sound && network[0].tab == .network
+                && network[0].body == "海外站点 [站点] 连续 3 轮探测失败" && network[0].subtitle == "网络故障"
         }),
         ("UI.Notifications/设置子菜单与提醒回调", {
             let state = PanelPreviewRenderer.syntheticState()

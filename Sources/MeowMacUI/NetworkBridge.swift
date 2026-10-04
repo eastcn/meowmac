@@ -25,20 +25,24 @@ public final class NetworkBridge {
     private let monitor: MonitorController
     private var subscription: AnyCancellable?
 
-    public init(onTone: @escaping (NetworkTone) -> Void) {
+    /// D41：通知由 MeowMac 发。`notifier` 注入给 TunCanary，它的故障通知被丢弃；
+    /// 出口告警改走 `onEgressAlert`，由 MeowMac 决定是否发。
+    public init(notifier: UserNotifying, root: URL = FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Library/Application Support/MeowMac", isDirectory: true),
+                onTone: @escaping (NetworkTone) -> Void, onEgressAlert: @escaping @MainActor (EgressAlert) -> Void = { _ in }) {
         let store = SettingsStore()
         let paths = KnownPaths.currentUser()
-        let appSupport = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/MeowMac/tuncanary", isDirectory: true)
+        let appSupport = root.appendingPathComponent("tuncanary", isDirectory: true)
         let egressHistory = EgressHistoryStore(fileURL: appSupport.appendingPathComponent("egress-history.json"))
         let model = AppModel(settings: store.load(), egressChecker: EgressIPChecker(),
                              egressGeoClient: EgressGeoClient(), egressHistoryStore: egressHistory)
         self.model = model
-        let notifier = UserNotificationCenterNotifier()
         let loginItem = MainAppLoginItemController()
         let monitor = Self.makeMonitor(model: model, paths: paths, notifier: notifier,
             eventStore: FaultEventStore(fileURL: appSupport.appendingPathComponent("events.jsonl")))
         self.monitor = monitor
+        // MonitorController 初始化时装了自己的出口告警发送，这里换成 MeowMac 的。
+        model.deliverEgressAlert = { alert in onEgressAlert(alert) }
         model.actions = AppActions.live(settingsStore: store, notifier: notifier, loginItem: loginItem,
                                          recheck: { [weak monitor] in monitor?.recheck() },
                                          reloadAdapters: { [weak monitor] in monitor?.reloadAdapters() },

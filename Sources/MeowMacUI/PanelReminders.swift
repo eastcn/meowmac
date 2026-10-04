@@ -8,7 +8,7 @@ public extension PanelState {
     var reminderBatch: ReminderBatch {
         let signals = networkModel?.overall.faults.map {
             NetworkReminderSignal(key: $0.key.rawValue, message: $0.message,
-                                  level: $0.severity == .critical ? .severe : .warn)
+                                  level: $0.severity == .critical ? .severe : .warn, hint: $0.hint)
         }
         let completed = networkModel.map { $0.checkProgress == nil && $0.lastCheckedAt != nil && !$0.overall.isSwitching } ?? true
         return ReminderCollector.collect(HealthInputs(system: snapshot, energy: energy,
