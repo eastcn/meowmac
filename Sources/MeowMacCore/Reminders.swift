@@ -5,6 +5,32 @@ public enum ReminderKind: String, Codable, CaseIterable {
     public var allowsSnooze: Bool { [.quotaLow, .quotaPace, .disk, .source].contains(self) }
 }
 
+/// 写具体通知用的数值（D41）。面板不显示这些字段。
+public struct ReminderFacts: Codable, Equatable {
+    /// 通知正文的主语，例如“Claude 5 小时窗口”、进程名或数据源名。
+    public var subject: String?
+    public var remainingPercent: Double?
+    public var secondsUntilExhaustion: TimeInterval?
+    public var cpuPercent: Double?
+    public var duration: TimeInterval?
+    public var pressurePercent: Double?
+    public var diskRemainingFraction: Double?
+    public var diskAvailableBytes: Int64?
+    public var thermalState: String?
+    public var failures: Int?
+    public var cachedAt: Date?
+    public var hint: String?
+    public init(subject: String? = nil, remainingPercent: Double? = nil, secondsUntilExhaustion: TimeInterval? = nil,
+                cpuPercent: Double? = nil, duration: TimeInterval? = nil, pressurePercent: Double? = nil,
+                diskRemainingFraction: Double? = nil, diskAvailableBytes: Int64? = nil, thermalState: String? = nil,
+                failures: Int? = nil, cachedAt: Date? = nil, hint: String? = nil) {
+        self.subject = subject; self.remainingPercent = remainingPercent; self.secondsUntilExhaustion = secondsUntilExhaustion
+        self.cpuPercent = cpuPercent; self.duration = duration; self.pressurePercent = pressurePercent
+        self.diskRemainingFraction = diskRemainingFraction; self.diskAvailableBytes = diskAvailableBytes
+        self.thermalState = thermalState; self.failures = failures; self.cachedAt = cachedAt; self.hint = hint
+    }
+}
+
 public struct Reminder: Identifiable, Codable, Equatable {
     public let kind: ReminderKind
     public let object: String
@@ -16,22 +42,24 @@ public struct Reminder: Identifiable, Codable, Equatable {
     public var resetAt: Date?
     public var confirmed: Bool
     public let provider: QuotaProvider?
+    public var facts: ReminderFacts?
     public var id: String { kind.rawValue + "." + object }
     public var canSnooze: Bool { kind.allowsSnooze && level == .warn && SnoozeRecord.validKey(id, kind: kind) }
     public init(kind: ReminderKind, object: String, tab: PanelTab, level: HealthLevel = .warn,
                 title: String, detail: String = "", sampledAt: Date? = nil, resetAt: Date? = nil,
-                confirmed: Bool = true, provider: QuotaProvider? = nil) {
+                confirmed: Bool = true, provider: QuotaProvider? = nil, facts: ReminderFacts? = nil) {
         self.kind = kind; self.object = object; self.tab = tab; self.level = level
         self.title = title; self.detail = detail; self.sampledAt = sampledAt; self.resetAt = resetAt
-        self.confirmed = confirmed; self.provider = provider
+        self.confirmed = confirmed; self.provider = provider; self.facts = facts
     }
 }
 
 public struct NetworkReminderSignal {
     public let key: String, message: String
     public let level: HealthLevel
-    public init(key: String, message: String, level: HealthLevel) {
-        self.key = key; self.message = message; self.level = level
+    public let hint: String?
+    public init(key: String, message: String, level: HealthLevel, hint: String? = nil) {
+        self.key = key; self.message = message; self.level = level; self.hint = hint
     }
 }
 
@@ -57,7 +85,8 @@ public enum ReminderCollector {
         if let signals = input.networkSignals, !signals.isEmpty {
             for signal in signals where signal.level > .normal {
                 add(Reminder(kind: .network, object: signal.key, tab: .network, level: signal.level,
-                             title: signal.message, sampledAt: input.networkCheckedAt, confirmed: networkValid))
+                             title: signal.message, sampledAt: input.networkCheckedAt, confirmed: networkValid,
+                             facts: ReminderFacts(hint: signal.hint)))
             }
         } else if input.network == .red || input.network == .yellow {
             add(Reminder(kind: .network, object: "overall", tab: .network,
@@ -76,18 +105,22 @@ public enum ReminderCollector {
                 let valid = sourceValid && (window.resetsAt.map { $0 > input.now } ?? true)
                 let prefix = snapshot.provider.displayName + " " + window.displayName.replacingOccurrences(of: "窗口", with: "")
                 let reset = valid ? window.resetsAt : nil
+                let subject = snapshot.provider.displayName + " " + window.displayName
                 if valid { batch.confirmedKeys.insert(ReminderKind.quotaLow.rawValue + "." + object) }
                 if window.remainingPercent / 100 < config.quotaRemainingWarn {
                     add(Reminder(kind: .quotaLow, object: object, tab: .quota, title: prefix + "额度剩余不足",
                                  detail: "剩余 \(Int(window.remainingPercent.rounded()))%", sampledAt: snapshot.updatedAt,
-                                 resetAt: reset, confirmed: valid, provider: snapshot.provider))
+                                 resetAt: reset, confirmed: valid, provider: snapshot.provider,
+                                 facts: ReminderFacts(subject: subject, remainingPercent: window.remainingPercent)))
                 }
                 if let pace = QuotaPace.calculate(window: window, now: input.now) {
                     if valid { batch.confirmedKeys.insert(ReminderKind.quotaPace.rawValue + "." + object) }
                     if pace.exhaustsBeforeReset {
                         add(Reminder(kind: .quotaPace, object: object, tab: .quota, title: prefix + "额度偏快",
                                      detail: "预计在重置前用完", sampledAt: snapshot.updatedAt,
-                                     resetAt: reset, confirmed: valid, provider: snapshot.provider))
+                                     resetAt: reset, confirmed: valid, provider: snapshot.provider,
+                                     facts: ReminderFacts(subject: subject, remainingPercent: window.remainingPercent,
+                                                          secondsUntilExhaustion: pace.secondsUntilExhaustion)))
                     }
                 }
             }
@@ -101,7 +134,8 @@ public enum ReminderCollector {
                 batch.confirmedKinds.insert(.disk)
                 if remaining < config.diskRemainingWarn {
                     add(Reminder(kind: .disk, object: "system", tab: .system, title: "磁盘剩余不足",
-                                 detail: "可用空间占 \(Int((remaining * 100).rounded()))%", sampledAt: system.timestamp))
+                                 detail: "可用空间占 \(Int((remaining * 100).rounded()))%", sampledAt: system.timestamp,
+                                 facts: ReminderFacts(diskRemainingFraction: remaining, diskAvailableBytes: system.diskAvailableBytes)))
                 }
             }
             var thermalCooling = false
@@ -112,7 +146,8 @@ public enum ReminderCollector {
                     let noProcess = input.energy?.runaway.isEmpty ?? true
                     add(Reminder(kind: .thermal, object: "system", tab: .system,
                                  title: noProcess ? "温度偏高，未发现异常进程，建议降温或用 AI 诊断" : "系统已降频，建议用 AI 诊断",
-                                 detail: "热状态 \(system.thermal.rawValue)", sampledAt: system.timestamp))
+                                 detail: "热状态 \(system.thermal.rawValue)", sampledAt: system.timestamp,
+                                 facts: ReminderFacts(thermalState: system.thermal.rawValue)))
                 }
                 thermalCooling = system.thermal == .fair && input.fairSince.map({ input.now.timeIntervalSince($0) >= config.fairThermalSeconds }) == true
             }
@@ -138,14 +173,18 @@ public enum ReminderCollector {
                              title: process.name + " · 进程 CPU 持续偏高",
                              detail: String(format: "CPU %.0f%% · 已持续 ", process.cpuPercent)
                                 + MetricFormat.duration(energy.runawayDurations[process.pid] ?? config.runawaySeconds),
-                             sampledAt: input.energyUpdatedAt, confirmed: valid))
+                             sampledAt: input.energyUpdatedAt, confirmed: valid,
+                             facts: ReminderFacts(subject: process.name, cpuPercent: process.cpuPercent,
+                                                  duration: energy.runawayDurations[process.pid] ?? config.runawaySeconds)))
             }
             let memoryValid = valid && input.system?.memoryPressure != .unavailable && input.system != nil
             if memoryValid { batch.confirmedKinds.insert(.memory) }
             if energy.prolongedMemoryPressure {
                 add(Reminder(kind: .memory, object: "system", tab: .system, title: "内存压力持续偏高",
                              detail: "已持续 " + MetricFormat.duration(energy.memoryPressureDuration ?? config.memoryPressureSeconds),
-                             sampledAt: input.energyUpdatedAt, confirmed: memoryValid))
+                             sampledAt: input.energyUpdatedAt, confirmed: memoryValid,
+                             facts: ReminderFacts(duration: energy.memoryPressureDuration ?? config.memoryPressureSeconds,
+                                                  pressurePercent: input.system?.memoryPressurePercent)))
             }
         }
         for (source, failures) in input.failedSources.sorted(by: { $0.key < $1.key }) {
@@ -155,10 +194,14 @@ public enum ReminderCollector {
             if failures >= config.sourceFailureCount {
                 let provider = source == "quota.codex-resets" ? .codex : source.hasPrefix("quota.") ? QuotaProvider(rawValue: String(source.dropFirst(6))) : nil
                 let names = ["energy": "能耗", "system": "系统", "quota": "额度", "network": "网络", "quota.codex-resets": "Codex 重置监控"]
+                let name = names[source] ?? provider?.displayName ?? source
+                // 只有单个渠道能确定缓存时间；聚合来源不写，避免误导。
+                let cachedAt = source.hasPrefix("quota.") ? input.quotaSnapshots.first { $0.provider == provider }?.updatedAt : nil
                 add(Reminder(kind: .source, object: object,
                              tab: source.hasPrefix("network") ? .network : source.hasPrefix("quota") ? .quota : .system,
-                             title: "数据源失效：" + (names[source] ?? provider?.displayName ?? source),
-                             detail: "连续 \(failures) 次采集失败", provider: provider))
+                             title: "数据源失效：" + name,
+                             detail: "连续 \(failures) 次采集失败", provider: provider,
+                             facts: ReminderFacts(subject: name, failures: failures, cachedAt: cachedAt)))
             }
         }
         return batch

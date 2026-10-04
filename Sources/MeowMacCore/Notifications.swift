@@ -1,0 +1,244 @@
+import Foundation
+
+/// 系统通知的类别（D41）。降温提示不通知，所以没有对应类别。
+public enum NotificationCategory: String, Codable, CaseIterable {
+    case network, egress, quotaLow, quotaPace, disk, process, memory, thermal, source
+
+    public init?(kind: ReminderKind) {
+        switch kind {
+        case .network: self = .network
+        case .quotaLow: self = .quotaLow
+        case .quotaPace: self = .quotaPace
+        case .disk: self = .disk
+        case .process: self = .process
+        case .memory: self = .memory
+        case .thermal: self = .thermal
+        case .source: self = .source
+        case .cooling: return nil
+        }
+    }
+
+    public var displayName: String {
+        switch self {
+        case .network: return "网络故障"
+        case .egress: return "出口 IP"
+        case .quotaLow: return "额度不足"
+        case .quotaPace: return "额度偏快"
+        case .disk: return "磁盘不足"
+        case .process: return "进程 CPU 持续偏高"
+        case .memory: return "内存压力持续偏高"
+        case .thermal: return "系统已降频"
+        case .source: return "数据源失效"
+        }
+    }
+
+    /// 默认全开，数据源失效默认关。
+    public static let defaultEnabled = Set(allCases).subtracting([.source])
+}
+
+/// 通知开关，本机设置，不进猫包。
+public struct NotificationSettings: Codable, Equatable {
+    public var enabled = true
+    public var categories = NotificationCategory.defaultEnabled
+    public init() {}
+    public func allows(_ category: NotificationCategory) -> Bool { enabled && categories.contains(category) }
+}
+
+/// 某个提醒的通知状态。恢复后保留到冷却结束，用来判断能否再次通知。
+public struct NotifiedRecord: Codable, Equatable {
+    public let key: String
+    public var level: HealthLevel
+    public var notifiedAt: Date
+    /// 额度类的重置时间，同一周期内最多通知一次。
+    public var cycleResetAt: Date?
+    public var recoveredAt: Date?
+    /// 暂缓期间出现或仍在的问题，暂缓结束后补发一次。
+    public var pendingAfterSnooze: Bool
+    public init(key: String, level: HealthLevel, notifiedAt: Date, cycleResetAt: Date? = nil,
+                recoveredAt: Date? = nil, pendingAfterSnooze: Bool = false) {
+        self.key = key; self.level = level; self.notifiedAt = notifiedAt; self.cycleResetAt = cycleResetAt
+        self.recoveredAt = recoveredAt; self.pendingAfterSnooze = pendingAfterSnooze
+    }
+}
+
+public struct NotificationDecision {
+    /// 需要发送的提醒，按严重程度和标签页排序。
+    public var reminders: [Reminder]
+    public var records: [String: NotifiedRecord]
+}
+
+public enum NotificationDecider {
+    public static let recoveryCooldown: TimeInterval = 3600
+    public static let severeRecoveryCooldown: TimeInterval = 600
+    public static let maxRecords = 256
+
+    /// 输入是 reconcile 之后的全部提醒（含未确认的）。不在列表里的键视为已确认恢复。
+    /// 开关关闭时照样维护记录，只是不发送，重新打开时不会把已有问题一次补发出来。
+    public static func decide(reminders: [Reminder], isSnoozed: (Reminder) -> Bool, records: [String: NotifiedRecord],
+                              settings: NotificationSettings, now: Date) -> NotificationDecision {
+        var next = records
+        let present = Set(reminders.map(\.id))
+        for (key, var record) in next where !present.contains(key) && record.recoveredAt == nil {
+            record.recoveredAt = now; record.pendingAfterSnooze = false
+            next[key] = record
+        }
+        var out: [Reminder] = []
+        for reminder in reminders where reminder.level > .normal {
+            guard let category = NotificationCategory(kind: reminder.kind), reminder.confirmed else { continue }
+            let key = reminder.id
+            let quota = category == .quotaLow || category == .quotaPace
+            let cycle = quota ? reminder.resetAt : nil
+            let old = next[key]
+            var notify = true
+            if let old {
+                let upgraded = reminder.level > old.level
+                let newCycle = quota && sameCycle(old.cycleResetAt, cycle) == false
+                if old.recoveredAt == nil {
+                    notify = upgraded || newCycle || old.pendingAfterSnooze
+                } else if quota && sameCycle(old.cycleResetAt, cycle) == true {
+                    notify = upgraded
+                } else if newCycle {
+                    notify = true
+                } else {
+                    let cooldown = reminder.level == .severe ? severeRecoveryCooldown : recoveryCooldown
+                    notify = upgraded || old.recoveredAt.map { now.timeIntervalSince($0) >= cooldown } ?? true
+                }
+            }
+            if isSnoozed(reminder) {
+                next[key] = NotifiedRecord(key: key, level: max(old?.level ?? reminder.level, reminder.level),
+                                           notifiedAt: old?.notifiedAt ?? now, cycleResetAt: cycle ?? old?.cycleResetAt,
+                                           pendingAfterSnooze: true)
+                continue
+            }
+            if notify && settings.allows(category) { out.append(reminder) }
+            next[key] = NotifiedRecord(key: key, level: notify ? reminder.level : max(old?.level ?? reminder.level, reminder.level),
+                                       notifiedAt: notify ? now : old?.notifiedAt ?? now,
+                                       cycleResetAt: cycle ?? old?.cycleResetAt)
+        }
+        return NotificationDecision(reminders: out.sorted(by: order), records: prune(next, now: now))
+    }
+
+    /// nil 表示无法判断（缺少可靠的重置时间）。
+    static func sameCycle(_ lhs: Date?, _ rhs: Date?) -> Bool? {
+        guard let lhs, let rhs else { return nil }
+        return abs(lhs.timeIntervalSince(rhs)) <= QuotaHistorySeries.resetTolerance
+    }
+
+    static func order(_ lhs: Reminder, _ rhs: Reminder) -> Bool {
+        if lhs.level != rhs.level { return lhs.level > rhs.level }
+        let tabs = PanelTab.allCases
+        if lhs.tab != rhs.tab { return tabs.firstIndex(of: lhs.tab)! < tabs.firstIndex(of: rhs.tab)! }
+        return lhs.id < rhs.id
+    }
+
+    /// 冷却已过、额度周期已过的恢复记录删除；总数超过上限时先删最早恢复的。
+    public static func prune(_ records: [String: NotifiedRecord], now: Date) -> [String: NotifiedRecord] {
+        var kept = records.filter { _, record in
+            guard let recovered = record.recoveredAt else { return true }
+            let cooled = now.timeIntervalSince(recovered) >= recoveryCooldown
+            return !cooled || (record.cycleResetAt.map { $0 > now } ?? false)
+        }
+        if kept.count > maxRecords {
+            let removable = kept.values.filter { $0.recoveredAt != nil }
+                .sorted { ($0.recoveredAt!, $0.key) < ($1.recoveredAt!, $1.key) }
+            for record in removable.prefix(kept.count - maxRecords) { kept.removeValue(forKey: record.key) }
+        }
+        return kept
+    }
+}
+
+/// 一条要发出的系统通知。
+public struct SystemNotice: Equatable {
+    public let key: String
+    public let tab: PanelTab
+    public let subtitle: String
+    public let body: String
+    public let sound: Bool
+    public init(key: String, tab: PanelTab, subtitle: String, body: String, sound: Bool) {
+        self.key = key; self.tab = tab; self.subtitle = subtitle; self.body = body; self.sound = sound
+    }
+}
+
+/// 通知文案（D41：写明对象、当前数值，以及重置时间、预计用完时间或已持续的时长）。
+public enum NotificationContent {
+    public static let title = "MeowMac"
+    /// 同一轮超过这个数量时，只发前两条，其余合成一条汇总。
+    public static let burstLimit = 3
+
+    public static func notices(for reminders: [Reminder], now: Date, timeZone: TimeZone = .current,
+                               redact: (String) -> String = { $0 }) -> [SystemNotice] {
+        guard reminders.count > burstLimit else { return reminders.map { notice(for: $0, now: now, timeZone: timeZone, redact: redact) } }
+        let head = reminders.prefix(burstLimit - 1).map { notice(for: $0, now: now, timeZone: timeZone, redact: redact) }
+        let rest = Array(reminders.dropFirst(burstLimit - 1))
+        let names = rest.prefix(3).map { NotificationCategory(kind: $0.kind)?.displayName ?? $0.title }
+        var unique: [String] = []
+        for name in names where !unique.contains(name) { unique.append(name) }
+        let summary = SystemNotice(key: "summary", tab: rest[0].tab, subtitle: "另有 \(rest.count) 条提醒",
+                                   body: unique.joined(separator: "、") + (rest.count > 3 ? "等" : "") + "，打开面板查看全部提醒",
+                                   sound: rest.contains { $0.level == .severe })
+        return head + [summary]
+    }
+
+    public static func notice(for reminder: Reminder, now: Date, timeZone: TimeZone = .current,
+                              redact: (String) -> String = { $0 }) -> SystemNotice {
+        let category = NotificationCategory(kind: reminder.kind)
+        return SystemNotice(key: reminder.id, tab: reminder.tab,
+                            subtitle: category?.displayName ?? reminder.title,
+                            body: body(for: reminder, now: now, timeZone: timeZone, redact: redact),
+                            sound: reminder.level == .severe)
+    }
+
+    static func body(for reminder: Reminder, now: Date, timeZone: TimeZone, redact: (String) -> String) -> String {
+        let facts = reminder.facts ?? ReminderFacts()
+        func percent(_ value: Double) -> String { "\(Int(value.rounded()))%" }
+        switch reminder.kind {
+        case .quotaLow:
+            var text = (facts.subject ?? reminder.title) + (facts.remainingPercent.map { "剩余 " + percent($0) } ?? "剩余不足")
+            if let reset = reminder.resetAt { text += "，" + time(reset, now: now, timeZone: timeZone) + " 重置" }
+            return text
+        case .quotaPace:
+            var text = (facts.subject ?? reminder.title)
+            if let seconds = facts.secondsUntilExhaustion, seconds.isFinite, seconds > 0 {
+                text += "按当前速度约 " + MetricFormat.duration(seconds) + "后用完"
+            } else {
+                text += "按当前速度会在重置前用完"
+            }
+            if let reset = reminder.resetAt { text += "，" + time(reset, now: now, timeZone: timeZone) + " 才重置" }
+            return text
+        case .disk:
+            guard let fraction = facts.diskRemainingFraction else { return "磁盘剩余不足，可在系统页清理" }
+            let bytes = facts.diskAvailableBytes.map { "（" + ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) + "）" } ?? ""
+            return "磁盘可用 " + percent(fraction * 100) + bytes + "，可在系统页清理"
+        case .process:
+            var text = (facts.subject ?? "某个进程") + (facts.cpuPercent.map { " 占用 CPU " + percent($0) } ?? " CPU 持续偏高")
+            if let duration = facts.duration { text += "，已持续 " + MetricFormat.duration(duration) }
+            return text
+        case .memory:
+            var text = facts.pressurePercent.map { "内存压力 " + percent($0) } ?? "内存压力持续偏高"
+            if let duration = facts.duration { text += "，已持续 " + MetricFormat.duration(duration) }
+            return text
+        case .thermal:
+            return (facts.thermalState.map { "热状态 \($0)，" } ?? "") + reminder.title
+        case .source:
+            // 渠道名是英文时与“数据”之间留空格，例如“Claude 数据”。
+            let subject = facts.subject.map { $0.last?.isASCII == true ? $0 + " 数据" : $0 + "数据" } ?? "数据源"
+            var text = subject + (facts.failures.map { "连续 \($0) 次采集失败" } ?? "采集失败")
+            if let cached = facts.cachedAt { text += "，面板显示的是 " + time(cached, now: now, timeZone: timeZone) + " 的缓存" }
+            return text
+        case .network:
+            let hint = facts.hint.flatMap { $0.isEmpty ? nil : $0 }
+            return redact(reminder.title + (hint.map { "。" + $0 } ?? ""))
+        case .cooling:
+            return reminder.title
+        }
+    }
+
+    /// 当天写“19:30”，7 天内写“周四 08:00”，更远写“10月12日 08:00”；过去的时间同理。
+    public static func time(_ date: Date, now: Date, timeZone: TimeZone) -> String {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "zh_CN"); formatter.timeZone = timeZone
+        let days = abs(calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 99)
+        formatter.dateFormat = days == 0 ? "HH:mm" : days < 7 ? "EEE HH:mm" : "M月d日 HH:mm"
+        return formatter.string(from: date)
+    }
+}
