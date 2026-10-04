@@ -11,7 +11,7 @@ public struct PanelCardDefinition {
 
 public enum PanelLayoutCatalog {
     public static let definitions: [PanelTab: [PanelCardDefinition]] = [
-        .system: [.init("system.chart", "系统趋势", canHide: false), .init("system.energy", "能耗排行"), .init("system.disk", "磁盘")],
+        .system: [.init("system.chart", "系统趋势", canHide: false), .init("system.energy", "能耗排行"), .init("system.sensors", "传感器"), .init("system.disk", "磁盘")],
         .quota: [.init("quota.trend", "用量趋势"), .init("quota.cost", "花费"), .init("quota.storage", "本地存储")],
         .network: [.init("network.checks", "连接检查"), .init("network.sites", "站点连通性"), .init("network.egress", "出口 IP")],
     ]
@@ -161,7 +161,23 @@ public struct PanelLayout: Codable, Equatable {
                                      hidden: hiddenNames.compactMap(OverviewItem.init(rawValue:)),
                                      quota: OverviewQuota(provider: provider, window: selector))
         }
-        return try PanelLayout(tabs: tabs, cards: cards, overview: overview).validated()
+        return try PanelLayout(tabs: tabs, cards: migrated(cards), overview: overview).validated()
+    }
+
+    /// v0.3 新增的功能块。旧文件恰好只缺这些块时，按默认位置补上并显示；其他缺项仍按无效处理。
+    static let addedCards: [(tab: PanelTab, id: String, before: String)] = [(.system, "system.sensors", "system.disk")]
+
+    static func migrated(_ cards: [String: [PanelCardPlacement]]) -> [String: [PanelCardPlacement]] {
+        var result = cards
+        for added in addedCards {
+            guard var placements = result[added.tab.rawValue], !placements.contains(where: { $0.id == added.id }) else { continue }
+            let expected = Set((PanelLayoutCatalog.definitions[added.tab] ?? []).map(\.id)).subtracting([added.id])
+            guard placements.count == expected.count, Set(placements.map(\.id)) == expected,
+                  let index = placements.firstIndex(where: { $0.id == added.before }) else { continue }
+            placements.insert(PanelCardPlacement(id: added.id), at: index)
+            result[added.tab.rawValue] = placements
+        }
+        return result
     }
 }
 

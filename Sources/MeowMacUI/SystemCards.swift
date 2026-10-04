@@ -13,6 +13,13 @@ public struct SystemTrend: Codable {
     public let name: String, rangeLabel: String, current: String
     public let lower: Double, upper: Double
     public let points: [TrendValue]
+    /// 行的身份，决定颜色：cpu、memory、power、temperature、fan。
+    public var kind: String = ""
+    /// 同一行的第二条线；温度行用它画电池温度。
+    public var secondaryPoints: [TrendValue]? = nil
+    public var secondaryCurrent: String? = nil
+    /// 虚线阈值；风扇行用它标降温阈值。
+    public var threshold: Double? = nil
 }
 public extension PanelState {
     var diagnosisRows: [DiagnosisRow] {
@@ -43,17 +50,36 @@ public extension PanelState {
         let points = visibleChartPoints
         let total = Double(snapshot?.memoryTotalBytes ?? 0) / 1_073_741_824
         let powerMax = max(40, ceil((points.compactMap(\.systemPowerWatts).max() ?? 0) / 10) * 10)
-        let temps = points.compactMap(\.batteryTemperatureCelsius)
+        let temps = points.compactMap(\.batteryTemperatureCelsius) + points.compactMap(\.socTemperatureCelsius)
         let minTemp = floor((temps.min() ?? 20) / 2) * 2
         let maxTemp = max(minTemp + 2, ceil((temps.max() ?? 40) / 2) * 2)
-        func trend(_ name: String, _ lower: Double, _ upper: Double, _ range: String, _ current: String, _ values: (ChartPoint) -> Double?) -> SystemTrend {
-            SystemTrend(name: name, rangeLabel: range, current: current, lower: lower, upper: upper,
-                points: points.compactMap { point in values(point).map { TrendValue(date: point.timestamp, value: $0) } })
+        func values(_ value: (ChartPoint) -> Double?) -> [TrendValue] {
+            points.compactMap { point in value(point).map { TrendValue(date: point.timestamp, value: $0) } }
         }
-        return [trend("CPU", 0, 100, "0–100%", snapshot?.cpuUsage.map { String(format: "%.0f%%", $0 * 100) } ?? "—", { $0.cpuUsage.map { $0 * 100 } }),
-            trend("内存", 0, max(1, total), String(format: "0–%.0f GB", total), snapshot?.memoryUsedBytes.map { String(format: "%.1f GB", Double($0) / 1_073_741_824) } ?? "—", { $0.memoryUsedBytes.map { Double($0) / 1_073_741_824 } }),
-            trend("整机功耗", 0, powerMax, String(format: "0–%.0f W", powerMax), snapshot?.battery.systemPowerWatts.map { String(format: "%.1f W", $0) } ?? "—", { $0.systemPowerWatts }),
-            trend("电池温度", minTemp, maxTemp, String(format: "%.0f–%.0f °C", minTemp, maxTemp), snapshot?.battery.temperatureCelsius.map { String(format: "%.1f °C", $0) } ?? "—", { $0.batteryTemperatureCelsius })]
+        func trend(_ kind: String, _ name: String, _ lower: Double, _ upper: Double, _ range: String, _ current: String, _ value: (ChartPoint) -> Double?) -> SystemTrend {
+            var trend = SystemTrend(name: name, rangeLabel: range, current: current, lower: lower, upper: upper, points: values(value))
+            trend.kind = kind
+            return trend
+        }
+        var temperature = trend("temperature", "温度", minTemp, maxTemp, String(format: "%.0f–%.0f °C", minTemp, maxTemp),
+            "SoC " + (snapshot?.sensors?.cpuAverageCelsius.map { String(format: "%.1f °C", $0) } ?? "—"), { $0.socTemperatureCelsius })
+        temperature.secondaryPoints = values { $0.batteryTemperatureCelsius }
+        temperature.secondaryCurrent = "电池 " + (snapshot?.battery.temperatureCelsius.map { String(format: "%.1f °C", $0) } ?? "—")
+        var rows = [trend("cpu", "CPU", 0, 100, "0–100%", snapshot?.cpuUsage.map { String(format: "%.0f%%", $0 * 100) } ?? "—", { $0.cpuUsage.map { $0 * 100 } }),
+            trend("memory", "内存", 0, max(1, total), String(format: "0–%.0f GB", total), snapshot?.memoryUsedBytes.map { String(format: "%.1f GB", Double($0) / 1_073_741_824) } ?? "—", { $0.memoryUsedBytes.map { Double($0) / 1_073_741_824 } }),
+            trend("power", "整机功耗", 0, powerMax, String(format: "0–%.0f W", powerMax), snapshot?.battery.systemPowerWatts.map { String(format: "%.1f W", $0) } ?? "—", { $0.systemPowerWatts }),
+            temperature]
+        // 本机报告没有风扇时不画风扇行；读不到时保留这一行，显示“—”。
+        if snapshot?.sensors?.fans != [] {
+            let knownMax = snapshot?.sensors?.leadingFan?.maxRPM ?? points.compactMap(\.fanMaxRPM).max()
+            let fanMax = knownMax ?? max(1000, ceil((points.compactMap(\.fanRPM).max() ?? 0) / 1000) * 1000)
+            let fanRange = knownMax == nil && !points.contains(where: { $0.fanRPM != nil }) ? "" : String(format: "0–%.0f rpm", fanMax)
+            var fan = trend("fan", "风扇", 0, fanMax, fanRange,
+                snapshot?.sensors?.leadingFan.map { String(format: "%.0f rpm", $0.rpm) } ?? "—", { $0.fanRPM })
+            fan.threshold = knownMax.map { $0 * configResult.config.fanHighFraction }
+            rows.append(fan)
+        }
+        return rows
     }
 }
 
@@ -89,7 +115,16 @@ struct DiagnosisCard: View {
 }
 struct SystemChartCard: View {
     @ObservedObject var state: PanelState
-    private let colors = [Design.blue, Design.purple, Design.teal, Design.pink]
+    static func color(_ kind: String) -> Color {
+        switch kind {
+        case "cpu": return Design.blue
+        case "memory": return Design.purple
+        case "power": return Design.teal
+        case "temperature": return Design.indigo
+        case "fan": return Design.brown
+        default: return Design.gray
+        }
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: Design.rowGap) {
             HStack {
@@ -98,15 +133,25 @@ struct SystemChartCard: View {
             }
             ForEach(state.systemTrends.indices, id: \.self) { index in
                 let trend = state.systemTrends[index]
+                let color = Self.color(trend.kind)
                 VStack(spacing: Design.smallGap) {
                     HStack(spacing: Design.gap) {
-                        Circle().fill(colors[index]).frame(width: Design.dot, height: Design.dot)
+                        HStack(spacing: Design.tightGap) {
+                            Circle().fill(color).frame(width: Design.dot, height: Design.dot)
+                            if trend.secondaryPoints != nil { Circle().fill(Design.pink).frame(width: Design.dot, height: Design.dot) }
+                        }
                         Text(trend.name).font(Design.body)
                         Text(trend.rangeLabel).font(Design.tiny).foregroundStyle(Design.secondary)
-                        Spacer(); Text(trend.current).font(Design.title).monospacedDigit()
+                        Spacer(minLength: Design.gap)
+                        if let secondary = trend.secondaryCurrent {
+                            Text(secondary).font(Design.tiny).foregroundStyle(Design.secondary).monospacedDigit().lineLimit(1)
+                        }
+                        Text(trend.current).font(Design.title).monospacedDigit().lineLimit(1)
                     }
                     MiniLineGraph(points: trend.points.map { GraphValue(date: $0.date, value: $0.value) }, domain: state.trendDomain,
-                        range: trend.lower...trend.upper, color: colors[index], fill: index == 1, warmPeriods: state.warmPeriods)
+                        range: trend.lower...trend.upper, color: color, fill: trend.kind == "memory", warmPeriods: state.warmPeriods,
+                        overlay: trend.secondaryPoints.map { values in [(values.map { GraphValue(date: $0.date, value: $0.value) }, Design.pink)] } ?? [],
+                        threshold: trend.threshold)
                 }
             }
             HStack {
@@ -116,7 +161,7 @@ struct SystemChartCard: View {
             }.font(Design.tiny).foregroundStyle(Design.secondary)
             HStack(alignment: .top, spacing: Design.smallGap) {
                 Rectangle().fill(Design.orange.opacity(Design.thermalFill)).frame(width: Design.legendDot, height: Design.legendDot).padding(.top, Design.tightGap)
-                Text(state.health.coolingHint ? "热状态 fair 已持续 \(Int(state.now().timeIntervalSince(state.fairSince ?? state.now()) / 60)) 分钟，达到‘建议降温’条件" : "热状态 fair 及以上的时段").fixedSize(horizontal: false, vertical: true)
+                Text(state.coolingLegend).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0); Text("同一时间轴 · 各自纵轴").fixedSize()
             }.font(Design.tiny).foregroundStyle(Design.secondary)
         }

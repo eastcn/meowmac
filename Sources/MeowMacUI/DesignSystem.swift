@@ -10,6 +10,7 @@ enum Design {
     static let cardRadius: CGFloat = 12, cardInset: CGFloat = 12, cardVertical: CGFloat = 10
     static let rule: CGFloat = 1, miniBar: CGFloat = 3, bar: CGFloat = 6, barRadius: CGFloat = 3
     static let tickWidth: CGFloat = 2, tickHeight: CGFloat = 12
+    static let sensorValueHeight: CGFloat = 22
     static let dot: CGFloat = 6, checkDot: CGFloat = 7, legendDot: CGFloat = 8
     static let tabHeight: CGFloat = 28, tabPadding: CGFloat = 3
     static let trendHeight: CGFloat = 26, cycleHeight: CGFloat = 56, columnHeight: CGFloat = 40
@@ -28,6 +29,7 @@ enum Design {
     static let body = Font.system(size: 13)
     static let status = Font.system(size: 15, weight: .semibold)
     static let metric = Font.system(size: 20, weight: .semibold)
+    static let sensorValue = Font.system(size: 17, weight: .semibold)
     static let amount = Font.system(size: 20, weight: .semibold)
     static let button = Font.system(size: 12)
     static let caption = Font.system(size: 11)
@@ -39,6 +41,7 @@ enum Design {
     static let teal = Color(nsColor: .systemTeal), pink = Color(nsColor: .systemPink)
     static let orange = Color(nsColor: .systemOrange), red = Color(nsColor: .systemRed)
     static let gray = Color(nsColor: .systemGray)
+    static let indigo = Color(nsColor: .systemIndigo), brown = Color(nsColor: .systemBrown)
     static let selection = Color(nsColor: .controlBackgroundColor)
     static let background = Color(nsColor: .windowBackgroundColor)
     static func provider(_ provider: QuotaProvider, style: StyleSettings = .default) -> Color { Color(nsColor: QuotaPalette.color(provider, style: style)) }
@@ -253,6 +256,10 @@ struct MiniLineGraph: View {
     var pace = false
     var now: Date? = nil
     var height = Design.trendHeight
+    /// 叠加在同一量程里的其他折线。
+    var overlay: [([GraphValue], Color)] = []
+    /// 虚线阈值。
+    var threshold: Double? = nil
     var body: some View {
         Canvas { context, size in
             let duration = max(1, domain.upperBound.timeIntervalSince(domain.lowerBound))
@@ -267,6 +274,17 @@ struct MiniLineGraph: View {
             if pace {
                 var guide = Path(); guide.move(to: CGPoint(x: 0, y: size.height)); guide.addLine(to: CGPoint(x: size.width, y: 0))
                 context.stroke(guide, with: .color(Design.red.opacity(Design.peakFill)), style: StrokeStyle(lineWidth: Design.rule, dash: [Design.smallGap, Design.smallGap]))
+            }
+            if let threshold {
+                var guide = Path(); guide.move(to: CGPoint(x: 0, y: y(threshold))); guide.addLine(to: CGPoint(x: size.width, y: y(threshold)))
+                context.stroke(guide, with: .color(Design.secondary.opacity(Design.peakFill)), style: StrokeStyle(lineWidth: Design.rule, dash: [Design.smallGap, Design.smallGap]))
+            }
+            for (values, lineColor) in overlay {
+                let visible = values.filter { domain.contains($0.date) }
+                guard let first = visible.first else { continue }
+                var path = Path(); path.move(to: CGPoint(x: x(first.date), y: y(first.value)))
+                for point in visible.dropFirst() { path.addLine(to: CGPoint(x: x(point.date), y: y(point.value))) }
+                context.stroke(path, with: .color(lineColor), style: StrokeStyle(lineWidth: Design.graphStroke, lineJoin: .round))
             }
             let visible = points.filter { domain.contains($0.date) }
             if let first = visible.first {

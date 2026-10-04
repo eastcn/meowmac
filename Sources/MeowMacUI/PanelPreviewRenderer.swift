@@ -20,7 +20,8 @@ public enum PanelPreviewRenderer {
                                           battery: BatteryMetrics(temperatureCelsius: 34 + cpu * 5,
                                                                   systemPowerWatts: 7 + cpu * 12),
                                           thermal: alert && index >= 25 || (25...30).contains(index) ? .fair : .nominal,
-                                          memoryUsedBytes: 11 * 1_073_741_824, memoryTotalBytes: 16 * 1_073_741_824, memoryPressurePercent: 55)
+                                          memoryUsedBytes: 11 * 1_073_741_824, memoryTotalBytes: 16 * 1_073_741_824, memoryPressurePercent: 55,
+                                          sensors: syntheticSensors(.idle, cpu: cpu))
             state.chartHistory.append(snapshot)
             state.snapshot = snapshot
         }
@@ -67,6 +68,73 @@ public enum PanelPreviewRenderer {
         state.lastCleaning = CleaningRecord(startedAt: now.addingTimeInterval(-172800), sizeDescription: "8.4 GB")
         state.lastRefreshedAt = now.addingTimeInterval(-60)
         return state
+    }
+
+    /// 设计稿 sensors.html 的六种状态，全部为虚构数据。
+    public enum SensorPreview: String, CaseIterable {
+        case idle, spinning, cooling, gpuMissing, noFan, unavailable
+    }
+
+    public static func syntheticSensors(_ variant: SensorPreview, cpu: Double) -> SensorReadings {
+        let average = 44 + cpu * 40, maxRPM = 6000.0
+        let rpm: Double
+        switch variant {
+        case .idle, .gpuMissing, .noFan, .unavailable: rpm = 0
+        case .spinning: rpm = 1500 + cpu * 2000
+        case .cooling: rpm = 4600 + cpu * 700
+        }
+        switch variant {
+        case .unavailable: return .unavailable("无法连接 SMC 传感器服务")
+        case .noFan:
+            return SensorReadings(cpuAverageCelsius: average, cpuMaxCelsius: average + 4.3, cpuSource: .smc, gpuAverageCelsius: average - 2.9, fans: [])
+        case .gpuMissing:
+            return SensorReadings(cpuAverageCelsius: average, cpuMaxCelsius: average + 4.8, cpuSource: .smc, gpuAverageCelsius: nil,
+                                  fans: [FanReading(rpm: rpm, maxRPM: maxRPM)])
+        default:
+            return SensorReadings(cpuAverageCelsius: average, cpuMaxCelsius: average + 5.3, cpuSource: .smc, gpuAverageCelsius: average - 3.4,
+                                  fans: [FanReading(rpm: rpm, maxRPM: maxRPM)])
+        }
+    }
+
+    /// 只替换传感器读数和对应的趋势历史，其余沿用正常合成状态。
+    public static func sensorState(_ variant: SensorPreview) -> PanelState {
+        let state = syntheticState()
+        let now = state.now()
+        var history = ChartHistory()
+        var latest: SystemSnapshot?
+        for index in 0..<60 {
+            let time = now.addingTimeInterval(Double(index - 59) * 60)
+            let ramp = Double(index) / 59
+            let cpu: Double
+            switch variant {
+            case .spinning: cpu = 0.45 + 0.4 * ramp
+            case .cooling: cpu = 0.85 + 0.08 * sin(Double(index) / 4)
+            default: cpu = 0.15 + 0.08 * sin(Double(index) / 5)
+            }
+            let snapshot = SystemSnapshot(timestamp: time, cpuUsage: cpu, memoryPressure: .normal, swapUsedBytes: 1024 * 1024 * 1024,
+                                          diskAvailableBytes: 120_000_000_000, diskTotalBytes: 500_000_000_000,
+                                          networkReceivedBytesPerSecond: 0, networkSentBytesPerSecond: 0,
+                                          battery: BatteryMetrics(temperatureCelsius: 31 + cpu * 6, systemPowerWatts: 6 + cpu * 30),
+                                          thermal: .nominal, memoryUsedBytes: 11 * 1_073_741_824, memoryTotalBytes: 16 * 1_073_741_824,
+                                          memoryPressurePercent: 55, sensors: syntheticSensors(variant, cpu: cpu))
+            history.append(snapshot)
+            latest = snapshot
+        }
+        state.chartHistory = history
+        state.snapshot = latest
+        if variant == .cooling { state.fanHighSince = now.addingTimeInterval(-360) }
+        return state
+    }
+
+    /// 系统趋势和传感器两块，用于逐张对照设计稿；材质沿用预览退路。
+    public static func sensorPNG(state: PanelState, dark: Bool) -> Data? {
+        let view = VStack(alignment: .leading, spacing: Design.sectionGap) {
+            SystemChartCard(state: state)
+            SectionRule()
+            SensorCard(state: state)
+        }.padding(.horizontal, Design.inset).padding(.vertical, Design.sectionGap).frame(width: Design.panelWidth)
+        let measure = NSHostingView(rootView: view)
+        return renderPNG(view, width: Design.panelWidth, height: ceil(measure.fittingSize.height), dark: dark)
     }
 
     public static func overviewPNG(alert: Bool, dark: Bool) -> Data? {

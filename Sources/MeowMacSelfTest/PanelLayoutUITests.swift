@@ -22,7 +22,7 @@ enum PanelLayoutUITests {
         do {
             let state = try prepare()
             guard Set(PanelCardRegistry.cards.keys) == Set(PanelLayoutCatalog.definitions.values.flatMap { $0.map(\.id) }),
-                  state.renderedCardIDs(for: .system) == ["system.chart", "system.energy", "system.disk"],
+                  state.renderedCardIDs(for: .system) == ["system.chart", "system.energy", "system.sensors", "system.disk"],
                   state.renderedCardIDs(for: .quota) == ["quota.trend", "quota.cost", "quota.storage"],
                   state.renderedCardIDs(for: .network) == ["network.checks", "network.sites", "network.egress"] else { return false }
             var changed = PanelLayout.default
@@ -32,7 +32,7 @@ enum PanelLayoutUITests {
             changed.cards["quota"]?[0].visible = false
             changed.cards["network"]?[0].visible = false
             try state.saveLayout(changed, for: "builtin.slim")
-            guard state.renderedCardIDs(for: .system) == ["system.energy", "system.chart"],
+            guard state.renderedCardIDs(for: .system) == ["system.sensors", "system.energy", "system.chart"],
                   state.renderedCardIDs(for: .quota) == ["quota.cost", "quota.trend"],
                   state.renderedCardIDs(for: .network) == ["network.sites", "network.checks"] else { return false }
             let snapshot = PanelSnapshot(state: state)
@@ -57,7 +57,7 @@ enum PanelLayoutUITests {
             var hidden = PanelLayout.default
             hidden.cards["system"]?[1].visible = false
             try alert.saveLayout(hidden, for: "builtin.slim")
-            return alert.renderedCardIDs(for: .system) == ["system.chart", "system.disk"] && !alert.diagnosisRows.isEmpty
+            return alert.renderedCardIDs(for: .system) == ["system.chart", "system.sensors", "system.disk"] && !alert.diagnosisRows.isEmpty
         } catch { print("面板布局渲染测试失败：\(error)"); return false }
     }
 
@@ -72,11 +72,13 @@ enum PanelLayoutUITests {
             state.selectedTab = .system
             let normal = try await PanelPreviewRenderer.settleLayout(controller)
             guard abs(normal.width - 360) < 0.5, normal.height <= 820,
-                  abs(normal.height - measurements.fixedHeight - measurements.contentHeight) < 0.5 else { return false }
+                  abs(normal.height - measurements.fixedHeight - measurements.viewportHeight) < 0.5,
+                  (measurements.cardBottoms["system.energy"] ?? .infinity) <= measurements.viewportHeight else { return false }
             var extreme = PanelLayout.default
             extreme.tabs.reverse()
-            extreme.cards["system"] = [extreme.placements(for: .system)[2],
+            extreme.cards["system"] = [extreme.placements(for: .system)[3],
                                       extreme.placements(for: .system)[0],
+                                      PanelCardPlacement(id: "system.sensors", visible: false),
                                       PanelCardPlacement(id: "system.energy", visible: false)]
             extreme.cards["quota"] = extreme.placements(for: .quota).map { PanelCardPlacement(id: $0.id, visible: false) }
             extreme.cards["network"] = extreme.placements(for: .network).map { PanelCardPlacement(id: $0.id, visible: false) }

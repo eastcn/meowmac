@@ -8,7 +8,7 @@
 
 | 标签页 | 功能块 id 与默认顺序 | 可隐藏 |
 | --- | --- | --- |
-| 系统 | `system.chart`、`system.energy`、`system.disk` | 后两项 |
+| 系统 | `system.chart`、`system.energy`、`system.sensors`、`system.disk` | 后三项 |
 | 额度 | `quota.trend`、`quota.cost`、`quota.storage` | 全部 |
 | 网络 | `network.checks`、`network.sites`、`network.egress` | 全部 |
 
@@ -58,7 +58,9 @@ v1 读取后在内存中补上此默认总览条。仅显式保存时才写成 v
 
 所有对象严格检查字段；版本是有限整数，布尔值不能代替版本。`visible` 必须是 JSON 布尔值。
 
-`tabs` 必须是三个标签页的完整排列。`cards` 恰好包含三个标签页；每个数组必须是该页三个 id 的完整排列。拒绝缺项、重复、未知 id、跨页 id 和错误类型。`system.chart.visible` 必须为 `true`。不接受空页数组，也不接受脚本、数据源、路径或健康阈值字段。
+`tabs` 必须是三个标签页的完整排列。`cards` 恰好包含三个标签页；每个数组必须是该页全部 id 的完整排列（系统页四个，额度页和网络页各三个）。拒绝缺项、重复、未知 id、跨页 id 和错误类型。
+
+v0.3 新增 `system.sensors`（2026-10-04）。读取本机布局或猫包 `panel` 时，如果系统页恰好只缺这一项、其余三项合法，就把它以可见状态插到 `system.disk` 之前，其余顺序和显隐不变；版本号不变。缺其他项仍按无效处理。写入时一律包含完整四项，旧版 MeowMac 读不了新写入的文件。`system.chart.visible` 必须为 `true`。不接受空页数组，也不接受脚本、数据源、路径或健康阈值字段。
 
 网络或额度的三个可选块全部隐藏是合法布局；固定内容仍显示。标签页不能隐藏，页内不能跨页拖动。
 

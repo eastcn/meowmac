@@ -79,6 +79,7 @@ enum SelfTestMain {
         ]
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }
         for test in SensorTests.tests { tests.append((test.0, { test.1() })) }
+        for test in SensorUITests.tests { tests.append((test.0, { test.1() })) }
         for test in ReminderTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         tests.append(("UI.ReminderStore/重载坏文件与安全写入", { (try? ReminderTests.storage()) ?? false }))
         tests.append(("UI.Reminders/动作重载到期与详情定位", { ReminderUITests.lifecycle() }))

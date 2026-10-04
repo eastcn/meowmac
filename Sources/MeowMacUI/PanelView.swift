@@ -48,6 +48,7 @@ public enum PanelCardRegistry {
                 switch definition.id {
                 case "system.chart": return AnyView(SystemChartCard(state: state))
                 case "system.energy": return AnyView(EnergyCard(state: state))
+                case "system.sensors": return AnyView(SensorCard(state: state))
                 case "system.disk": return AnyView(DiskCard(state: state))
                 case "quota.trend": return AnyView(QuotaTrendView(state: state, provider: state.selectedProvider))
                 case "quota.cost":
@@ -79,6 +80,8 @@ public final class PanelState: ObservableObject {
     @Published public var networkTone: NetworkTone = .gray { didSet { refreshReminders() } }
     @Published public var failures: [String: Int] = [:] { didSet { refreshReminders() } }
     @Published public var fairSince: Date? { didSet { refreshReminders() } }
+    /// 风扇转速开始持续超过阈值的时刻（D14）。
+    @Published public var fanHighSince: Date? { didSet { refreshReminders() } }
     @Published public var configResult: ConfigLoadResult
     @Published public var lastRefreshedAt: Date?
     @Published public var selectedTab: PanelTab = .system
@@ -301,7 +304,7 @@ public struct PanelView: View {
                 let ids = state.renderedCardIDs(for: .system)
                 ForEach(Array(ids.enumerated()), id: \.element) { index, id in
                     if index > 0 { SectionRule() }
-                    PanelCardRegistry.cards[id]?.makeView(state: state)
+                    PanelCardRegistry.cards[id]?.makeView(state: state).measureCardBottom(id)
                 }
             case .quota:
                 QuotaPage(state: state)
@@ -360,7 +363,8 @@ public struct PanelView: View {
                     SnoozeForm(state: state, reminder: reminder).id(id)
                 } else { ReminderList(state: state) }
             } else { tabContent }
-        }.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.content)
+        }.fixedSize(horizontal: false, vertical: true).coordinateSpace(name: PanelCardBottomKey.space).measurePanelHeight(.content)
+            .onPreferenceChange(PanelCardBottomKey.self) { measurements.updateCards($0) }
     }
 }
 
@@ -371,7 +375,20 @@ private struct PanelHeightKey: PreferenceKey {
         value.merge(nextValue()) { _, new in new }
     }
 }
+/// 功能块底边在标签页内容里的位置，用来核对首屏能看到哪些块。
+private struct PanelCardBottomKey: PreferenceKey {
+    static let space = "panelContent"
+    static let defaultValue: [String: CGFloat] = [:]
+    static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
 private extension View {
+    func measureCardBottom(_ id: String) -> some View {
+        background(GeometryReader { proxy in
+            Color.clear.preference(key: PanelCardBottomKey.self, value: [id: proxy.frame(in: .named(PanelCardBottomKey.space)).maxY])
+        })
+    }
     func measurePanelHeight(_ part: PanelPart) -> some View {
         background(GeometryReader { proxy in Color.clear.preference(key: PanelHeightKey.self, value: [part: proxy.size.height]) })
     }
@@ -382,6 +399,8 @@ public final class PanelMeasurements: ObservableObject {
     @Published public private(set) var headerHeight: CGFloat = 0
     @Published public private(set) var footerHeight: CGFloat = 0
     @Published public private(set) var contentHeight: CGFloat = 0
+    /// 系统页各功能块底边距内容顶部的距离。
+    @Published public private(set) var cardBottoms: [String: CGFloat] = [:]
     public init() {}
     public var fixedHeight: CGFloat { headerHeight + footerHeight }
     public var viewportHeight: CGFloat { min(contentHeight, max(0, Design.panelHeight - fixedHeight)) }
@@ -391,6 +410,10 @@ public final class PanelMeasurements: ObservableObject {
         if let height = values[.header], abs(height - headerHeight) > 0.01 { headerHeight = height }
         if let height = values[.footer], abs(height - footerHeight) > 0.01 { footerHeight = height }
         if let height = values[.content], abs(height - contentHeight) > 0.01 { contentHeight = height }
+    }
+
+    fileprivate func updateCards(_ values: [String: CGFloat]) {
+        if values != cardBottoms { cardBottoms = values }
     }
 }
 
