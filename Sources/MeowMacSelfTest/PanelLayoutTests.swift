@@ -38,7 +38,7 @@ enum PanelLayoutTests {
             let error = try await PanelPreviewRenderer.settleLayout(controller)
             guard error.height < short.height else { return false }
             state.selectedTab = .system
-            _ = try await PanelPreviewRenderer.settleLayout(controller)
+            let normal = try await PanelPreviewRenderer.settleLayout(controller)
             let header = measurements.headerHeight
             let alert = PanelPreviewRenderer.syntheticState(alert: true)
             state.energy = alert.energy; state.snapshot = alert.snapshot; state.fairSince = alert.fairSince
@@ -48,7 +48,7 @@ enum PanelLayoutTests {
             let alertBottoms = measurements.cardBottoms
             print("合成提醒系统功能块底边：\(alertBottoms.sorted { $0.value < $1.value }.map { "\($0.key)=\($0.value)" })，可视 \(measurements.viewportHeight)")
             guard let alertEnergy = alertBottoms["system.energy"], alertEnergy <= measurements.viewportHeight else { return false }
-            return measurements.contentHeight > normalContent && warning.height <= 820 && measurements.headerHeight > header
+            return warning.height > normal.height && measurements.contentHeight > normalContent && warning.height <= 820 && measurements.headerHeight > header
         } catch { print("面板尺寸验证失败：\(error)"); return false }
     }
 }

@@ -70,7 +70,7 @@ public enum PanelPreviewRenderer {
         return state
     }
 
-    /// 设计稿 sensors.html 的六种状态，全部为虚构数据。
+    /// 传感器的六种状态（沿用 sensors.html 的状态划分，界面以 system-tab-redesign.html 方案 A 为准），全部为虚构数据。
     public enum SensorPreview: String, CaseIterable {
         case idle, spinning, cooling, gpuMissing, noFan, unavailable
     }

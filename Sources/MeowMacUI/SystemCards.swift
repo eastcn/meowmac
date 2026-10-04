@@ -179,7 +179,7 @@ struct SystemChartCard: View {
             HStack(alignment: .top, spacing: Design.smallGap) {
                 Rectangle().fill(Design.orange.opacity(Design.thermalFill)).frame(width: Design.legendDot, height: Design.legendDot).padding(.top, Design.tightGap)
                 Text(state.coolingLegend).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0); Text("同一时间轴 · 各自纵轴").fixedSize()
+                Spacer(minLength: 0); Text("同一时间轴").fixedSize()
             }.font(Design.tiny).foregroundStyle(Design.secondary)
         }
     }

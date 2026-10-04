@@ -3,10 +3,12 @@ import Darwin
 import MeowMacCore
 
 public enum EnergySampler {
-    public static func processes(rawOutput: ((Data) -> Void)? = nil) throws -> [ProcessEnergy] {
+    /// - Parameter window: 两次采样的间隔，第二次采样的 CPU 是这段时间的平均值。
+    ///   判定持续高占用时必须传入完整的采样间隔，1 秒的窗口抓不到整分钟的负载。
+    public static func processes(window: TimeInterval = 1, rawOutput: ((Data) -> Void)? = nil) throws -> [ProcessEnergy] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/top")
-        process.arguments = ["-l", "2", "-s", "1", "-o", "power", "-n", "10", "-stats", "pid,command,cpu,power"]
+        process.arguments = ["-l", "2", "-s", String(Int(window.rounded())), "-o", "power", "-n", "10", "-stats", "pid,command,cpu,power"]
         let output = Pipe()
         process.standardOutput = output
         process.standardError = Pipe()

@@ -62,24 +62,47 @@ public struct EnergyDiagnosis: Codable {
     }
 }
 
+/// 失控进程和内存压力的持续判定。
+///
+/// 每次判定的 CPU 必须是覆盖整个采样间隔的平均值（`top -s` 的第二次采样就是），
+/// 瞬时值会让每分钟一次的短峰反复撞上采样点。相邻两次判定的间隔超过
+/// 采样间隔的 2.5 倍（休眠、采样失败、应用暂停）时，已累计的时长清零，
+/// 因为断档里没有观测，不能当作持续高占用。
 public struct EnergyTracker {
     private var aboveSince: [Int32: Date] = [:]
     private var pressureSince: Date?
+    private var lastWindowEnd: Date?
 
     public init() {}
 
+    /// - Parameter coverage: 这次 CPU 数据覆盖的时长，默认等于 `processSampleSeconds`。
+    ///   短于采样间隔一半的样本（启动、手动刷新）只更新排行，不影响持续时长。
     public mutating func evaluate(processes: [ProcessEnergy], assertions: [SleepAssertion] = [],
-                                  pressure: MemoryPressure, now: Date, config: LocalConfig) -> EnergyDiagnosis {
+                                  pressure: MemoryPressure, now: Date, config: LocalConfig,
+                                  coverage: TimeInterval? = nil) -> EnergyDiagnosis {
+        let window = coverage ?? config.processSampleSeconds
+        guard window >= config.processSampleSeconds / 2 else {
+            return diagnosis(processes: processes, now: now, config: config)
+        }
+        if let last = lastWindowEnd, now.timeIntervalSince(last) > config.processSampleSeconds * 2.5 {
+            aboveSince.removeAll()
+            pressureSince = nil
+        }
+        lastWindowEnd = now
         let currentPIDs = Set(processes.map(\.pid))
         aboveSince = aboveSince.filter { currentPIDs.contains($0.key) }
         for process in processes {
             if process.cpuPercent >= config.runawayCPU {
-                if aboveSince[process.pid] == nil { aboveSince[process.pid] = now }
+                if aboveSince[process.pid] == nil { aboveSince[process.pid] = now.addingTimeInterval(-window) }
             } else { aboveSince.removeValue(forKey: process.pid) }
         }
         if pressure.isElevated {
             if pressureSince == nil { pressureSince = now }
         } else { pressureSince = nil }
+        return diagnosis(processes: processes, now: now, config: config)
+    }
+
+    private func diagnosis(processes: [ProcessEnergy], now: Date, config: LocalConfig) -> EnergyDiagnosis {
         let runaway = processes.filter { process in
             guard let since = aboveSince[process.pid] else { return false }
             return now.timeIntervalSince(since) >= config.runawaySeconds

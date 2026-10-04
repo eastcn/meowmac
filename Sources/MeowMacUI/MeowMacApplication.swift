@@ -25,7 +25,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var frame = 0
     private var frameInterval = 0.5
     private var sampleTimer: Timer?
-    private var energyTimer: Timer?
+    private var energyLoop: Task<Void, Never>?
+    private var energyGeneration = 0
     private var frameTimer: Timer?
     private var screenSleeping = false
     private var observers: [NSObjectProtocol] = []
@@ -93,9 +94,6 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         sampleTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.sample() }
         }
-        energyTimer = Timer.scheduledTimer(withTimeInterval: configResult.config.processSampleSeconds, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.sampleEnergy() }
-        }
         observers.append(NotificationCenter.default.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification,
                                                                object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in self?.sample(thermalChanged: true) }
@@ -103,6 +101,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         sample()
         updateCleaningHistory()
         sampleEnergy()
+        startEnergyLoop()
         scheduleFrame()
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
@@ -117,7 +116,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.panelState.refreshReminders(); self?.sample(); self?.sampleEnergy() }
+            Task { @MainActor [weak self] in self?.panelState.refreshReminders(); self?.sample(); self?.sampleEnergy(); self?.startEnergyLoop() }
         })
     }
 
@@ -147,26 +146,55 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         frameInterval = panelState.catDisplay().frameInterval
     }
 
+    /// 立即采样一次，窗口只有 1 秒，只刷新排行，不计入持续时长。
     private func sampleEnergy() {
         Task.detached { [weak self] in
             do {
                 let processes = try EnergySampler.processes()
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    let sampledAt = Date()
-                    self.panelState.energyUpdatedAt = sampledAt
-                    self.panelState.energy = self.energyTracker.evaluate(processes: processes,
-                        pressure: self.snapshot?.memoryPressure ?? .unavailable, now: sampledAt, config: self.configResult.config)
-                    self.panelState.failures["energy"] = 0
-                }
+                await MainActor.run { [weak self] in self?.applyEnergy(processes, coverage: 1) }
             } catch {
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.panelState.failures["energy", default: 0] += 1
-                    self.logger.error("能耗采样失败：\(error.localizedDescription, privacy: .private)")
+                await MainActor.run { [weak self] in self?.energyFailed(error) }
+            }
+        }
+    }
+
+    /// 首尾相接地采样：每次 `top` 的窗口就是一个完整的采样间隔，
+    /// 所以持续高占用的判定覆盖了整段时间。唤醒后重启，丢弃跨越休眠的那一次。
+    private func startEnergyLoop() {
+        energyLoop?.cancel()
+        energyGeneration += 1
+        let generation = energyGeneration
+        let window = configResult.config.processSampleSeconds
+        energyLoop = Task.detached { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    let processes = try EnergySampler.processes(window: window)
+                    await MainActor.run { [weak self] in
+                        guard let self, self.energyGeneration == generation else { return }
+                        self.applyEnergy(processes, coverage: window)
+                    }
+                } catch {
+                    await MainActor.run { [weak self] in
+                        guard let self, self.energyGeneration == generation else { return }
+                        self.energyFailed(error)
+                    }
+                    try? await Task.sleep(nanoseconds: UInt64(min(window, 30) * 1_000_000_000))
                 }
             }
         }
+    }
+
+    private func applyEnergy(_ processes: [ProcessEnergy], coverage: TimeInterval) {
+        let sampledAt = Date()
+        panelState.energyUpdatedAt = sampledAt
+        panelState.energy = energyTracker.evaluate(processes: processes,
+            pressure: snapshot?.memoryPressure ?? .unavailable, now: sampledAt, config: configResult.config, coverage: coverage)
+        panelState.failures["energy"] = 0
+    }
+
+    private func energyFailed(_ error: Error) {
+        panelState.failures["energy", default: 0] += 1
+        logger.error("能耗采样失败：\(error.localizedDescription, privacy: .private)")
     }
 
     @objc private func togglePopover() {
@@ -292,7 +320,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
 
     public func applicationWillTerminate(_ notification: Notification) {
         sampleTimer?.invalidate()
-        energyTimer?.invalidate()
+        energyLoop?.cancel()
         networkBridge?.stop()
         quotaCoordinator?.stop()
         resetCoordinator?.stop()

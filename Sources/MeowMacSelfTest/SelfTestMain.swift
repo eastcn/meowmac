@@ -31,7 +31,12 @@ enum SelfTestMain {
             }),
             ("System.Live/系统采样", { SelfTestMain.liveSystem() }),
             ("Core.Energy/top 第二次采样", { SelfTestMain.topParser() }),
-            ("Core.Energy/失控进程时间线", { SelfTestMain.runawayTimeline() }),
+            ("Core.Energy/持续高占用到 10 分钟告警", { EnergyTrackerTests.sustainedAlerts() }),
+            ("Core.Energy/每分钟短峰不告警", { EnergyTrackerTests.periodicSpikeIgnored() }),
+            ("Core.Energy/回落、消失后重新计时", { EnergyTrackerTests.dropResetsStreak() }),
+            ("Core.Energy/采样断档后重新计时", { EnergyTrackerTests.gapResetsStreak() }),
+            ("Core.Energy/短窗口样本不改变持续时长", { EnergyTrackerTests.shortSampleKeepsStreak() }),
+            ("Core.Energy/内存压力断档后重新计时", { EnergyTrackerTests.pressureGapResets() }),
             ("Core.Energy/忽略三小时休眠断言", { MemoryTests.ignoredAssertions() }),
             ("System.Metrics/活动监视器内存口径", { MemoryTests.usage() }),
             ("UI.System/内存压力百分比", { MemoryTests.pressure() }),
@@ -285,20 +290,6 @@ enum SelfTestMain {
         let text = "PID    COMMAND          %CPU POWER\n1 First 99.0 99.0\n\nPID    COMMAND          %CPU POWER\n42 VeryLongProcessN 91.0 12.0\n43 Example Helper 10.0 5.0\n"
         let values = TopParser.secondSample(text)
         return values?.count == 2 && values?[0].pid == 42 && values?[0].name == "VeryLongProcessN" && values?[1].name == "Example Helper"
-    }
-
-    private static func runawayTimeline() -> Bool {
-        let start = Date(timeIntervalSince1970: 1_000_000)
-        let high = ProcessEnergy(pid: 42, name: "Example", cpuPercent: 95, impact: 2)
-        let low = ProcessEnergy(pid: 42, name: "Example", cpuPercent: 20, impact: 1)
-        let config = LocalConfig()
-        var tracker = EnergyTracker()
-        guard tracker.evaluate(processes: [high], assertions: [], pressure: .warn, now: start, config: config).runaway.isEmpty,
-              tracker.evaluate(processes: [high], assertions: [], pressure: .warn, now: start.addingTimeInterval(600), config: config).runawayDurations[42] == 600,
-              tracker.evaluate(processes: [low], assertions: [], pressure: .normal, now: start.addingTimeInterval(660), config: config).runaway.isEmpty,
-              tracker.evaluate(processes: [high], assertions: [], pressure: .normal, now: start.addingTimeInterval(720), config: config).runaway.isEmpty,
-              tracker.evaluate(processes: [], assertions: [], pressure: .normal, now: start.addingTimeInterval(800), config: config).runaway.isEmpty else { return false }
-        return tracker.evaluate(processes: [high], assertions: [], pressure: .normal, now: start.addingTimeInterval(1_300), config: config).runaway.isEmpty
     }
 
     private static func liveEnergy() -> Bool {
