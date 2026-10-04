@@ -38,6 +38,21 @@ enum NotificationUITests {
             + observe("203.0.113.3", "JP", 900)
     }
 
+    /// 新 IP 查不到地区时，正文不写地区，也不借用旧 IP 的地区。
+    static func geoMissing(_ alert: EgressAlert) -> Bool {
+        guard let root = try? temporaryRoot() else { return false }
+        defer { try? FileManager.default.removeItem(at: root) }
+        func observation(_ ip: String, _ geo: String?, _ offset: TimeInterval) -> EgressObservation {
+            let at = now.addingTimeInterval(offset)
+            return EgressObservation(result: EgressIPResult(target: .cloudflare, checkedAt: at, ip: ip, ipVersion: .ipv4, location: nil, failure: nil),
+                                     geo: geo.map { EgressGeo(ip: ip, countryCode: $0, checkedAt: at) })
+        }
+        var sent: [SystemNotice] = []
+        let coordinator = NotificationCoordinator(store: NotificationStore(rootURL: root)) { sent.append($0) }
+        coordinator.process(alert, history: [observation("203.0.113.1", "JP", 0), observation("203.0.113.2", nil, 300)], redact: { $0 })
+        return sent.map(\.body) == ["\(EgressIPTarget.cloudflare.displayName)（\(EgressIPTarget.cloudflare.host)）"]
+    }
+
     /// 记录 TunCanary 经注入接口发起的调用。
     final class SpyNotifier: UserNotifying {
         var requests = 0, statusCalls = 0, delivered = 0
@@ -139,6 +154,7 @@ enum NotificationUITests {
                 && subtitles == ["出口 IP 已变化", "出口地域超出允许范围", "出口 IP 已变化"]
                 && sent[1].sound && !sent[0].sound && sent.allSatisfy { $0.tab == .network }
                 && sent.map(\.body) == [prefix + "美国", prefix + "美国", prefix + "日本"]
+                && geoMissing(run[0].0)
         }),
         ("UI.Notifications/网络接管：注入通知器、出口告警改道、故障走提醒", {
             guard let root = try? temporaryRoot() else { return false }

@@ -107,6 +107,27 @@ enum NotificationTests {
                             (7320, [network(level: .severe)])], records: &records)
             return sent == [["network.group.overseas"], [], [], ["network.group.overseas"]]
         }),
+        ("Core.Notifications/静默重现后升级仍守严重档冷却", {
+            var records: [String: NotifiedRecord] = [:]
+            // 严重 → 恢复 → 提醒档重现（不发）→ 2 分钟后升严重：离恢复不满 10 分钟，不发。
+            let flapping = run([(0, [network(level: .severe)]), (60, []), (120, [network(level: .warn)]),
+                                (180, [network(level: .severe)])], records: &records)
+            records = [:]
+            // 同样的过程，升严重时离恢复已满 10 分钟，发。
+            let later = run([(0, [network(level: .severe)]), (60, []), (120, [network(level: .warn)]),
+                             (660, [network(level: .severe)])], records: &records)
+            return flapping == [["network.group.overseas"], [], [], []] && later == [["network.group.overseas"], [], [], ["network.group.overseas"]]
+        }),
+        ("Core.Notifications/长期既不出现也未确认的记录按恢复处理", {
+            var records: [String: NotifiedRecord] = [:]
+            _ = run([(0, [disk()])], records: &records)
+            func absent(_ offset: TimeInterval) -> [String: NotifiedRecord] {
+                NotificationDecider.decide(reminders: [], isSnoozed: { _ in false }, records: records,
+                                           settings: NotificationSettings(), now: now.addingTimeInterval(offset),
+                                           confirmsRecovery: { _ in false }).records
+            }
+            return absent(86399)["disk.system"]?.recoveredAt == nil && absent(86400)["disk.system"]?.recoveredAt != nil
+        }),
         ("Core.Notifications/没有检测结果时不算恢复", {
             var records: [String: NotifiedRecord] = [:]
             _ = run([(0, [disk()])], records: &records)

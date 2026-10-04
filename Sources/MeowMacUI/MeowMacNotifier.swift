@@ -109,11 +109,13 @@ public final class NotificationCoordinator {
     }
 
     /// TunCanary 的出口告警：IP 变化和地域超出范围发通知，地域恢复不发。
-    /// IP 变化的告警不带地区，从出口历史里取同一目标、同一 IP 的最近地区。
+    /// IP 变化的告警不带地区，取该目标最新一条成功观测的地区；那条没有地区（查询失败或被限流）就不写，
+    /// 不借用旧 IP 的地区。
     public func process(_ alert: EgressAlert, history: [EgressObservation] = [], redact: (String) -> String) {
         guard alert.kind != .regionRecovered, settings.allows(.egress) else { return }
-        let latest = history.last { $0.result.target == alert.target && $0.result.isSuccess && $0.geo?.ip == $0.result.ip }
-        let place = (alert.countryCode ?? latest?.geo?.countryCode).map(EgressRegions.name) ?? ""
+        let latest = history.last { $0.result.target == alert.target && $0.result.isSuccess }
+        let latestCountry = latest.flatMap { $0.geo?.ip == $0.result.ip ? $0.geo?.countryCode : nil }
+        let place = (alert.countryCode ?? latestCountry).map(EgressRegions.name) ?? ""
         let body = redact("\(alert.target.displayName)（\(alert.target.host)）" + (place.isEmpty ? "" : "：" + place))
         let violation = alert.kind == .regionViolation
         send(SystemNotice(key: "egress." + (violation ? "region" : "ip"), tab: .network,
