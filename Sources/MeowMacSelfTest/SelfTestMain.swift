@@ -91,6 +91,8 @@ enum SelfTestMain {
             ("Core.Quota/花费与会话", { SelfTestMain.costAndSessions() }),
             ("Core.Quota/调度", { SelfTestMain.quotaSchedule() }),
             ("Core.Quota/历史保留", { SelfTestMain.quotaHistory() }),
+            ("System.Cleaning/路径优先与自定义失败", { CleaningTests.paths() }),
+            ("System.Cleaning/可执行检查与缺失历史", { CleaningTests.filesAndHistory() }),
             ("Core.System/mo 清理历史", { SelfTestMain.moHistory() }),
         ]
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }

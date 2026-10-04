@@ -224,7 +224,7 @@ struct DiskCard: View {
                     Text(String(format: "共 %.0f GB", Double(total) / 1_000_000_000))
                 }.font(Design.caption).foregroundStyle(Design.secondary)
             }
-            Text(state.lastCleaning.map { "上次清理：" + DisplayDate.format($0.startedAt, pattern: "M 月 d 日") + " · 释放 " + $0.sizeDescription } ?? "暂无清理记录").font(Design.caption).foregroundStyle(Design.secondary)
+            Text(state.cleaningHistoryMessage ?? state.lastCleaning.map { "上次清理：" + DisplayDate.format($0.startedAt, pattern: "M 月 d 日") + " · 释放 " + $0.sizeDescription } ?? "暂无清理记录").font(Design.caption).foregroundStyle(Design.secondary)
         }
     }
 }

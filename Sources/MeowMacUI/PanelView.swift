@@ -97,6 +97,7 @@ public final class PanelState: ObservableObject {
     @Published public var networkHistory = NetworkHistory()
     @Published public var networkRange: NetworkTrendRange = .hour
     public var networkCapture: NetworkCaptureInfo?
+    @Published public var cleaningHistoryMessage: String?
     @Published public var lastCleaning: CleaningRecord?
     @Published public var selectedCat: LoadedCat? = CatPackageLoader.defaultCat
     public var catStore: CatStore?

@@ -231,8 +231,19 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     }
 
     private func updateCleaningHistory() {
-        do { panelState.lastCleaning = try MoHistoryReader.latest(executable: configResult.config.moPath) }
-        catch { logger.error("清理历史读取失败：\(error.localizedDescription, privacy: .private)") }
+        do {
+            switch try MoHistoryReader.read(configuredPath: configResult.config.moPath) {
+            case .notInstalled:
+                panelState.lastCleaning = nil
+                panelState.cleaningHistoryMessage = "未找到 Mole · 清理需要先安装"
+            case .available(let record):
+                panelState.lastCleaning = record
+                panelState.cleaningHistoryMessage = nil
+            }
+        } catch {
+            panelState.cleaningHistoryMessage = "清理记录读取失败"
+            logger.error("清理历史读取失败：\(error.localizedDescription, privacy: .private)")
+        }
     }
 
     private func openConfig() {

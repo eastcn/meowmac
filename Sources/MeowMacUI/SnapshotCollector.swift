@@ -62,8 +62,15 @@ public enum SnapshotCollector {
             do { state.localStorage[provider] = try await Task.detached { try LocalStorageCollector.scan(directory: url, provider: provider) }.value }
             catch { logger.error("快照存储统计失败：\(error.localizedDescription, privacy: .private)") }
         }
-        do { state.lastCleaning = try MoHistoryReader.latest(executable: config.moPath) }
-        catch { logger.error("快照清理历史失败：\(error.localizedDescription, privacy: .private)") }
+        do {
+            switch try MoHistoryReader.read(configuredPath: config.moPath) {
+            case .notInstalled: state.cleaningHistoryMessage = "未找到 Mole · 清理需要先安装"
+            case .available(let record): state.lastCleaning = record
+            }
+        } catch {
+            state.cleaningHistoryMessage = "清理记录读取失败"
+            logger.error("快照清理历史失败：\(error.localizedDescription, privacy: .private)")
+        }
         let networkHistoryDirectory = rawDirectory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/acceptance", isDirectory: true)
         try FileManager.default.createDirectory(at: networkHistoryDirectory, withIntermediateDirectories: true)
         let networkHistory = networkHistoryDirectory.appendingPathComponent("snapshot-egress-\(UUID().uuidString).json")
