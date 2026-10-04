@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>传感器 · v0.3 设计稿</title>
+<style>
+:root{--bg:#ececee;--text:#1d1d1f;--sub:#6e6e73;--card:rgba(255,255,255,.62);--rule:rgba(0,0,0,.08);--glass:linear-gradient(160deg,#dfe6ee,#efe9e2);
+--blue:#007AFF;--purple:#AF52DE;--teal:#30B0C7;--pink:#FF2D55;--indigo:#5856D6;--brown:#A2845E;--orange:#FF9500;--orangeText:#C93400;--band:rgba(255,149,0,.16)}
+.dark{--text:#f5f5f7;--sub:#98989d;--card:rgba(44,44,46,.62);--rule:rgba(255,255,255,.1);--glass:linear-gradient(160deg,#1f2630,#2b2622);
+--blue:#0A84FF;--purple:#BF5AF2;--teal:#40C8E0;--pink:#FF375F;--indigo:#5E5CE6;--brown:#AC8E68;--orange:#FF9F0A;--orangeText:#FF9F0A;--band:rgba(255,159,10,.2)}
+*{box-sizing:border-box}
+body{margin:0;padding:32px;background:#d9d9de;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;-webkit-font-smoothing:antialiased}
+header{max-width:1140px;margin:0 auto 24px}h1{font-size:22px;margin:0 0 8px}header p{font-size:13px;color:#55555a;margin:4px 0;line-height:1.7}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,360px);gap:24px;justify-content:center;max-width:1140px;margin:0 auto}
+.sample{width:360px}.sample h2{font-size:12px;font-weight:600;color:#55555a;margin:0 0 8px}
+.panel{background:var(--glass);color:var(--text);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border-radius:12px;padding:12px}
+.title{font-size:13px;font-weight:600}.tiny{font-size:10px;color:var(--sub)}.caption{font-size:11px;color:var(--sub)}
+.head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.col .name{font-size:11px;color:var(--sub);margin-bottom:2px}.col .val{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.col .val small{font-size:11px;font-weight:500;margin-left:2px}.col .sub{font-size:10px;color:var(--sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.col.warn .val,.col.warn .sub{color:var(--orangeText)}.col.na .val{color:var(--sub);font-weight:500;font-size:13px;line-height:23px}
+.foot{border-top:1px solid var(--rule);margin-top:10px;padding-top:8px}
+.row{margin-bottom:8px}.rowhead{display:flex;align-items:center;gap:6px;font-size:12px}
+.dot{width:6px;height:6px;border-radius:3px;display:inline-block}.rowhead .cur{margin-left:auto;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.rowhead .cur span{font-size:10px;font-weight:400;color:var(--sub);margin-right:4px}
+svg{display:block;width:100%;height:26px;margin-top:3px}
+.axis{display:flex;justify-content:space-between}.legend{display:flex;gap:6px;align-items:flex-start;margin-top:6px}
+.legend i{width:8px;height:8px;background:var(--band);flex:none;margin-top:2px}.legend .r{margin-left:auto;white-space:nowrap}
+.note{max-width:1140px;margin:28px auto 0;font-size:13px;color:#55555a;line-height:1.8}
+.note code{background:rgba(0,0,0,.06);padding:1px 4px;border-radius:4px}
+@media(max-width:420px){body{padding:16px}.grid{grid-template-columns:1fr}.sample{width:100%}}
+</style>
+<header>
+<h1>传感器（v0.3）</h1>
+<p>系统页新增可配置功能块“传感器”，默认位于能耗排行和磁盘之间；系统趋势的温度行加 SoC 温度线，另起风扇一行。</p>
+<p>数据均为虚构示例。HTML 只模拟玻璃背景，不代表原生液态玻璃效果；真实材质和观感由用户实机验收。</p>
+</header>
+<main class="grid" id="samples"></main>
+<div class="note">
+<b>要点</b><br>
+· 卡片三列：CPU（各核心平均，副信息写最热核心）、GPU（平均）、风扇（转速，副信息写占最大值的百分比；0 rpm 时写“静止”）。<br>
+· 标题右侧写“实验”；底部一行说明来源和局限。某一列读不到时只那一列显示“不可用”，其余照常。<br>
+· 本机报告没有风扇时，风扇列写“无风扇”，趋势图不显示风扇行。全部读不到时整卡保留，三列均为“不可用”，底部写原因。<br>
+· 风扇转速超过最大值 80% 持续 5 分钟：风扇列和数值用橙色，副信息写持续时长；总览条出现降温标记（D14），猫的形态不变。<br>
+· 趋势图温度行：电池温度（粉）和 SoC 温度（靛蓝）两条线共用量程，右侧当前值以 SoC 为主、电池为辅。风扇行量程 0 到最大转速，虚线标 80% 阈值。<br>
+· 橙色底色带仍只表示 <code>thermalState</code> fair 及以上的时段；图例文字在风扇触发时改写触发原因。
+</div>
+<script>
+const N=60;
+function series(base,amp,seed,trend=0){let v=[];for(let i=0;i<N;i++){v.push(base+amp*Math.sin(i/6+seed)+amp*.5*Math.sin(i/2.3+seed*2)+trend*i/N)}return v}
+function path(vals,lo,hi){return vals.map((v,i)=>`${i?"L":"M"}${(i/(N-1)*332).toFixed(1)},${(25-(v-lo)/(hi-lo)*24).toFixed(1)}`).join("")}
+function graph(lines,lo,hi,band,dash){let s=`<svg viewBox="0 0 332 26" preserveAspectRatio="none">`;
+ if(band)s+=`<rect x="${band[0]*332}" y="0" width="${(band[1]-band[0])*332}" height="26" fill="var(--band)"/>`;
+ if(dash!=null){const y=25-(dash-lo)/(hi-lo)*24;s+=`<line x1="0" x2="332" y1="${y}" y2="${y}" stroke="var(--sub)" stroke-width=".8" stroke-dasharray="3 3"/>`}
+ for(const [vals,color] of lines)s+=`<path d="${path(vals,lo,hi)}" fill="none" stroke="var(${color})" stroke-width="1.4"/>`;return s+`</svg>`}
+function sensorCard(c){
+ const col=(name,val,sub,cls="")=>`<div class="col ${cls}"><div class="name">${name}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`;
+ return `<div class="card"><div class="head"><span class="title">传感器</span><span class="tiny">实验</span></div><div class="cols">${c.cols.map(x=>col(...x)).join("")}</div><div class="foot caption">${c.foot}</div></div>`}
+function trendCard(c){
+ const fanRow=c.fan===null?"":`<div class="row"><div class="rowhead"><i class="dot" style="background:var(--brown)"></i>风扇<span class="tiny">0–6000 rpm</span><span class="cur">${c.fanNow}</span></div>${graph([[c.fan,"--brown"]],0,6000,c.band,4800)}</div>`;
+ return `<div class="card"><div class="head"><span class="title">系统趋势</span><span class="tiny">15 分钟 ｜ 1 小时</span></div>
+ <div class="row"><div class="rowhead"><i class="dot" style="background:var(--blue)"></i>CPU<span class="tiny">0–100%</span><span class="cur">${c.cpuNow}</span></div>${graph([[c.cpu,"--blue"]],0,100,c.band)}</div>
+ <div class="row"><div class="rowhead"><i class="dot" style="background:var(--purple)"></i>内存<span class="tiny">0–16 GB</span><span class="cur">11.2 GB</span></div>${graph([[series(11,.4,1),"--purple"]],0,16,c.band)}</div>
+ <div class="row"><div class="rowhead"><i class="dot" style="background:var(--teal)"></i>整机功耗<span class="tiny">0–40 W</span><span class="cur">${c.powerNow}</span></div>${graph([[c.power,"--teal"]],0,40,c.band)}</div>
+ <div class="row"><div class="rowhead"><i class="dot" style="background:var(--indigo)"></i><i class="dot" style="background:var(--pink)"></i>温度<span class="tiny">${c.tempRange[0]}–${c.tempRange[1]} °C</span><span class="cur"><span>电池 ${c.batNow}</span>SoC ${c.socNow}</span></div>${graph([[c.bat,"--pink"],[c.soc,"--indigo"]],c.tempRange[0],c.tempRange[1],c.band)}</div>
+ ${fanRow}
+ <div class="axis tiny"><span>14:20</span><span>14:28</span><span>14:35</span></div>
+ <div class="legend tiny"><i></i><span>${c.legend}</span><span class="r">同一时间轴 · 各自纵轴</span></div></div>`}
+const states=[
+ {name:"正常：风扇静止",sensor:{cols:[["CPU","48.6<small>°C</small>","最高 53.9 °C"],["GPU","45.2<small>°C</small>","平均"],["风扇","0<small>rpm</small>","静止"]],foot:"来源：SMC，非公开接口，新芯片上可能读不到"},
+  trend:{cpu:series(14,5,0),cpuNow:"12%",power:series(7,2,2),powerNow:"6.8 W",bat:series(31,.3,1),batNow:"31.4 °C",soc:series(47,2.5,3),socNow:"48.6 °C",tempRange:[30,52],fan:Array(N).fill(0),fanNow:"0 rpm",band:null,legend:"热状态 fair 及以上的时段"}},
+ {name:"高负载：风扇转动",sensor:{cols:[["CPU","71.3<small>°C</small>","最高 82.6 °C"],["GPU","64.0<small>°C</small>","平均"],["风扇","3180<small>rpm</small>","最大值的 53%"]],foot:"来源：SMC，非公开接口，新芯片上可能读不到"},
+  trend:{cpu:series(55,25,0,30),cpuNow:"86%",power:series(18,6,2,10),powerNow:"27.5 W",bat:series(33,.6,1,1.5),batNow:"34.6 °C",soc:series(60,8,3,14),socNow:"71.3 °C",tempRange:[30,84],fan:series(1700,550,1,1500).map(v=>Math.max(0,v)),fanNow:"3180 rpm",band:null,legend:"热状态 fair 及以上的时段"}},
+ {name:"风扇触发建议降温",sensor:{cols:[["CPU","88.4<small>°C</small>","最高 96.1 °C"],["GPU","79.5<small>°C</small>","平均"],["风扇","5240<small>rpm</small>","87% · 已持续 6 分钟","warn"]],foot:"风扇超过最大值 80% 已持续 6 分钟，达到“建议降温”条件"},
+  trend:{cpu:series(85,8,0,8),cpuNow:"94%",power:series(32,3,2,4),powerNow:"35.8 W",bat:series(36,.6,1,2),batNow:"38.2 °C",soc:series(84,4,3,6),socNow:"88.4 °C",tempRange:[34,98],fan:series(4600,200,1,700),fanNow:"5240 rpm",band:null,legend:"风扇超过最大值 80% 已持续 6 分钟，达到‘建议降温’条件"}},
+ {name:"部分不可用：GPU 读不到",sensor:{cols:[["CPU","50.2<small>°C</small>","最高 55.0 °C"],["GPU","不可用","没有匹配的传感器","na"],["风扇","0<small>rpm</small>","静止"]],foot:"来源：SMC，非公开接口，新芯片上可能读不到"},trend:null},
+ {name:"本机无风扇",sensor:{cols:[["CPU","46.9<small>°C</small>","最高 51.2 °C"],["GPU","44.0<small>°C</small>","平均"],["风扇","无风扇","本机未报告风扇","na"]],foot:"来源：SMC，非公开接口，新芯片上可能读不到"},
+  trend:{cpu:series(14,5,0),cpuNow:"12%",power:series(7,2,2),powerNow:"6.8 W",bat:series(31,.3,1),batNow:"31.4 °C",soc:series(45,2,3),socNow:"46.9 °C",tempRange:[30,50],fan:null,band:null,legend:"热状态 fair 及以上的时段"}},
+ {name:"全部不可用",sensor:{cols:[["CPU","不可用","","na"],["GPU","不可用","","na"],["风扇","不可用","","na"]],foot:"读不到 SMC：无法连接传感器服务。其他系统数据不受影响"},
+  trend:{cpu:series(14,5,0),cpuNow:"12%",power:series(7,2,2),powerNow:"6.8 W",bat:series(31,.3,1),batNow:"31.4 °C",soc:[],socNow:"—",tempRange:[30,32],fan:[],fanNow:"—",band:null,legend:"热状态 fair 及以上的时段"}}
+];
+const host=document.getElementById("samples");
+for(const dark of [false,true])for(const s of states){
+ const el=document.createElement("section");el.className="sample";
+ el.innerHTML=`<h2>${s.name}${dark?" · 深色":" · 浅色"}</h2><div class="panel ${dark?"dark":""}">${s.trend?trendCard(s.trend):""}${sensorCard(s.sensor)}</div>`;
+ host.append(el)}
+</script>
+</html>
