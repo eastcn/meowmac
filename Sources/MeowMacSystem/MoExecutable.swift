@@ -16,7 +16,7 @@ public enum MoExecutable {
     }
 
     public static func usableFile(_ path: String) -> Bool {
-        let file = URL(fileURLWithPath: path)
+        let file = URL(fileURLWithPath: path).resolvingSymlinksInPath()
         guard let values = try? file.resourceValues(forKeys: [.isRegularFileKey]), values.isRegularFile == true else { return false }
         return FileManager.default.isExecutableFile(atPath: path)
     }

@@ -25,6 +25,9 @@ enum CleaningTests {
             guard !MoExecutable.usableFile(executable.path), !MoExecutable.usableFile(root.path) else { return false }
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
             guard MoExecutable.resolve(configuredPath: executable.path) == executable.path else { return false }
+            let link = root.appendingPathComponent("mo-link")
+            try FileManager.default.createSymbolicLink(at: link, withDestinationURL: executable)
+            guard MoExecutable.resolve(configuredPath: link.path) == link.path else { return false }
             switch try MoHistoryReader.read(configuredPath: executable.path) {
             case .available(nil): break
             default: return false

@@ -25,6 +25,7 @@ public struct LocalConfig: Codable, Equatable {
     public var processSampleSeconds = 60.0
     public var quotaHistoryDays = 90
     public var codexBarCLIPath = "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI"
+    public var cleanTerminal = CleanTerminal.automatic
     public var moPath = "/opt/homebrew/bin/mo"
 
     public init() {}
@@ -34,7 +35,7 @@ public struct LocalConfig: Codable, Equatable {
         case sleepAssertionSeconds, memoryPressureSeconds, fairThermalSeconds, fanHighFraction, fanHighSeconds, sourceFailureCount
         case memoryNormalLoad, memoryWarnLoad, memoryCriticalLoad, idleFrameSeconds, fullFrameSeconds
         case quotaRefreshSeconds, sessionPollSeconds, sessionFinishDelaySeconds, manualMergeSeconds
-        case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath
+        case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath, cleanTerminal
     }
 
     public init(from decoder: Decoder) throws {
@@ -66,6 +67,7 @@ public struct LocalConfig: Codable, Equatable {
         processSampleSeconds = (10...600).contains(sampleSeconds) ? sampleSeconds : defaults.processSampleSeconds
         quotaHistoryDays = try fields.decodeIfPresent(Int.self, forKey: .quotaHistoryDays) ?? defaults.quotaHistoryDays
         codexBarCLIPath = try fields.decodeIfPresent(String.self, forKey: .codexBarCLIPath) ?? defaults.codexBarCLIPath
+        cleanTerminal = try fields.decodeIfPresent(CleanTerminal.self, forKey: .cleanTerminal) ?? defaults.cleanTerminal
         moPath = try fields.decodeIfPresent(String.self, forKey: .moPath) ?? defaults.moPath
     }
 }
@@ -84,6 +86,27 @@ public enum ConfigStore {
     public static var defaultURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/MeowMac/config.json")
+    }
+
+    /// 只更新清理终端字段，保留用户配置的其他字段和未知字段。
+    public static func saveCleanTerminal(_ preference: CleanTerminal, to url: URL = defaultURL) throws {
+        var object: [String: Any]
+        do {
+            let data = try Data(contentsOf: url)
+            let decoded = try JSONDecoder().decode(LocalConfig.self, from: data)
+            guard decoded.schemaVersion == 1,
+                  let existing = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            object = existing
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            let data = try JSONEncoder().encode(LocalConfig())
+            object = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        }
+        object["cleanTerminal"] = preference.rawValue
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url, options: .atomic)
     }
 
     public static func load(from url: URL = defaultURL) -> ConfigLoadResult {

@@ -40,6 +40,9 @@ public enum SettingsMenu {
         menu.addItem(catItem)
         add("布局与显示…", enabled: state.selectedCat != nil, action: state.onShowLayoutSettings)
         add("样式…", action: state.onShowStyleSettings)
+        let terminalItem = NSMenuItem(title: "清理终端", action: nil, keyEquivalent: "")
+        terminalItem.submenu = cleanTerminalMenu(state: state)
+        menu.addItem(terminalItem)
         if state.showsCodexBarImport { add("导入 CodexBar 历史…", action: state.onImportCodexBarHistory) }
         add("开机启动", checked: state.loginEnabled) { state.onToggleLogin(!state.loginEnabled) }
         menu.addItem(.separator())
@@ -47,6 +50,29 @@ public enum SettingsMenu {
         add("退出 MeowMac", key: "q", action: state.onQuit)
         return menu
     }
+    public static func cleanTerminalMenu(state: PanelState) -> NSMenu {
+        state.onPrepareCleanTerminalMenu()
+        let menu = NSMenu(title: "清理终端"); menu.autoenablesItems = false
+        for terminal in CleanTerminal.allCases {
+            var title = terminal.name
+            if terminal == .automatic, let selected = terminal.resolved(available: state.availableCleanTerminals) {
+                title += "（当前：" + selected.name + "）"
+            }
+            let target = Action { state.onSelectCleanTerminal(terminal) }
+            let item = NSMenuItem(title: title, action: #selector(Action.invoke), keyEquivalent: "")
+            item.target = target; item.representedObject = target
+            item.state = state.cleanTerminalPreference == terminal ? .on : .off
+            item.isEnabled = terminal == .automatic || state.availableCleanTerminals.contains(terminal)
+            menu.addItem(item)
+            if terminal == .automatic { menu.addItem(.separator()) }
+        }
+        return menu
+    }
+
+    public static func presentCleanTerminals(state: PanelState, anchor: NSView) {
+        cleanTerminalMenu(state: state).popUp(positioning: nil, at: NSPoint(x: 0, y: anchor.bounds.maxY), in: anchor)
+    }
+
     static func present(state: PanelState) {
         guard let event = NSApplication.shared.currentEvent, let view = event.window?.contentView else { return }
         NSMenu.popUpContextMenu(make(state: state), with: event, for: view)

@@ -97,6 +97,9 @@ public final class PanelState: ObservableObject {
     @Published public var networkHistory = NetworkHistory()
     @Published public var networkRange: NetworkTrendRange = .hour
     public var networkCapture: NetworkCaptureInfo?
+    @Published public var cleanTerminalPreference: CleanTerminal
+    @Published public var availableCleanTerminals: Set<CleanTerminal> = []
+    @Published public var cleanLaunching = false
     @Published public var cleaningHistoryMessage: String?
     @Published public var lastCleaning: CleaningRecord?
     @Published public var selectedCat: LoadedCat? = CatPackageLoader.defaultCat
@@ -123,6 +126,8 @@ public final class PanelState: ObservableObject {
 
     public var onShowStorage: (QuotaProvider) -> Void = { _ in }
     public var onRefresh: () -> Void = {}
+    public var onPrepareCleanTerminalMenu: () -> Void = {}
+    public var onSelectCleanTerminal: (CleanTerminal) -> Void = { _ in }
     public var onClean: () -> Void = {}
     public var onOpenConfig: () -> Void = {}
     public var onShowConfigFolder: () -> Void = {}
@@ -181,6 +186,7 @@ public final class PanelState: ObservableObject {
 
     public init(configResult: ConfigLoadResult = ConfigStore.load()) {
         self.configResult = configResult
+        self.cleanTerminalPreference = configResult.config.cleanTerminal
     }
 
     public var health: HealthSummary {
