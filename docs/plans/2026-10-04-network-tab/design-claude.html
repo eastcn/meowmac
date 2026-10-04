@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>网络页重新设计 · Claude 稿</title>
+<style>
+:root{--text:#1d1d1f;--sub:#6e6e73;--card:rgba(255,255,255,.6);--rule:rgba(0,0,0,.09);--glass:linear-gradient(170deg,#e3e8ee,#efeae4);
+--blue:#007AFF;--teal:#30B0C7;--indigo:#5856D6;--gray:#8E8E93;--orange:#FF9500;--red:#FF3B30;--green:#34C759;
+--greenText:#1E8E3E;--orangeText:#B25000;--redText:#D70015;--track:rgba(0,0,0,.07);--seg1:rgba(0,0,0,.16);--seg2:rgba(0,0,0,.30)}
+.dark{--text:#f5f5f7;--sub:#98989d;--card:rgba(44,44,46,.6);--rule:rgba(255,255,255,.1);--glass:linear-gradient(170deg,#1c2129,#26221f);
+--blue:#0A84FF;--teal:#40C8E0;--indigo:#5E5CE6;--gray:#98989D;--orange:#FF9F0A;--red:#FF453A;--green:#30D158;
+--greenText:#30D158;--orangeText:#FF9F0A;--redText:#FF453A;--track:rgba(255,255,255,.1);--seg1:rgba(255,255,255,.22);--seg2:rgba(255,255,255,.42)}
+*{box-sizing:border-box}
+body{margin:0;padding:32px;background:#d6d6db;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;-webkit-font-smoothing:antialiased}
+header,.notes,h2.option,p.option{max-width:1600px;margin-left:auto;margin-right:auto}
+h1{font-size:22px;margin:0 0 8px}header p,p.option,.notes{font-size:13px;color:#55555a;line-height:1.7;margin:4px auto}
+h2.option{margin-top:28px;margin-bottom:6px;font-size:17px}
+.grid{display:flex;flex-wrap:wrap;gap:24px;max-width:1600px;margin:0 auto}
+.sample h3{font-size:12px;font-weight:600;color:#55555a;margin:0 0 8px}
+.panel{position:relative;width:360px;background:var(--glass);color:var(--text);border-radius:16px;overflow:hidden}
+.fold{position:absolute;left:0;right:0;border-top:2px dashed #FF3B30;z-index:3}
+.fold span{position:absolute;right:6px;top:-18px;font-size:10px;color:#FF3B30;background:rgba(255,255,255,.8);padding:1px 4px;border-radius:4px}
+.below{position:absolute;left:0;right:0;bottom:0;background:repeating-linear-gradient(135deg,rgba(255,59,48,.05) 0 6px,transparent 6px 12px);z-index:2;pointer-events:none}
+.head{padding:14px 16px 0}.status{font-size:15px;font-weight:600}
+.ov{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.ov .n{font-size:11px;color:var(--sub)}.ov .v{font-size:20px;font-weight:600}.ov .s{font-size:10px;color:var(--sub)}.ov .b{height:3px;border-radius:2px;background:var(--track);margin-top:4px}.ov .b i{display:block;height:3px;border-radius:2px}
+.tabs{display:flex;background:var(--track);border-radius:99px;padding:3px;margin-bottom:12px}.tabs div{flex:1;text-align:center;font-size:13px;padding:5px 0;border-radius:99px}.tabs .on{background:var(--card);font-weight:600}
+.dotc{display:inline-block;width:6px;height:6px;border-radius:3px;vertical-align:1px}
+.rule{border-top:1px solid var(--rule)}
+.content{padding:12px 16px;display:flex;flex-direction:column;gap:12px}
+.t{font-size:13px;font-weight:600}.tiny{font-size:10px;color:var(--sub)}.cap{font-size:11px;color:var(--sub)}
+.hrow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.seg{font-size:10px;display:flex;background:var(--track);border-radius:99px;padding:2px}.seg span{padding:2px 8px;border-radius:99px}.seg .on{background:var(--card);font-weight:600}
+.pill{font-size:12px;background:var(--track);border-radius:99px;padding:4px 10px;white-space:nowrap}
+.ok{color:var(--greenText)}.warn{color:var(--orangeText)}.bad{color:var(--redText)}.unk{color:var(--sub)}
+/* 结论 */
+.verdict{display:flex;gap:10px;align-items:center}
+.vicon{width:28px;height:28px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;flex:none}
+.verdict .txt{flex:1;min-width:0}.verdict .c{font-size:15px;font-weight:600}.verdict .d{font-size:11px;color:var(--sub);margin-top:1px}
+/* 时间线：检查 */
+.sub{font-size:11px;color:var(--sub);margin:8px 0 3px;display:flex;justify-content:space-between}
+.crow{display:grid;grid-template-columns:78px 1fr 40px;gap:8px;align-items:center;height:19px;font-size:12px}
+.crow .r{text-align:right;font-size:11px;white-space:nowrap}
+.strip{position:relative;height:8px;border-radius:2px;background:var(--track);overflow:hidden}
+.strip i{position:absolute;top:0;bottom:0}
+.note{font-size:10px;color:var(--sub);margin-top:3px;line-height:1.45}
+/* 站点与流量：一行一指标 */
+.mrow{display:grid;grid-template-columns:78px 1fr 64px;gap:8px;align-items:center;height:34px}
+.mrow .nm{font-size:12px}.mrow .sb{font-size:10px;color:var(--sub);white-space:nowrap;margin-top:1px}
+.mrow .val{text-align:right;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.mrow .val small{display:block;font-size:10px;font-weight:400;color:var(--sub)}
+svg{display:block;width:100%}
+.axis{display:grid;grid-template-columns:78px 1fr 64px;gap:8px}.axis div{display:flex;justify-content:space-between}
+/* 出口 */
+.erow{margin-top:8px}.erow .l1{display:flex;justify-content:space-between;font-size:12px}.erow .ip{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;font-weight:600;margin-top:1px}
+.estrip{position:relative;height:6px;border-radius:2px;background:var(--track);margin-top:4px;overflow:hidden}.estrip i{position:absolute;top:0;bottom:0}
+.estrip b{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--text)}
+code{font-size:12px}
+</style>
+<header>
+<h1>网络页重新设计 · Claude 稿</h1>
+<p>思路：把“此刻是否正常”压到一行结论，把五项检查、三组站点和上下行流量放进<b>同一条时间轴</b>。代理 DNS 黄的那几分钟、海外延迟抬高的那一段、流量的起伏，上下对齐就能看出是不是同一件事。出口 IP 用自己的 30 天尺度，每个目标一条变化条。</p>
+<p>红色虚线是 820 pt 面板的首屏底边（扣掉总览、标签页约 236 pt 和底栏 44 pt，内容可视约 540 pt）。数据全部虚构，IP 为文档保留段。HTML 只模拟材质。</p>
+</header>
+<div id="root"></div>
+<div class="notes">
+<b>版式结构与高度估算（1 小时视图，正常状态）</b><br>
+· 结论（约 32 pt）：28 pt 状态图标、结论和一句说明；右侧是“刚刚检测”和“复测”胶囊。原来的两行合成一行，省约 30 pt。说明里把通过数和未确认数写全，例如“4 项通过 · Tailnet 未确认”，和下面的检查列表一致。<br>
+· 网络趋势（约 300 pt）：标题和“1 小时 / 24 小时”切换。三个分组共用时间轴：<br>
+　连接检查：每项一行 19 pt，名称、状态色带、当前状态。色带绿、黄、红、灰对应通过、提醒、失败、未确认，没有记录的时段留空。说明文字不再每项占一行：只有非“通过”的项，在这组下面写一句（如“Tailnet：当前网络与子网网段相同，不探测”）；通过项的说明放悬停提示。<br>
+　站点：每组一行 34 pt，左边名称和“29 / 30 轮成功”，中间延迟折线，失败的轮次在折线底部画红色刻度、折线断开；右边是最近一轮的延迟中位数，失败时写“失败”。不探测的分组写“不探测”，折线区留空。<br>
+　流量：一行，下行蓝、上行青，右边写当前速率。量程取窗口内峰值，写在悬停提示里。<br>
+　底部 3 个时刻刻度，最右写“现在”。<br>
+· 出口 IP（每个目标约 52 pt）：第 1 行目标名、地区，靠右“3 天未变”；第 2 行完整 IP（12 pt 等宽，IPv6 也能放下）；第 3 行 30 天变化条：每段一个 IP，相邻段深浅交替，变化点画竖线，标题右侧写“30 天 · 变过 N 次”。悬停某段显示 IP、地区和起止时间。<br>
+· 正常状态合计约 500 pt，首屏能看到全部内容；提醒、严重时说明行变多，出口 IP 第二个目标可能滚到首屏下面。<br><br>
+<b>解决的问题</b>：有了 1 小时和 24 小时的连续变化；结论和检查数一致；五项检查从约 190 pt 压到约 110 pt；站点不再是三行两个数字；出口 IP 在首屏，IPv6 不再挤占目标名；VPN“已断开”属于预期时，说明进悬停提示，右侧只写“通过”，不再出现“已断开 · 通过”这种并列。<br><br>
+<b>功能块</b>：<code>network.trend</code>（网络趋势：检查、站点、流量共用时间轴）、<code>network.egress</code>（出口 IP）。读到旧布局里的 <code>network.checks</code>、<code>network.sites</code> 时合并成 <code>network.trend</code>，位置取两者中靠前的那个，任一可见即可见。<br><br>
+<b>需要新增的数据记录</b>（MeowMac 自己写，<code>~/Library/Application Support/MeowMac/</code>，保留 24 小时）：<br>
+· 站点：每轮每组一条，含时间、通过数、总数、延迟中位数。约 2 分钟一轮，24 小时约 720 条 × 3 组。<br>
+· 检查：每 20 秒的状态只在变化时记一条（时间、项、状态）。重启时从 TunCanary 故障事件日志补回之前的段，日志里没有的时段留空。<br>
+· 流量：系统采样里已有的速率，按 1 分钟取平均记一条，24 小时 1440 条。<br>
+· 24 小时视图：站点按 10 分钟聚合，延迟取中位数，失败轮次超过 0 就画刻度；流量按 10 分钟取平均和峰值。<br>
+· 出口 IP 直接用 TunCanary 的 30 天出口历史，不另存。
+</div>
+<script>
+let seed=7;function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647}
+const N=30; // 1 小时：每 2 分钟一轮
+function latency(base,jit,n,{rise=null,fail=[]}={}){const v=[];for(let i=0;i<n;i++){let x=base*(1+jit*(rnd()-.5));if(rise&&i>=rise[0])x=rise[1]*(1+jit*(rnd()-.5));v.push(fail.includes(i)?null:x)}return v}
+function traffic(n,base,amp,bursts=[]){const v=[];for(let i=0;i<n;i++){let x=base*(.6+.8*rnd());for(const b of bursts)if(Math.abs(i-b)<2)x+=amp*(1-Math.abs(i-b)/2);v.push(x)}return v}
+const svgW=200;
+function spark(series,h,{hi=null,fails=[],start=0,n=N}={}){
+ const all=series.flatMap(s=>s.v.filter(x=>x!=null));const top=hi??Math.max(...all,1)*1.15;
+ let s=`<svg viewBox="0 0 ${svgW} ${h}" preserveAspectRatio="none" style="height:${h}px"><line x1="0" x2="${svgW}" y1="${h-.5}" y2="${h-.5}" stroke="var(--rule)"/>`;
+ for(const f of fails.filter(f=>f>=start)){const x=f/(n-1)*svgW;s+=`<line x1="${x}" x2="${x}" y1="${h-7}" y2="${h}" stroke="var(--red)" stroke-width="2" vector-effect="non-scaling-stroke"/>`}
+ for(const ser of series){let d="",pen=false;ser.v.forEach((y,i)=>{if(i<start||y==null){pen=false;return}const X=(i/(n-1)*svgW).toFixed(1),Y=(h-2-Math.min(y,top)/top*(h-4)).toFixed(1);d+=`${pen?"L":"M"}${X},${Y}`;pen=true});
+  s+=`<path d="${d}" fill="none" stroke="var(${ser.c})" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`}
+ return s+"</svg>"}
+function strip(segs){return `<div class="strip">${segs.map(([a,b,c])=>`<i style="left:${a*100}%;width:${(b-a)*100}%;background:var(${c})"></i>`).join("")}</div>`}
+const toneCls={"--green":"ok","--orange":"warn","--red":"bad","--gray":"unk"},toneTxt={"--green":"通过","--orange":"提醒","--red":"失败","--gray":"未确认"};
+
+function scenario(kind){
+ seed=11;const S={};const full=[[0,1]];const n=kind=="day"?96:N;S.n=n;
+ const startAt=kind=="fresh"?.86:0; // 刚启动：只有最近约 8 分钟
+ const seg=(c,from=startAt)=>[[from,1,c]];
+ S.checks=[["代理 TUN",seg("--green")],["VPN",seg("--green")],["主网络 DNS",seg("--green")],["代理 DNS",seg("--green")],["Tailnet",seg("--gray")]];
+ S.notes=["Tailnet：当前网络与子网网段相同，不探测"];
+ S.start=Math.round(startAt*(n-1));
+ S.sites=[{name:"国内",v:latency(90,.35,n),fail:[]},{name:"海外",v:latency(320,.3,n,{fail:[17]}),fail:[17]},{name:"子网目标",v:null}];
+ S.down=traffic(n,40e3,2.2e6,[6,21]);S.up=traffic(n,15e3,4e5,[6,21]);
+ S.ticks=["19:24","19:54","现在"];S.range="1 小时";S.verdict=["--green","✓","网络正常","4 项通过 · Tailnet 未确认"];
+ S.checked="刚刚检测";
+ if(kind=="warn"){
+  S.checks[3][1]=[[0,.87,"--green"],[.87,1,"--orange"]];
+  S.notes=["代理 DNS：7874 端口响应超过 1.5 秒，已持续 8 分钟","Tailnet：当前网络与子网网段相同，不探测"];
+  S.sites[1]={name:"海外",v:latency(320,.25,n,{rise:[24,900]}),fail:[]};
+  S.verdict=["--orange","!","网络提醒","代理 DNS 响应慢，已持续 8 分钟"];
+ }
+ if(kind=="bad"){
+  S.checks[0][1]=[[0,.9,"--green"],[.9,1,"--red"]];S.checks[3][1]=[[0,.9,"--green"],[.9,1,"--gray"]];
+  S.notes=["代理 TUN：配置开启，但 utun 接口不存在，已持续 6 分钟","代理 DNS：TUN 失效，无法确认","Tailnet：当前网络与子网网段相同，不探测"];
+  S.sites[1]={name:"海外",v:latency(320,.25,n,{fail:[27,28,29]}),fail:[27,28,29]};
+  S.verdict=["--red","✕","网络异常","代理 TUN 失效 · 海外连续 3 轮失败"];
+ }
+ if(kind=="day"){
+  S.range="24 小时";S.ticks=["昨天 20:24","8:24","现在"];
+  S.checks[3][1]=[[0,.31,"--green"],[.31,.325,"--orange"],[.325,1,"--green"]];
+  S.checks[0][1]=[[0,.62,"--green"],[.62,.625,"--red"],[.625,1,"--green"]];
+  S.checks[2][1]=[[0,.18,"--green"],[.18,.34,"--gray"],[.34,1,"--green"]];
+  S.notes=["Tailnet：当前网络与子网网段相同，不探测","灰色时段：电脑休眠，没有记录"];
+  S.sites=[{name:"国内",v:latency(95,.5,n),fail:[]},{name:"海外",v:latency(340,.45,n,{fail:[59]}),fail:[59]},{name:"子网目标",v:null}];
+  S.sites[0].v=S.sites[0].v.map((x,i)=>i>=18&&i<33?null:x);S.sites[1].v=S.sites[1].v.map((x,i)=>i>=18&&i<33?null:x);
+  S.down=traffic(n,60e3,3e6,[40,41,70,88]).map((x,i)=>i>=18&&i<33?null:x);S.up=traffic(n,20e3,6e5,[40,70]).map((x,i)=>i>=18&&i<33?null:x);
+ }
+ if(kind=="fresh"){
+  S.checked="12 秒前检测";S.ticks=["19:24","19:54","现在"];
+  S.notes=["Tailnet：当前网络与子网网段相同，不探测","20:16 启动，之前没有记录"];
+ }
+ return S}
+
+function fmtRate(b){if(b>=1e6)return (b/1048576).toFixed(1)+"M";if(b>=1e3)return (b/1024).toFixed(1)+"K";return Math.round(b)+"B"}
+function median(a){const s=a.filter(x=>x!=null).sort((x,y)=>x-y);return s.length?s[Math.floor(s.length/2)]:null}
+
+function header(tone){const t={"--green":"网络","--orange":"网络","--red":"网络"};
+ const st=tone=="--green"?'一切正常 <span class="tiny" style="font-weight:400">· 20:24 刷新</span>':tone=="--orange"?'<span class="warn">提醒</span> · 代理 DNS 响应慢 ›':'<span class="bad">严重</span> · 代理 TUN 失效 ›';
+ return `<div class="head"><div class="status">${st}</div>
+ <div class="ov">${[["CPU","14%","整机负载",14,"--blue"],["内存","52%","已用 13 / 16 GB",52,"--green"],["Claude","62%","5 小时 · 剩余",62,"--green"],["网络","↓14.0K","↑50.0K",100,tone]].map(x=>`<div><div class="n">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div><div class="b"><i style="width:${x[3]}%;background:var(${x[4]})"></i></div></div>`).join("")}</div>
+ <div class="tabs"><div><i class="dotc" style="background:var(--green)"></i> 系统</div><div><i class="dotc" style="background:var(--green)"></i> 额度</div><div class="on"><i class="dotc" style="background:var(${tone})"></i> 网络</div></div></div><div class="rule"></div>`}
+
+function page(kind,dark){
+ const S=scenario(kind),n=S.n;
+ const [tone,icon,concl,detail]=S.verdict;
+ let h=`<div class="verdict"><div class="vicon" style="background:var(${tone})">${icon}</div><div class="txt"><div class="c">${concl}</div><div class="d">${detail}</div></div>
+  <div style="text-align:right"><div class="tiny" style="margin-bottom:3px">${S.checked}</div><span class="pill">复测</span></div></div>`;
+ h+=`<div class="rule"></div><div>`;
+ h+=`<div class="hrow"><span class="t">网络趋势</span><span class="seg"><span class="${S.range=="1 小时"?"on":""}">1 小时</span><span class="${S.range=="24 小时"?"on":""}">24 小时</span></span></div>`;
+ const pass=S.checks.filter(c=>c[1].at(-1)[2]=="--green").length;
+ h+=`<div class="sub"><span>连接检查</span><span>${pass} / 5 通过</span></div>`;
+ for(const [name,segs] of S.checks){const cur=segs.at(-1)[2];h+=`<div class="crow"><span>${name}</span>${strip(segs)}<span class="r ${toneCls[cur]}">${toneTxt[cur]}</span></div>`}
+ h+=`<div class="note">${S.notes.join("<br>")}</div>`;
+ h+=`<div class="sub"><span>站点延迟</span><span>${kind=="day"?"每 10 分钟取中位数":"每 2 分钟一轮"}</span></div>`;
+ for(const s of S.sites){
+  if(!s.v){h+=`<div class="mrow"><div><div class="nm">${s.name}</div><div class="sb">0 / 0</div></div><div class="tiny" style="text-align:center">与子网网段相同，不探测</div><div class="val unk">—<small>不探测</small></div></div>`;continue}
+  const valid=s.v.slice(S.start).filter(x=>x!=null).length,total=s.v.slice(S.start).length - (kind=="day"?15:0);
+  const last=s.v.at(-1);const failing=last==null;
+  const consec=failing?s.v.slice().reverse().findIndex(x=>x!=null):0;
+  const sb=kind=="day"?`成功率 ${(100-s.fail.length/total*100*0.3).toFixed(1)}%`:`${valid} / ${s.v.slice(S.start).length} 轮成功`;
+  const valTxt=failing?`<span class="bad">失败</span><small>连续 ${consec} 轮</small>`:`${Math.round(last)} ms<small>${kind=="day"?"中位 "+Math.round(median(s.v))+" ms":"最近一轮"}</small>`;
+  const slow=!failing&&last>600;
+  h+=`<div class="mrow"><div><div class="nm">${s.name}</div><div class="sb">${sb}</div></div><div>${spark([{v:s.v,c:slow?"--orange":"--indigo"}],26,{fails:s.fail,start:S.start,n})}</div><div class="val ${slow?"warn":""}">${valTxt}</div></div>`;
+ }
+ h+=`<div class="sub"><span>流量</span><span><i class="dotc" style="background:var(--blue)"></i> 下行　<i class="dotc" style="background:var(--teal)"></i> 上行</span></div>`;
+ h+=`<div class="mrow"><div><div class="nm">上下行</div><div class="sb">${kind=="day"?"峰值 ↓3.1M":"峰值 ↓2.3M"}</div></div><div>${spark([{v:S.down,c:"--blue"},{v:S.up,c:"--teal"}],26,{start:S.start,n})}</div><div class="val">↓${fmtRate(14e3)}<small>↑50.0K</small></div></div>`;
+ h+=`<div class="axis tiny"><span></span><div>${S.ticks.map(t=>`<span>${t}</span>`).join("")}</div><span></span></div>`;
+ h+=`</div><div class="rule"></div>`;
+ // 出口 IP
+ const eg=[{t:"Cloudflare",ip:"2001:db8:d002:0:188:253:121:92",r:"新加坡 · Central Singapore",since:"3 天未变",segs:[[0,.42],[.42,.9],[.9,1]],changes:2},
+  {t:"Claude",ip:"203.0.113.14",r:"日本 · 东京",since:"12 天未变",segs:[[0,.6],[.6,1]],changes:1}];
+ if(kind=="warn"){eg[1]={t:"Claude",ip:"198.51.100.27",r:"日本 · 大阪",since:"20 分钟前变化",segs:[[0,.6],[.6,.9993],[.9993,1]],changes:2,fresh:true}}
+ h+=`<div><div class="hrow"><span class="t">出口 IP</span><span class="tiny">30 天 · 每 60 分钟采样</span></div>`;
+ for(const e of eg){h+=`<div class="erow"><div class="l1"><span>${e.t} <span class="cap">· ${e.r}</span></span><span class="cap ${e.fresh?"warn":""}">${e.since}</span></div><div class="ip">${e.ip}</div>
+  <div class="hrow" style="gap:8px"><div class="estrip" style="flex:1">${e.segs.map(([a,b],i)=>`<i style="left:${a*100}%;width:${(b-a)*100}%;background:var(${i%2?"--seg2":"--seg1"})"></i>`).join("")}${e.segs.slice(1).map(([a])=>`<b style="left:calc(${a*100}% - 1px)"></b>`).join("")}</div><span class="tiny" style="margin-top:4px">变过 ${e.changes} 次</span></div></div>`}
+ h+=`</div>`;
+ return `<div class="panel ${dark?"dark":""}">${header(tone)}<div class="content">${h}</div><div class="rule"></div><div class="hrow" style="padding:10px 16px"><span class="pill">↻ 刷新</span><span class="cap">额度更新于 20:15</span><span class="pill">⚙ 设置</span></div></div>`}
+
+const root=document.getElementById("root");
+const states=[["normal","正常：1 小时里海外失败过 1 轮"],["warn","提醒：代理 DNS 黄 8 分钟，海外延迟抬到 900 ms，Claude 出口刚变"],["bad","严重：TUN 失效，海外连续失败"],["day","24 小时视图：含一段休眠和两次短暂异常"],["fresh","刚启动：历史不足 10 分钟"]];
+for(const dark of [false,true]){
+ root.insertAdjacentHTML("beforeend",`<h2 class="option">${dark?"深色":"浅色"}</h2><div class="grid" id="g${dark}"></div>`);
+ const g=document.getElementById("g"+dark);
+ for(const [k,label] of states){const s=document.createElement("section");s.className="sample";s.innerHTML=`<h3>${label}</h3>`+page(k,dark);g.append(s);
+  requestAnimationFrame(()=>{const p=s.querySelector(".panel");const fold=820-44;if(p.offsetHeight>fold)p.insertAdjacentHTML("beforeend",`<div class="fold" style="top:${fold}px"><span>首屏底边</span></div><div class="below" style="top:${fold}px"></div>`)});}
+}
+</script>
+</html>

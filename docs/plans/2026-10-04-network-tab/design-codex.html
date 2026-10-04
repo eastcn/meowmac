@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeowMac 网络页 · Codex 独立设计</title>
+<style>
+:root{color-scheme:light;--ink:#1d1d1f;--secondary:#64646c;--sheet:#eeedf3;--rule:rgba(60,60,67,.14);--fill:rgba(120,120,128,.12);--glass:rgba(255,255,255,.35);--selected:#fff;--edge:rgba(255,255,255,.8);--green:#34c759;--orange:#ff9500;--red:#ff3b30;--gray:#8e8e93;--green-text:#1e8e3e;--orange-text:#b25000;--red-text:#d70015;--blue:#007aff;--teal:#30b0c7;--purple:#af52de;--hint:#fff}
+.dark{color-scheme:dark;--ink:#f5f5f7;--secondary:#ababB3;--sheet:#26262e;--rule:rgba(235,235,245,.16);--fill:rgba(120,120,128,.22);--glass:rgba(255,255,255,.06);--selected:#53535d;--edge:rgba(255,255,255,.16);--green:#30d158;--orange:#ff9f0a;--red:#ff453a;--gray:#98989d;--green-text:#30d158;--orange-text:#ff9f0a;--red-text:#ff453a;--blue:#0a84ff;--teal:#40c8e0;--purple:#bf5af2;--hint:#363640}
+*{box-sizing:border-box}body{margin:0;background:#dedee3;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}button:focus-visible,[tabindex]:focus-visible,summary:focus-visible{outline:2px solid var(--blue);outline-offset:3px}button:disabled{cursor:default;opacity:.6}svg{display:block}h1,h2,h3,p{margin:0}code,.ip{font-family:ui-monospace,"SF Mono",Menlo,monospace}code{font-size:12px}button,summary{-webkit-tap-highlight-color:transparent}
+.page-head,.gallery,.notes{max-width:1152px;margin:auto}.page-head{padding:42px 24px 26px}.eyebrow{font-size:11px;letter-spacing:.08em;color:#64646c;margin-bottom:10px}.page-head h1{font-size:28px;font-weight:650;letter-spacing:-.8px;margin-bottom:12px}.intro{max-width:760px;font-size:14px;line-height:1.8;color:#50505a}.review-bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:20px;font-size:12px;color:#64646c}.review-toggle{padding:7px 13px;border:1px solid #bcbcc5;background:rgba(255,255,255,.5);border-radius:99px}.review-toggle[aria-pressed="true"]{background:#31313a;color:#fff}.review-meta{display:flex;gap:14px;flex-wrap:wrap}.review-meta span{border-left:1px solid #aaaab5;padding-left:14px}
+.gallery{padding:0 24px}.scenario{padding:26px 0 30px;border-top:1px solid #bdbdc7}.scenario-head{display:flex;align-items:flex-start;gap:18px;margin-bottom:20px}.scenario-number{font-size:12px;font-family:ui-monospace,Menlo,monospace;color:#767681;padding-top:3px}.scenario h2{font-size:17px;line-height:1.4}.scenario-description{font-size:12px;line-height:1.8;color:#595963;margin-top:5px;max-width:820px}.pair{display:grid;grid-template-columns:360px 360px;gap:32px;justify-content:center}.board{width:360px}.board-label{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#64646c;margin-bottom:9px}.board-label b{font-weight:500;color:#3e3e48}.tab-panel{width:360px;position:relative;border-radius:16px;background:var(--sheet);color:var(--ink);box-shadow:0 14px 30px rgba(22,22,35,.09),0 0 0 1px rgba(255,255,255,.6);isolation:isolate}.viewport{height:540px;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--gray) transparent;border-radius:16px;overscroll-behavior:contain}.viewport::-webkit-scrollbar{width:3px}.viewport::-webkit-scrollbar-thumb{border-radius:2px;background:var(--gray)}.tab-content{padding:12px 16px 16px}.fold{position:absolute;left:0;right:0;top:540px;border-top:1px dashed #767681;pointer-events:none;z-index:5}.fold span{position:absolute;right:8px;top:-14px;font-size:10px;line-height:12px;padding:0 4px;background:var(--sheet);color:var(--secondary)}.board-caption{font-size:11px;color:#64646c;line-height:1.7;margin-top:14px}.full-length .viewport{height:auto;overflow:visible}.full-length .viewport .tab-content{border-radius:16px}
+.headline{display:flex;gap:8px;align-items:center;min-height:32px}.status-icon{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;background:var(--green);font-size:21px;font-weight:600}.status-icon.warn{background:var(--orange)}.status-icon.bad{background:var(--red)}.status-copy{flex:1;min-width:0}.conclusion{font-size:15px;line-height:18px;font-weight:600}.count{font-size:11px;line-height:14px;color:var(--secondary)}.capsule{font-size:12px;line-height:16px;border:1px solid var(--edge);border-radius:99px;background:var(--glass);backdrop-filter:blur(8px);box-shadow:0 1px 2px rgba(10,10,20,.08);padding:4px 9px;white-space:nowrap;flex:none}.meta-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;min-height:24px}.caption{font-size:11px;line-height:15px;color:var(--secondary)}.tiny{font-size:10px;line-height:12px;color:var(--secondary)}.segment{display:flex;gap:2px;border-radius:99px;padding:2px;background:var(--fill);border:1px solid var(--edge);backdrop-filter:blur(8px)}.segment button{background:transparent;border:0;border-radius:99px;padding:2px 9px;font-size:10px;line-height:14px;color:var(--secondary)}.segment button[aria-pressed="true"]{background:var(--selected);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.13);font-weight:600}.startup-note{font-size:11px;line-height:15px;color:var(--secondary);margin-top:6px}
+.block{border-top:1px solid var(--rule);padding-top:6px;margin-top:6px}.section-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;min-height:18px;margin-bottom:2px}.section-title{font-size:13px;line-height:18px;font-weight:600}.section-detail{font-size:10px;line-height:12px;color:var(--secondary);text-align:right}.data-row{display:grid;grid-template-columns:88px 1fr 72px;column-gap:8px;align-items:center;position:relative}.site-row{height:28px}.check-row{min-height:19px}.traffic-row{height:24px}.row-name{font-size:13px;line-height:16px;white-space:nowrap}.row-sub{font-size:10px;line-height:12px;color:var(--secondary)}.row-value{text-align:right;font-size:13px;font-weight:600;line-height:16px;white-space:nowrap}.row-value small{font-size:10px;color:var(--secondary);font-weight:400}.row-value .secondary{display:block;font-size:10px;font-weight:400;line-height:12px;color:var(--secondary)}.check-value{text-align:right;font-size:11px;line-height:16px}.green{color:var(--green-text)}.warn{color:var(--orange-text)}.bad{color:var(--red-text)}.neutral{color:var(--secondary)}.dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:4px;vertical-align:2px}.chart{min-width:0;position:relative;height:24px}.check-row .chart{height:10px}.chart svg{width:100%;height:100%;overflow:visible}.grid-line{stroke:var(--rule);stroke-width:.6;vector-effect:non-scaling-stroke}.plot-line{fill:none;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}.time-axis{display:grid;grid-template-columns:88px 1fr 72px;column-gap:8px;margin-top:1px;line-height:12px}.ticks{display:flex;justify-content:space-between;gap:3px;font-size:10px;color:var(--secondary);white-space:nowrap}.legend{font-size:10px;line-height:12px;color:var(--secondary);margin-top:2px;display:flex;gap:7px;align-items:center}.legend .failure-key{color:var(--red-text);font-weight:700}.swatch{display:inline-block;width:12px;height:5px;vertical-align:1px;margin-right:3px}.missing-key{display:inline-block;width:12px;height:7px;margin-right:3px;background:repeating-linear-gradient(135deg,transparent 0 2px,var(--gray) 2px 3px);opacity:.6}.timeline-key{display:flex;justify-content:space-between;font-size:10px;line-height:12px;color:var(--secondary);margin-top:3px}.timeline-key span{white-space:nowrap}
+.status-icon.green,.status-icon.warn,.status-icon.bad{color:#fff}.chart-inspector{font-size:11px;line-height:1.6;color:var(--secondary);padding:5px 0 1px;display:none}.chart-inspector.visible{display:block}.probe-line{stroke:var(--secondary);stroke-width:1;stroke-dasharray:2 2;opacity:0;pointer-events:none;vector-effect:non-scaling-stroke}.inspecting .probe-line{opacity:.8}.chart[tabindex]{cursor:crosshair}.chart:focus-visible{outline-offset:1px}
+.egress-current{padding:2px 0 4px}.egress-target{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;line-height:16px}.egress-target small{color:var(--secondary);font-size:10px;line-height:12px}.ip-line{display:flex;justify-content:space-between;gap:6px;align-items:baseline}.ip{font-size:13px;font-weight:400;line-height:16px;overflow-wrap:anywhere;word-break:normal;min-width:0;flex:1}.history{margin-top:7px;border-top:1px solid var(--rule);padding-top:7px}.history-heading{font-size:11px;font-weight:600;line-height:15px;margin-bottom:4px}.change{position:relative;padding-left:12px;margin-top:8px;border-left:1px solid var(--rule)}.change:before{content:"";position:absolute;width:5px;height:5px;left:-3px;top:5px;border-radius:50%;background:var(--gray)}.change-time{font-size:11px;line-height:15px;display:flex;justify-content:space-between;gap:8px}.change-region{font-size:11px;line-height:16px;color:var(--secondary)}.change .ip{display:block;font-size:11px;line-height:16px}.sample-caveat{font-size:10px;line-height:15px;color:var(--secondary);margin-top:8px}.muted-empty{font-size:11px;color:var(--secondary);line-height:16px;padding:4px 0}
+.notes{padding:30px 24px 56px;border-top:1px solid #bdbdc7}.notes h2{font-size:19px;margin-bottom:16px}.note-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px 32px}.note h3{font-size:13px;margin-bottom:7px}.note p,.note li{font-size:12px;line-height:1.9;color:#50505a}.note p+p{margin-top:8px}.note ul{padding-left:18px;margin:6px 0}.note table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px;line-height:1.7}.note th{text-align:left;font-weight:500;color:#64646c}.note td,.note th{padding:5px 7px 5px 0;border-bottom:1px solid #c7c7d0;vertical-align:top}.note-wide{grid-column:1/-1}.note code{overflow-wrap:anywhere}.page-foot{margin-top:28px;font-size:11px;color:#64646c;line-height:1.8}
+@media(max-width:820px){.pair{grid-template-columns:360px;gap:24px}.note-grid{grid-template-columns:1fr}.page-head,.gallery,.notes{padding-left:16px;padding-right:16px}.page-head h1{font-size:24px}.note-wide{grid-column:auto}}@media(max-width:391px){body{min-width:384px}.gallery{padding-left:12px;padding-right:12px}.pair{justify-content:start}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}@media print{body{background:#fff}.viewport{height:auto;overflow:visible}.review-bar{display:none}.scenario{break-inside:avoid}.tab-panel{box-shadow:none;border:1px solid #ccc}.fold{display:none}}
+</style>
+</head>
+<body>
+<header class="page-head">
+  <div class="eyebrow">MEOWMAC / NETWORK / CODEX · 2026-10-04</div>
+  <h1>把变化放在同一条时间轴上</h1>
+  <p class="intro">网络页独立设计稿。左边认对象，中间看变化，右边读当前值。延迟、检查状态和速率共用时间轴；出口 IP 单独保留 30 天记录。</p>
+  <div class="review-bar">
+    <button class="review-toggle" id="full-length" aria-pressed="false">展开完整稿</button>
+    <div class="review-meta"><span>网络内容区 360 × 540 pt</span><span>总览、标签页与底栏约 280 pt，此处省略</span><span>全部数据为合成示例</span></div>
+  </div>
+  <p class="scenario-description">每个面板可独立切换时间范围、滚动和复测演示。悬停或聚焦图表可读详情。“展开完整稿”只用于审稿。</p>
+</header>
+<main class="gallery" id="gallery" aria-label="网络页设计状态对照"></main>
+<section class="notes" aria-labelledby="notes-title">
+  <h2 id="notes-title">版式与数据约定</h2>
+  <div class="note-grid">
+    <article class="note">
+      <h3>版式结构与首屏</h3>
+      <p>只画网络标签页。每块宽 328 pt，左右各留 16 pt。正文平铺，不叠加玻璃卡片。结论和复测固定在页内最前，检测时间与范围胶囊共用下一行。默认内容首屏高 540 pt，虚线标出边界；展开后虚线仍留在同一位置。</p>
+      <p>默认顺序为站点、检查、速率、出口。首屏可见三组延迟、五条状态时间线、两条速率，以及第一个当前出口。第二个出口紧接首屏线，完整变化记录在下方。刚启动时多一行历史不足说明，出口块向下移动。地址和异常说明变长时增加行高，允许滚动。</p>
+      <table><thead><tr><th>区域</th><th>预计高度</th><th>内容</th></tr></thead><tbody>
+        <tr><td>结论与范围</td><td>62 pt</td><td>结论、数量、复测、时间</td></tr>
+        <tr><td><code>network.sites</code></td><td>约 131 pt</td><td>三行延迟、失败标记</td></tr>
+        <tr><td><code>network.checks</code></td><td>约 143 pt</td><td>五行状态、状态图例</td></tr>
+        <tr><td><code>network.traffic</code></td><td>约 94 pt</td><td>两行速率、共用时间刻度</td></tr>
+        <tr><td><code>network.egress</code></td><td>当前约 109 pt</td><td>两个目标，长地址换行</td></tr>
+        <tr><td>出口变化记录</td><td>约 230 pt</td><td>三条示例记录与采样说明</td></tr>
+      </tbody></table>
+      <p>以上功能块高度包含 12 pt 节间距与 1 pt 分隔线。加上 24 pt 上下边距，两个当前出口结束处约在 560 pt。完整内容约 790 pt，需要滚动。原生实现须测量实际高度，面板仍遵守最高 820 pt。</p>
+    </article>
+    <article class="note">
+      <h3>为什么采用紧凑行</h3>
+      <p>沿用系统页的行式结构。名称列 88 pt，当前值列 72 pt，中间图宽 152 pt，两侧间距各 8 pt。网络名称更短，缩小名称列，把空间留给曲线。只在速率块底部标时间，所有趋势图的中点和右端严格对齐。该块隐藏或重排时，将刻度移到最后一个可见的趋势块。</p>
+      <p>正常检查不常驻第二行说明。悬停或键盘聚焦整行可读完整说明和事件时间。异常的具体对象与持续时间直接写在顶部结论；行尾写“提醒”或“失效”。VPN 的绿态文案为“符合预期”，悬停说明“当前断开，符合配置预期”。</p>
+      <p>计数统一写“4 项通过 · 1 项未确认”；未确认不计入通过，也不因它单独显示异常。结论沿用数据源的严重程度，设计不新增健康阈值。历史里的短暂失败保留红色标记；恢复后当前结论仍按当前状态显示。</p>
+    </article>
+    <article class="note">
+      <h3>曲线、状态与缺失</h3>
+      <p>延迟统一用 <code>systemBlue</code>。下行用 <code>systemTeal</code>，上行用 <code>systemPurple</code>，后者同时使用虚线。颜色辨认指标，绿、橙、红只表示状态。字色、字号和玻璃范围遵守 SPEC；数字用等宽数字，IP 用等宽字体。HTML 的淡色底仅模拟透过桌面的材质。</p>
+      <ul>
+        <li>延迟三组共用窗口量程。最低为 0，最高覆盖窗口最大值并向上取整。量程、采样时间和通过数量放在图表详情里，不增加常驻纵轴。</li>
+        <li>失败轮次画红色短线和叉号。部分站点失败时保留成功样本的延迟中位数；全部失败时曲线断开，当前值写“失败”，不连线、不置零。</li>
+        <li>状态时间线画连续区间。绿为通过，橙为提醒，红为失败，实心灰为未确认。斜纹代表没有记录，和“未确认”区别呈现。</li>
+        <li>子网目标为 0 / 0 时，写“不探测 · 当前同网段”；图中不画延迟。本文的 24 小时示例展示这个状态。</li>
+        <li>刚启动只在最近 7 分钟画样本，前 53 分钟留斜纹。休眠、退出和采集缺口也不连线。更早仍有效的持久化出口记录可继续显示。</li>
+      </ul>
+    </article>
+    <article class="note">
+      <h3>出口 IP 的独立时间尺度</h3>
+      <p>出口固定展示最近 30 天，完全独立于“1 小时 / 24 小时”。先列每个目标最新成功采样的地区、完整 IP 和已观察未变时长，再按时间倒序列变化记录。记录包含目标、发现时间、新地区、新 IP，以及上一条记录的地区和 IP。</p>
+      <p>当前 IP 使用 13 pt 等宽字体，独占一行。IPv6 不省略，必要时按字符换行。历史地址使用 11 pt 等宽字体。目标名和地区过长也换行，不隐藏文字。采样失败时写“本轮采样失败”，旧值标“上次成功”，不将未变时长刷新到当前。无成功结果写“等待采样”；无变化记录写“已记录范围内没有出口变化”，不暗示整个 30 天都未变。</p>
+      <p>默认每 60 分钟采样。时间表示“首次采到新出口”，真实切换发生在前后两次成功采样之间。记录不宣称精确切换时刻，也不虚构“变化次数百分比”。复测不加密出口采样频率。</p>
+    </article>
+    <article class="note note-wide">
+      <h3>需要新增的数据记录</h3>
+      <table><thead><tr><th>数据</th><th>记录方式</th><th>显示边界</th></tr></thead><tbody>
+        <tr><td>站点探测</td><td>MeowMac 按轮保存时间、组、通过数、总数、延迟中位数和探测是否跳过。以轮次去重，不把打开面板或重复读取当新一轮。</td><td>约 2 分钟一轮。1 小时保留轮次；24 小时显示 10 分钟汇总，保留任一失败标记、失败轮数和延迟范围。缺口保持缺口。</td></tr>
+        <tr><td>上下行速率</td><td>复用 MeowMac 每 2 秒系统采样，新增时间、下行、上行及有效性记录。当前值仍用最新采样；历史保存分桶统计。</td><td>1 小时按 30 秒桶，24 小时按 5 分钟桶。画平均值，保留并可查桶内峰值，图中显示峰值范围。不把负值或失败样本记成 0。</td></tr>
+        <tr><td>检查状态</td><td>以公开的当前检查值建立已观察起点，用 <code>recentEvents</code> 补充可归属检查项的变化。MeowMac 新增五项状态变化、说明和观察区间的本地记录。</td><td>现有日志最多 200 条，不能保证覆盖 24 小时，也不必含每项初始绿态。仅能确定的区间着色；无法映射的事件不补画。采集间断用斜纹。</td></tr>
+        <tr><td>出口 IP</td><td>复用 <code>egressState.history</code>，逐目标整理变化记录。不新增探测，也不复制整份出口历史。</td><td>沿用 30 天保留与目标采样间隔。基于成功采样对比 IP；初次发现显示“首次记录”，失败不算 IP 变化。</td></tr>
+      </tbody></table>
+      <p>新增的站点、检查和速率记录由 MeowMac 自己维护，存入 <code>~/Library/Application Support/MeowMac/</code>。设计建议保留至少 24 小时并记录缺口，不修改 TunCanary。图表仅使用已经采到的记录，不能从现有最近 5 轮反推一整天历史。</p>
+    </article>
+    <article class="note">
+      <h3>功能块与兼容</h3>
+      <p>新增一个可排序、可隐藏的块 <code>network.traffic</code>。默认顺序：<code>network.sites</code> → <code>network.checks</code> → <code>network.traffic</code> → <code>network.egress</code>。三个现有 id 保留。结论、检测时间、复测和时间切换保留在固定内容。</p>
+      <p>后续实现需扩展功能块清单和布局读取兼容：旧布局缺少速率块时，在出口块之前插入，并保留原有顺序与显隐。显式保存才写新布局。全部趋势块隐藏时隐藏范围胶囊；隐藏故障块仍保留总览告警和页状态点。</p>
+    </article>
+    <article class="note">
+      <h3>与现有页面相比</h3>
+      <p>把三个时刻快照变成同轴历史。五项检查压到约 100 pt 的行区，说明按需看。当前结论和通过数量使用同一口径；VPN 的当前连接状态通过完整说明解释。站点三行同时给出当前通过数、延迟和过去失败。出口的当前值进入首屏，长地址可换行，变化记录移入自己的 30 天尺度。</p>
+      <p>取舍是中间图宽约 152 pt，适合看走势，细节要悬停或聚焦读取。24 小时必须汇总，保留失败和峰值信息。完整出口历史需要滚动。本文不新增诊断按钮、设置或网络操作。</p>
+    </article>
+  </div>
+  <p class="page-foot">设计依据：brief.md、SPEC.md、system-tab-redesign.html、Network.dc.html、NetworkPage.swift 与 PANEL_LAYOUT_FORMAT.md。稿件只模拟展示，复测按钮不访问网络。样例时刻固定为 2026-10-04 15:00。浅色与深色均覆盖五种状态。</p>
+</section>
+<script>
+"use strict";
+const examples = [
+  {id:"normal",title:"现在正常，过去有过一次失败",description:"4 项通过、Tailnet 未确认。海外在 14:32 有 1 轮全部失败，14:34 恢复。过去的失败留下记录，当前结论保持正常。",range:"hour"},
+  {id:"warn",title:"提醒：代理 DNS 已黄 8 分钟",description:"代理 DNS 待验证，不宣称 DNS 泄漏。海外延迟从约 300 ms 抬到 900 ms；时间线和曲线可直接比较发生时段。",range:"hour"},
+  {id:"severe",title:"严重：TUN 失效，海外连续失败",description:"TUN 在 14:48 开始失效。海外自 14:50 起连续 6 轮失败，曲线断开；保留最近一次成功值的时间，失败不显示为 0 ms。",range:"hour"},
+  {id:"day",title:"24 小时：看跨日变化",description:"从 10 月 3 日 15:00 到 10 月 4 日 15:00。有两段历史异常与一段采集缺口；子网当前同网段，不探测。24 小时汇总保留短暂失败和速率峰值。",range:"day"},
+  {id:"startup",title:"刚启动：仅积累了 7 分钟",description:"站点和速率只画已观察的时间，不拉伸填满 1 小时。本例没有可恢复的检查起点。出口 IP 来自持久化记录，仍能显示启动前的变化。",range:"hour"}
+];
+const modes = ["light","dark"];
+const esc = value => String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const wave = (x,seed=0) => Math.sin(x*25+seed)*.65 + Math.sin(x*69+seed*2)*.35;
+const state = new Map();
+const color = tone => `var(--${tone})`;
+const toneText = tone => tone==="orange"?"warn":tone==="red"?"bad":tone==="green"?"green":"neutral";
+function current(id){
+  const serious=id==="severe",warn=id==="warn";
+  return {tone:serious?"red":warn?"orange":"green",icon:serious?"×":warn?"!":"✓",title:serious?"TUN 失效 · 12 分钟":warn?"代理 DNS 提醒 · 8 分钟":"网络正常",counts:serious?"3 项通过 · 1 项失败 · 1 项未确认":warn?"3 项通过 · 1 项提醒 · 1 项未确认":"4 项通过 · 1 项未确认"};
+}
+function timeAt(fraction,range,withDate=false){
+  const end=Date.UTC(2026,9,4,15,0),span=(range==="day"?24:1)*3600000;
+  const d=new Date(end-span+fraction*span);
+  const hm=`${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")}`;
+  return (withDate?`${d.getUTCMonth()+1}/${d.getUTCDate()} `:"")+hm;
+}
+function absent(x,id,range){
+  if(id==="startup")return x<1-7/(range==="day"?1440:60);
+  return range==="day"&&id==="day"&&x>.40&&x<.435;
+}
+function failed(x,id,range,group){
+  if(group!==1)return false;
+  if(id==="severe")return x>=1-10/(range==="day"?1440:60);
+  if(range==="day")return id==="normal"?(x>=1-28/1440&&x<1-26/1440):id==="day"&&((x>=.273&&x<.281)||(x>=.702&&x<.716));
+  return id==="normal"&&x>=32/60&&x<34/60;
+}
+function data(id,range,type,group=0){
+  const n=range==="day"?(type==="site"?144:288):(type==="site"?30:120);
+  return Array.from({length:n+1},(_,i)=>{
+    const x=i/n,missing=absent(x,id,range),failure=type==="site"&&failed(x,id,range,group);
+    let value;
+    if(type==="traffic")value=group===0?Math.max(.03,1.5+1.2*wave(x,1)+3.6*Math.exp(-(((x-.71)/.10)**2))):Math.max(.03,.34+.23*wave(x,3)+.28*Math.exp(-(((x-.65)/.13)**2)));
+    else value=group===0?28+6*wave(x,2):group===2?8+2*wave(x,4):150+35*wave(x,1);
+    if(type==="site"&&group===1&&id==="warn"){
+      const start=1-8/(range==="day"?1440:60);
+      value=x<start?300+40*wave(x,1):300+600*(x-start)/(1-start);
+    }
+    if(type==="site"&&group===1&&id==="severe")value=180+30*wave(x,1);
+    if(type==="site"&&group===1&&range==="day"&&x>.69&&x<.75)value+=450;
+    if(i===n){if(type==="traffic")value=group===0?2.4:.128;else value=group===0?28:group===2?8:id==="warn"?900:142;}
+    const skipped=type==="site"&&group===2&&id==="day";
+    return {x,value:missing||failure||skipped?null:value,missing,failure,skipped,low:Math.max(0,value*(type==="site"?.82:.52)),high:value*(type==="site"?1.22:1.6)};
+  }).map((point,i)=>{
+    if(range!=="day"||type!=="site")return {...point,failedRounds:point.failure?1:0,totalRounds:1};
+    // 24 小时以 10 分钟桶展示，逐个检查桶内的 2 分钟轮次。
+    // 单轮失败仍有标记；同桶有成功样本时保留延迟曲线。
+    const start=Math.max(0,point.x-1/n),raw=Array.from({length:i===0?1:5},(_,j)=>i===0?0:start+(j+1)/720);
+    const observed=raw.filter(x=>!absent(x,id,range));
+    const failedRounds=observed.filter(x=>failed(x,id,range,group)).length;
+    const allFailed=observed.length>0&&failedRounds===observed.length;
+    const value=allFailed?null:point.value===null&&point.failure&&!point.skipped&&!point.missing?(group===1?150+35*wave(point.x,1):point.value):point.value;
+    return {...point,failure:failedRounds>0,failedRounds,totalRounds:observed.length,value};
+  });
+}
+function background(uid){return `<defs><pattern id="h-${uid}" patternUnits="userSpaceOnUse" width="5" height="5"><path d="M-1 1L1-1M0 5L5 0M4 6L6 4" stroke="var(--gray)" stroke-width=".65" opacity=".45"/></pattern></defs><path d="M0 24H152" class="grid-line"/><path d="M0 0V24M76 0V24M152 0V24" class="grid-line"/>`;}
+function missingIntervals(id,range){if(id==="startup")return [[0,1-7/(range==="day"?1440:60)]];if(id==="day"&&range==="day")return [[.40,.435]];return [];}
+function spark(id,range,type,group,uid){
+  const pts=data(id,range,type,group),max=type==="traffic"?(group===0?10:2):id==="warn"?1200:range==="day"?900:300;
+  let parts=`<svg viewBox="0 0 152 24" preserveAspectRatio="none" role="img" aria-label="${type==="site"?"延迟与失败轮次":"速率历史"}">${background(uid)}`;
+  for(const [a,b] of missingIntervals(id,range))parts+=`<rect x="${a*152}" y="0" width="${(b-a)*152}" height="24" fill="url(#h-${uid})"/>`;
+  if(id==="day"&&type==="site"&&group===2)parts+=`<text x="76" y="16" fill="var(--secondary)" font-size="10" text-anchor="middle">未探测</text>`;
+  const c=type==="site"?"blue":group===0?"teal":"purple";
+  let path="",pen=false;
+  for(const p of pts){if(p.value===null){pen=false;continue}path+=`${pen?"L":"M"}${(p.x*152).toFixed(2)},${(22-Math.min(max,p.value)/max*20).toFixed(2)} `;pen=true;}
+  if(range==="day"||type==="traffic"){
+    // 分桶后的范围线保留局部峰值，不将汇总均值当作原始峰值。
+    for(const p of pts){if(p.value===null)continue;const y1=22-Math.min(max,p.high)/max*20,y2=22-p.low/max*20;parts+=`<path d="M${p.x*152} ${y1}V${y2}" stroke="${color(c)}" opacity=".16" stroke-width="1" vector-effect="non-scaling-stroke"/>`;}
+  }
+  parts+=`<path d="${path}" class="plot-line" stroke="${color(c)}" ${type==="traffic"&&group===1?'stroke-dasharray="3 2"':""}/>`;
+  for(const p of pts){if(p.failure){const x=p.x*152;parts+=`<rect x="${Math.min(149,x-1.5)}" y="0" width="3" height="24" fill="var(--red)" opacity=".14"/><path d="M${x-2} 18L${x+2} 22M${x+2} 18L${x-2} 22" stroke="var(--red)" stroke-width="1.1" vector-effect="non-scaling-stroke"/>`;}}
+  const last=pts.at(-1);if(last.value!==null)parts+=`<circle cx="152" cy="${22-last.value/max*20}" r="1.7" fill="${color(c)}"/>`;
+  return parts+`<path class="probe-line" d="M76 0V24"/></svg>`;
+}
+function checkState(id,range,index,x){
+  if(absent(x,id,range))return "missing";
+  if(index===4)return "gray";
+  if(id==="warn"&&index===3&&x>=1-8/(range==="day"?1440:60))return "orange";
+  if(id==="severe"&&index===0&&x>=1-12/(range==="day"?1440:60))return "red";
+  if(id==="day"&&range==="day"&&index===3&&x>=.69&&x<.75)return "orange";
+  if(id==="day"&&range==="day"&&index===0&&x>=.70&&x<.72)return "red";
+  return "green";
+}
+function statusAt(id,range,index){
+  const boundaries=[0,1,...missingIntervals(id,range).flat()];
+  if(id==="warn"&&index===3)boundaries.push(1-8/(range==="day"?1440:60));
+  if(id==="severe"&&index===0)boundaries.push(1-12/(range==="day"?1440:60));
+  if(id==="day"&&range==="day"&&index===3)boundaries.push(.69,.75);
+  if(id==="day"&&range==="day"&&index===0)boundaries.push(.70,.72);
+  const sorted=[...new Set(boundaries)].sort((a,b)=>a-b);
+  return sorted.slice(0,-1).map((start,i)=>({start,end:sorted[i+1],tone:checkState(id,range,index,(start+sorted[i+1])/2)}));
+}
+function timeline(id,range,index,uid){
+  let html=`<svg viewBox="0 0 152 24" preserveAspectRatio="none" role="img" aria-label="检查状态时间线">${background(uid)}`;
+  for(const s of statusAt(id,range,index))html+=`<rect x="${s.start*152}" y="4" width="${(s.end-s.start)*152}" height="16" fill="${s.tone==="missing"?`url(#h-${uid})`:color(s.tone)}" opacity="${s.tone==="gray"?.6:.85}"/>`;
+  return html+`<path class="probe-line" d="M76 0V24"/></svg>`;
+}
+function chartMark(type,index,html,title){return `<div class="chart" tabindex="0" data-type="${type}" data-index="${index}" aria-label="${esc(title)}" title="${esc(title)}">${html}</div>`;}
+function sites(id,range,key){
+  let html=`<section class="block" data-block="network.sites"><div class="section-head"><h3 class="section-title">站点延迟</h3><span class="section-detail">${range==='day'?'10 分钟汇总 · 2 分钟探测':'约 2 分钟一轮'}</span></div>`;
+  ["国内","海外","子网目标"].forEach((name,i)=>{
+    const bad=id==="severe"&&i===1,skip=id==="day"&&i===2,warning=id==="warn"&&i===1;
+    const latency=i===0?28:i===2?8:warning?900:142;
+    const count=bad?"0 / 4 通过":skip?"0 / 0 · 不探测":i===0?"3 / 3 通过":i===1?"4 / 4 通过":"2 / 2 通过";
+    const detail=skip?"当前同网段":bad?"连续 6 轮失败":"延迟中位数";
+    const label=skip?`${name}，当前同网段，不探测。`:bad?`${name}，最近成功为 14:48，约 180 ms；最新 6 轮全部失败。`:`${name}，最新一轮 ${count}，延迟中位数 ${latency} ms。蓝线仅表示延迟，不表示状态。`;
+    html+=`<div class="data-row site-row"><div><div class="row-name">${name}</div><div class="row-sub ${bad?'bad':skip?'neutral':'green'}">${count}</div></div>${chartMark("site",i,spark(id,range,"site",i,`${key}-site-${i}`),label)}<div class="row-value ${bad?'bad':warning?'warn':''}">${bad?"失败":skip?"—":`${latency}<small> ms</small>`}<span class="secondary">${detail}</span></div></div>`;
+  });
+  return html+`<div class="legend"><span><span class="failure-key">×</span> 失败轮次</span><span>全部失败处断线</span></div></section>`;
+}
+function checks(id,range,key){
+  const names=["代理 TUN","VPN","主网络 DNS","代理 DNS","Tailnet"];
+  let html=`<section class="block" data-block="network.checks"><div class="section-head"><h3 class="section-title">连接检查</h3><span class="section-detail">每 20 秒检查</span></div>`;
+  names.forEach((name,i)=>{
+    const tone=checkState(id,range,i,1),label=tone==="orange"?"提醒":tone==="red"?"失效":tone==="gray"?"未确认":i===1?"符合预期":"通过";
+    const details=i===0?(id==="severe"?"TUN 失效，自 14:48 持续 12 分钟。":"TUN 已启用，默认路由经过代理。"):i===1?"当前断开，符合配置预期。绿色表示检查通过，不表示已连接。":i===2?"主网络解析器与配置预期一致。":i===3?(id==="warn"?"代理 DNS 解析结果待验证，自 14:52 持续 8 分钟。":"解析请求经过代理，符合配置预期。"):"Tailnet 尚未确认，不能记作通过。";
+    html+=`<div class="data-row check-row" title="${esc(details)}"><div class="row-name">${name}</div>${chartMark("check",i,timeline(id,range,i,`${key}-check-${i}`),`${name}：${details}`)}<div class="check-value ${toneText(tone)}">${label}</div></div>`;
+  });
+  return html+`<div class="timeline-key"><span><i class="swatch" style="background:var(--green)"></i>通过 <i class="swatch" style="background:var(--orange)"></i>提醒 <i class="swatch" style="background:var(--red)"></i>失败</span><span><i class="swatch" style="background:var(--gray)"></i>未确认</span></div></section>`;
+}
+function traffic(id,range,key){
+  let html=`<section class="block" data-block="network.traffic"><div class="section-head"><h3 class="section-title">上下行速率</h3><span class="section-detail">整机 · ${range==='day'?'5 分钟':'30 秒'}均值</span></div>`;
+  ["下行","上行"].forEach((name,i)=>{
+    html+=`<div class="data-row traffic-row"><div class="row-name"><i class="dot" style="background:var(--${i===0?'teal':'purple'})"></i>${name}</div>${chartMark("traffic",i,spark(id,range,"traffic",i,`${key}-traffic-${i}`),`${name}速率，最新${i===0?' 2.4 MB/s':' 128 KB/s'}。历史曲线为桶内平均，浅色竖线为范围。`)}<div class="row-value">${i===0?'2.4<small> MB/s</small>':'128<small> KB/s</small>'}</div></div>`;
+  });
+  return html+`<div class="time-axis"><span class="tiny"><i class="missing-key"></i>无记录</span><div class="ticks"><span>${timeAt(0,range)}</span><span>${timeAt(.5,range)}</span><span>${timeAt(1,range)}</span></div><span class="tiny" style="text-align:right">${range==='day'?'10/3 → 10/4':'10 月 4 日'}</span></div></section>`;
+}
+function egress(id){
+  return `<section class="block" data-block="network.egress"><div class="section-head"><h3 class="section-title">出口 IP</h3><span class="section-detail">记录 30 天 · 每 60 分钟采样</span></div>
+  <div class="egress-current"><div class="egress-target"><span>Cloudflare</span><small>日本 · 东京 · 2 小时未变</small></div><div class="ip-line"><span class="ip">203.0.113.42</span></div></div>
+  <div class="egress-current"><div class="egress-target"><span>Claude</span><small>新加坡 · 3 天未变</small></div><div class="ip-line"><span class="ip">2001:db8:1234:5678:abcd:ef01:2345:6789</span></div></div>
+  <div class="history"><div class="history-heading">最近变化 <span class="tiny">· 最近 30 天，按发现时间</span></div>
+  <div class="change"><div class="change-time"><span>10/4 13:00</span><span>Cloudflare</span></div><div class="change-region">新加坡 → 日本 · 东京</div><span class="ip">203.0.113.42</span><div class="tiny">上次 10/4 12:00 · <span class="ip">198.51.100.17</span></div></div>
+  <div class="change"><div class="change-time"><span>10/1 15:00</span><span>Claude</span></div><div class="change-region">日本 · 东京 → 新加坡</div><span class="ip">2001:db8:1234:5678:abcd:ef01:2345:6789</span><div class="tiny">上次 10/1 14:00 · <span class="ip">2001:db8:aa00:1::27</span></div></div>
+  <div class="change"><div class="change-time"><span>9/28 09:00</span><span>Cloudflare</span></div><div class="change-region">美国 · 洛杉矶 → 新加坡</div><span class="ip">198.51.100.17</span><div class="tiny">上次 9/28 08:00 · <span class="ip">192.0.2.86</span></div></div>
+  <p class="sample-caveat">时间是首次采到新 IP 的时刻。真实切换发生在前后两次成功采样之间。最新出口采样于 15:00。</p></div></section>`;
+}
+function renderPanel(key){
+  const s=state.get(key),c=current(s.id),panel=document.querySelector(`[data-panel="${key}"]`);
+  panel.innerHTML=`<div class="headline"><div class="status-icon ${toneText(c.tone)}" aria-hidden="true">${c.icon}</div><div class="status-copy"><div class="conclusion">${c.title}</div><div class="count">${c.counts}</div></div><button class="capsule recheck">立即复测</button></div>
+  <div class="meta-row"><span class="caption checked-at" aria-live="polite">12 秒前检测</span><div class="segment" aria-label="历史时间范围"><button data-range="hour" aria-pressed="${s.range==='hour'}">1 小时</button><button data-range="day" aria-pressed="${s.range==='day'}">24 小时</button></div></div>
+  ${s.id==='startup'?'<div class="startup-note">已记录 7 分钟，较早时段暂无数据。</div>':''}
+  ${sites(s.id,s.range,key)}${checks(s.id,s.range,key)}${traffic(s.id,s.range,key)}<div class="chart-inspector" aria-live="polite"></div>${egress(s.id)}`;
+  panel.querySelectorAll("[data-range]").forEach(button=>button.addEventListener("click",()=>{const next=button.dataset.range;if(s.range===next)return;s.range=next;renderPanel(key);panel.querySelector(`[data-range="${next}"]`).focus();}));
+  panel.querySelector(".recheck").addEventListener("click",event=>{
+    const button=event.currentTarget;button.disabled=true;button.textContent="正在检测…";panel.querySelector(".checked-at").textContent="演示检测中";
+    setTimeout(()=>{if(!button.isConnected)return;button.disabled=false;button.textContent="立即复测";panel.querySelector(".checked-at").textContent="刚刚检测（演示）";},650);
+  });
+  panel.querySelectorAll(".chart").forEach(chart=>{
+    chart.addEventListener("pointermove",event=>{const box=chart.getBoundingClientRect();inspect(panel,s,chart,Math.max(0,Math.min(1,(event.clientX-box.left)/box.width)));});
+    chart.addEventListener("focus",()=>inspect(panel,s,chart,1));
+    chart.addEventListener("keydown",event=>{if(event.key==="ArrowLeft"||event.key==="ArrowRight"){event.preventDefault();const x=Number(chart.dataset.cursor||1)+(event.key==="ArrowLeft"?-.05:.05);inspect(panel,s,chart,Math.max(0,Math.min(1,x)));}});
+    chart.addEventListener("pointerleave",()=>{if(document.activeElement!==chart)clearInspect(panel);});
+    chart.addEventListener("blur",()=>clearInspect(panel));
+  });
+}
+function inspect(panel,s,chart,x){
+  panel.classList.add("inspecting");chart.dataset.cursor=x;
+  panel.querySelectorAll(".probe-line").forEach(line=>line.setAttribute("d",`M${x*152} 0V24`));
+  const type=chart.dataset.type,i=Number(chart.dataset.index),out=panel.querySelector(".chart-inspector"),t=timeAt(x,s.range,true);
+  let text;
+  if(type==="check"){
+    const interval=statusAt(s.id,s.range,i).find(row=>x>=row.start&&x<=row.end),tone=interval?.tone||"missing";
+    const name=["代理 TUN","VPN","主网络 DNS","代理 DNS","Tailnet"][i],word={green:"通过",orange:"提醒",red:"失败",gray:"未确认",missing:"无记录"}[tone];
+    text=`${t} · ${name}：${word}。${tone==="missing"?"这个时段没有可确认的状态。":`${timeAt(interval.start,s.range,true)} 至 ${timeAt(interval.end,s.range,true)}。`} ${chart.title}`;
+  }else{
+    const series=data(s.id,s.range,type,i),p=series[Math.round(x*(series.length-1))];
+    const name=type==="site"?["国内","海外","子网目标"][i]:["下行","上行"][i];
+    const value=p.missing?"无记录":p.skipped?"当前同网段，未探测":p.value===null?`全部失败；${p.failedRounds} 轮失败`:type==="site"?`${Math.round(p.value)} ms；${p.failedRounds?`${p.totalRounds} 轮中 ${p.failedRounds} 轮失败；`:''}量程 0～${s.id==='warn'?1200:s.range==='day'?900:300} ms`:`均值 ${p.value.toFixed(2)} MB/s，桶内峰值 ${p.high.toFixed(2)} MB/s`;
+    text=`${timeAt(p.x,s.range,true)} · ${name}：${value}。${s.range==='day'&&type==='site'?'10 分钟汇总，保留失败轮次与延迟范围。':''}`;
+  }
+  out.textContent=text;out.classList.add("visible");
+}
+function clearInspect(panel){panel.classList.remove("inspecting");panel.querySelector(".chart-inspector").classList.remove("visible");}
+const gallery=document.getElementById("gallery");
+examples.forEach((sample,index)=>{
+  const section=document.createElement("section");section.className="scenario";
+  section.innerHTML=`<div class="scenario-head"><span class="scenario-number">0${index+1}</span><div><h2>${sample.title}</h2><p class="scenario-description">${sample.description}</p></div></div><div class="pair"></div>`;
+  modes.forEach(mode=>{
+    const key=`${sample.id}-${mode}`;state.set(key,{id:sample.id,range:sample.range});
+    const board=document.createElement("article");board.className="board";
+    board.innerHTML=`<div class="board-label"><b>${mode==='dark'?'深色':'浅色'}</b><span>360 pt · 网络标签页</span></div><div class="tab-panel ${mode==='dark'?'dark':''}"><div class="viewport" aria-label="${sample.title}，${mode==='dark'?'深色':'浅色'}网络页"><div class="tab-content" data-panel="${key}"></div></div><div class="fold"><span>首屏线 · 540 pt</span></div></div><p class="board-caption">虚线以下需要滚动。固定总览与底栏未画出；出口记录不随趋势范围切换。</p>`;
+    section.querySelector(".pair").append(board);
+  });gallery.append(section);
+});
+state.forEach((value,key)=>renderPanel(key));
+document.getElementById("full-length").addEventListener("click",event=>{const on=document.body.classList.toggle("full-length");event.currentTarget.setAttribute("aria-pressed",String(on));event.currentTarget.textContent=on?"收起到首屏":"展开完整稿";});
+</script>
+</body>
+</html>
