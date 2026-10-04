@@ -1,5 +1,6 @@
 import Foundation
 import MeowMacCore
+import MeowMacSystem
 
 /// 失控进程和内存压力的持续判定。每个样本代表一个完整采样间隔的平均 CPU。
 enum EnergyTrackerTests {
@@ -82,5 +83,50 @@ enum EnergyTrackerTests {
         guard let resumed = feed(&tracker, minutes: 29..<30, cpu: 1, pressure: .critical),
               !resumed.prolongedMemoryPressure, resumed.memoryPressureDuration == 0 else { return false }
         return feed(&tracker, minutes: 30..<40, cpu: 1, pressure: .critical)?.prolongedMemoryPressure == true
+    }
+
+    /// 短样本的输出：排行换成这次样本，失控进程沿用上一次完整样本，不闪烁，CPU 也不是瞬时值。
+    static func shortSampleKeepsRunaway() -> Bool {
+        var tracker = EnergyTracker()
+        guard let long = feed(&tracker, minutes: 0..<10, cpu: 95), long.runaway.map(\.pid) == [42] else { return false }
+        let other = ProcessEnergy(pid: 7, name: "Other", cpuPercent: 30, impact: 9)
+        // 失控进程这 1 秒没进前 10，或者只有 1%：都不能让它从失控列表里消失。
+        let absent = tracker.evaluate(processes: [other], pressure: .normal, now: at(9).addingTimeInterval(20), config: config, coverage: 1)
+        let quiet = tracker.evaluate(processes: [process(1), other], pressure: .normal, now: at(9).addingTimeInterval(30), config: config, coverage: 1)
+        guard absent.topFive.map(\.pid) == [7], absent.runaway.map(\.pid) == [42], absent.runaway.first?.cpuPercent == 95,
+              quiet.topFive.map(\.pid) == [42, 7], quiet.runaway.first?.cpuPercent == 95,
+              quiet.runawayDurations[42] == 630 else { return false }
+        // 完整样本落回阈值以下后，短样本不再显示它。
+        _ = tracker.evaluate(processes: [process(10)], pressure: .normal, now: at(10), config: config)
+        return tracker.evaluate(processes: [process(95)], pressure: .normal, now: at(10).addingTimeInterval(10), config: config, coverage: 1).runaway.isEmpty
+    }
+
+    /// 断档阈值是采样间隔的 2.5 倍：149 秒的间隔继续累计，151 秒清零。
+    static func gapBoundary() -> Bool {
+        // 判定后的 aboveSince 通过持续时长间接观察：用一个很短的 runawaySeconds 读出来。
+        var short = config; short.runawaySeconds = 100
+        func duration(gap: TimeInterval) -> TimeInterval? {
+            var tracker = EnergyTracker()
+            _ = tracker.evaluate(processes: [process(95)], pressure: .normal, now: start, config: short)
+            return tracker.evaluate(processes: [process(95)], pressure: .normal, now: start.addingTimeInterval(gap), config: short).runawayDurations[42]
+        }
+        return duration(gap: 149) == 209 && duration(gap: 150) == 210 && duration(gap: 151) == nil
+    }
+
+    /// 采样间隔来自用户可编辑的配置，越界回退默认值；`top` 的参数再限制一次。
+    static func sampleSecondsValidation() -> Bool {
+        func decode(_ value: String) -> Double? {
+            (try? JSONDecoder().decode(LocalConfig.self, from: Data("{\"processSampleSeconds\": \(value)}".utf8)))?.processSampleSeconds
+        }
+        let fallback = LocalConfig().processSampleSeconds
+        guard decode("42") == 42, decode("10") == 10, decode("600") == 600,
+              decode("-1") == fallback, decode("0") == fallback, decode("9.9") == fallback,
+              decode("601") == fallback, decode("1e300") == fallback else { return false }
+        func seconds(_ window: TimeInterval) -> String? {
+            let arguments = EnergySampler.arguments(window: window)
+            return arguments.firstIndex(of: "-s").map { arguments[$0 + 1] }
+        }
+        return seconds(60) == "60" && seconds(.nan) == "1" && seconds(-5) == "1" && seconds(1e300) == "600"
+            && EnergySampler.arguments(window: 60).starts(with: ["-l", "2"])
     }
 }

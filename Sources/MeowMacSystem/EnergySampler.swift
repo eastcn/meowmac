@@ -8,7 +8,7 @@ public enum EnergySampler {
     public static func processes(window: TimeInterval = 1, rawOutput: ((Data) -> Void)? = nil) throws -> [ProcessEnergy] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/top")
-        process.arguments = ["-l", "2", "-s", String(Int(window.rounded())), "-o", "power", "-n", "10", "-stats", "pid,command,cpu,power"]
+        process.arguments = arguments(window: window)
         let output = Pipe()
         process.standardOutput = output
         process.standardError = Pipe()
@@ -22,6 +22,11 @@ public enum EnergySampler {
             let name = fullName(pid: item.pid) ?? item.name
             return ProcessEnergy(pid: item.pid, name: name, cpuPercent: item.cpuPercent, impact: item.impact)
         }
+    }
+
+    public static func arguments(window: TimeInterval) -> [String] {
+        let seconds = window.isFinite ? Int(min(max(window, 1), 600).rounded()) : 1
+        return ["-l", "2", "-s", String(seconds), "-o", "power", "-n", "10", "-stats", "pid,command,cpu,power"]
     }
 
     private static func fullName(pid: Int32) -> String? {

@@ -61,7 +61,9 @@ public struct LocalConfig: Codable, Equatable {
         sessionFinishDelaySeconds = try fields.decodeIfPresent(Double.self, forKey: .sessionFinishDelaySeconds) ?? defaults.sessionFinishDelaySeconds
         manualMergeSeconds = try fields.decodeIfPresent(Double.self, forKey: .manualMergeSeconds) ?? defaults.manualMergeSeconds
         costRefreshSeconds = try fields.decodeIfPresent(Double.self, forKey: .costRefreshSeconds) ?? defaults.costRefreshSeconds
-        processSampleSeconds = try fields.decodeIfPresent(Double.self, forKey: .processSampleSeconds) ?? defaults.processSampleSeconds
+        // 采样间隔直接传给 `top -s`：负值、0 和极大值会让采样崩溃或空转，越界回退默认值。
+        let sampleSeconds = try fields.decodeIfPresent(Double.self, forKey: .processSampleSeconds) ?? defaults.processSampleSeconds
+        processSampleSeconds = (10...600).contains(sampleSeconds) ? sampleSeconds : defaults.processSampleSeconds
         quotaHistoryDays = try fields.decodeIfPresent(Int.self, forKey: .quotaHistoryDays) ?? defaults.quotaHistoryDays
         codexBarCLIPath = try fields.decodeIfPresent(String.self, forKey: .codexBarCLIPath) ?? defaults.codexBarCLIPath
         moPath = try fields.decodeIfPresent(String.self, forKey: .moPath) ?? defaults.moPath

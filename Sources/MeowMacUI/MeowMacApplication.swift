@@ -25,8 +25,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var frame = 0
     private var frameInterval = 0.5
     private var sampleTimer: Timer?
-    private var energyLoop: Task<Void, Never>?
-    private var energyGeneration = 0
+    private var energyLoop: EnergyLoopControl?
     private var frameTimer: Timer?
     private var screenSleeping = false
     private var observers: [NSObjectProtocol] = []
@@ -63,7 +62,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         resetCoordinator = reset
         reset.start()
         panelState.onRefresh = { [weak self] in
-            self?.sample(); self?.sampleEnergy(); self?.networkBridge?.recheck(); self?.quotaCoordinator?.manualRefresh()
+            self?.sample(); self?.networkBridge?.recheck(); self?.quotaCoordinator?.manualRefresh()
             self?.resetCoordinator?.refresh()
         }
         panelState.onShowStorage = { provider in
@@ -160,28 +159,32 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
 
     /// 首尾相接地采样：每次 `top` 的窗口就是一个完整的采样间隔，
     /// 所以持续高占用的判定覆盖了整段时间。唤醒后重启，丢弃跨越休眠的那一次。
+    /// 用专用线程而不是协作线程池，因为 `top` 一次要阻塞一整个窗口。
     private func startEnergyLoop() {
         energyLoop?.cancel()
-        energyGeneration += 1
-        let generation = energyGeneration
+        let control = EnergyLoopControl()
+        energyLoop = control
         let window = configResult.config.processSampleSeconds
-        energyLoop = Task.detached { [weak self] in
-            while !Task.isCancelled {
+        let thread = Thread { [weak self] in
+            while !control.isCancelled {
                 do {
                     let processes = try EnergySampler.processes(window: window)
-                    await MainActor.run { [weak self] in
-                        guard let self, self.energyGeneration == generation else { return }
-                        self.applyEnergy(processes, coverage: window)
+                    Task { @MainActor [weak self] in
+                        guard !control.isCancelled else { return }
+                        self?.applyEnergy(processes, coverage: window)
                     }
                 } catch {
-                    await MainActor.run { [weak self] in
-                        guard let self, self.energyGeneration == generation else { return }
-                        self.energyFailed(error)
+                    Task { @MainActor [weak self] in
+                        guard !control.isCancelled else { return }
+                        self?.energyFailed(error)
                     }
-                    try? await Task.sleep(nanoseconds: UInt64(min(window, 30) * 1_000_000_000))
+                    Thread.sleep(forTimeInterval: min(window, 30))
                 }
             }
         }
+        thread.name = "io.github.eastcn.meowmac.energy"
+        thread.qualityOfService = .utility
+        thread.start()
     }
 
     private func applyEnergy(_ processes: [ProcessEnergy], coverage: TimeInterval) {
@@ -330,4 +333,11 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver($0)
         }
     }
+}
+
+private final class EnergyLoopControl: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+    var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
+    func cancel() { lock.lock(); cancelled = true; lock.unlock() }
 }

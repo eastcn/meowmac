@@ -72,18 +72,18 @@ public struct EnergyTracker {
     private var aboveSince: [Int32: Date] = [:]
     private var pressureSince: Date?
     private var lastWindowEnd: Date?
+    private var lastRunaway: [ProcessEnergy] = []
 
     public init() {}
 
     /// - Parameter coverage: 这次 CPU 数据覆盖的时长，默认等于 `processSampleSeconds`。
-    ///   短于采样间隔一半的样本（启动、手动刷新）只更新排行，不影响持续时长。
+    ///   短于采样间隔一半的样本（启动、唤醒）只替换排行；失控进程和内存压力沿用上一次完整样本的结论，
+    ///   因为 1 秒的瞬时值既不能确认也不能推翻“持续”。
     public mutating func evaluate(processes: [ProcessEnergy], assertions: [SleepAssertion] = [],
                                   pressure: MemoryPressure, now: Date, config: LocalConfig,
                                   coverage: TimeInterval? = nil) -> EnergyDiagnosis {
         let window = coverage ?? config.processSampleSeconds
-        guard window >= config.processSampleSeconds / 2 else {
-            return diagnosis(processes: processes, now: now, config: config)
-        }
+        guard window >= config.processSampleSeconds / 2 else { return preview(processes, now: now, config: config) }
         if let last = lastWindowEnd, now.timeIntervalSince(last) > config.processSampleSeconds * 2.5 {
             aboveSince.removeAll()
             pressureSince = nil
@@ -99,7 +99,20 @@ public struct EnergyTracker {
         if pressure.isElevated {
             if pressureSince == nil { pressureSince = now }
         } else { pressureSince = nil }
-        return diagnosis(processes: processes, now: now, config: config)
+        let result = diagnosis(processes: processes, now: now, config: config)
+        lastRunaway = result.runaway
+        return result
+    }
+
+    /// 短样本：排行来自这次样本，持续性判断来自上一次完整样本，时长按当前时间推算。
+    private func preview(_ processes: [ProcessEnergy], now: Date, config: LocalConfig) -> EnergyDiagnosis {
+        let runaway = lastRunaway.filter { aboveSince[$0.pid] != nil }
+        return EnergyDiagnosis(topFive: Array(processes.prefix(5)), runaway: runaway, longAssertions: [],
+                               prolongedMemoryPressure: pressureSince.map { now.timeIntervalSince($0) >= config.memoryPressureSeconds } ?? false,
+                               runawayDurations: Dictionary(uniqueKeysWithValues: runaway.compactMap { process in
+                                   aboveSince[process.pid].map { (process.pid, now.timeIntervalSince($0)) }
+                               }),
+                               memoryPressureDuration: pressureSince.map { now.timeIntervalSince($0) })
     }
 
     private func diagnosis(processes: [ProcessEnergy], now: Date, config: LocalConfig) -> EnergyDiagnosis {
