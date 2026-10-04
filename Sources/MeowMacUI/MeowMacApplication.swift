@@ -68,8 +68,9 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             onTone: { [weak panelState] tone in panelState?.networkTone = tone },
             onEgressAlert: { [weak self] alert in
                 guard let self else { return }
-                let redactor = self.panelState.networkModel?.redactor
-                self.notificationCoordinator?.process(alert, redact: { redactor?.redact($0) ?? $0 })
+                let model = self.panelState.networkModel, redactor = model?.redactor
+                self.notificationCoordinator?.process(alert, history: model?.egressState.history ?? [],
+                                                      redact: { redactor?.redact($0) ?? $0 })
             })
         networkBridge = bridge
         panelState.networkModel = bridge.model
@@ -247,10 +248,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
                 NSWorkspace.shared.open(url)
             }
         }
-        panelState.onRemindersRefreshed = { [weak self] tracker in
+        panelState.onRemindersRefreshed = { [weak self] tracker, batch in
             guard let self, let coordinator = self.notificationCoordinator else { return }
             let redactor = self.panelState.networkModel?.redactor
-            coordinator.process(tracker, now: self.panelState.now(), redact: { redactor?.redact($0) ?? $0 })
+            coordinator.process(tracker, batch: batch, now: self.panelState.now(), redact: { redactor?.redact($0) ?? $0 })
         }
         notifier.onOpen = { [weak self] tab in self?.openPanel(at: tab) }
         refreshNotificationAuthorization(request: true)

@@ -145,7 +145,7 @@ public final class PanelState: ObservableObject {
     public var onOpenNotificationSystemSettings: () -> Void = {}
     public var onPrepareNotificationMenu: () -> Void = {}
     /// 每次提醒 reconcile 之后调用，由通知协调器接收。
-    public var onRemindersRefreshed: (ReminderTracker) -> Void = { _ in }
+    public var onRemindersRefreshed: (ReminderTracker, ReminderBatch) -> Void = { _, _ in }
     /// 历史导入是一次性功能，导入完成后菜单不再显示入口。
     @Published public var showsCodexBarImport = true
     public var onCatChanged: () -> Void = {}

@@ -57,12 +57,13 @@ public extension PanelState {
     }
     func refreshReminders() {
         let before = reminderTracker.records
-        var value = reminderTracker; value.reconcile(reminderBatch, now: now())
+        let batch = reminderBatch
+        var value = reminderTracker; value.reconcile(batch, now: now())
         reminderTracker = value
         if let id = activeSnoozeID, value.current[id]?.canSnooze != true || value.current[id].map({ value.isSnoozed($0, now: now()) }) == true {
             activeSnoozeID = nil
         }
-        onRemindersRefreshed(value)
+        onRemindersRefreshed(value, batch)
         if before != value.records { reminderPersistenceDirty = true }
         guard reminderPersistenceDirty, let store = reminderStore,
               reminderSaveAttempt.map({ now().timeIntervalSince($0) >= 60 }) ?? true else { return }

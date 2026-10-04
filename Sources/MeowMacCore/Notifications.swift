@@ -72,13 +72,15 @@ public enum NotificationDecider {
     public static let severeRecoveryCooldown: TimeInterval = 600
     public static let maxRecords = 256
 
-    /// 输入是 reconcile 之后的全部提醒（含未确认的）。不在列表里的键视为已确认恢复。
+    /// 输入是 reconcile 之后的全部提醒（含未确认的）。不在列表里、且 `confirmsRecovery` 认可的键才算恢复；
+    /// 刚启动还没有检测结果时，不在列表里只表示未知，记录保持不变。
     /// 开关关闭时照样维护记录，只是不发送，重新打开时不会把已有问题一次补发出来。
     public static func decide(reminders: [Reminder], isSnoozed: (Reminder) -> Bool, records: [String: NotifiedRecord],
-                              settings: NotificationSettings, now: Date) -> NotificationDecision {
+                              settings: NotificationSettings, now: Date,
+                              confirmsRecovery: (String) -> Bool = { _ in true }) -> NotificationDecision {
         var next = records
         let present = Set(reminders.map(\.id))
-        for (key, var record) in next where !present.contains(key) && record.recoveredAt == nil {
+        for (key, var record) in next where !present.contains(key) && record.recoveredAt == nil && confirmsRecovery(key) {
             record.recoveredAt = now; record.pendingAfterSnooze = false
             next[key] = record
         }
@@ -111,7 +113,9 @@ public enum NotificationDecider {
                 continue
             }
             if notify && settings.allows(category) { out.append(reminder) }
-            next[key] = NotifiedRecord(key: key, level: notify ? reminder.level : max(old?.level ?? reminder.level, reminder.level),
+            // 恢复后重现算新的一轮：档位从当前档开始，之后升级为严重时能再通知。
+            let restart = notify || old?.recoveredAt != nil
+            next[key] = NotifiedRecord(key: key, level: restart ? reminder.level : max(old?.level ?? reminder.level, reminder.level),
                                        notifiedAt: notify ? now : old?.notifiedAt ?? now,
                                        cycleResetAt: cycle ?? old?.cycleResetAt)
         }
@@ -162,28 +166,19 @@ public struct SystemNotice: Equatable {
 /// 通知文案（D41：写明对象、当前数值，以及重置时间、预计用完时间或已持续的时长）。
 public enum NotificationContent {
     public static let title = "MeowMac"
-    /// 同一轮超过这个数量时，只发前两条，其余合成一条汇总。
-    public static let burstLimit = 3
-
+    /// D41：每个问题一条通知，不合并。系统按标签页分组显示。
     public static func notices(for reminders: [Reminder], now: Date, timeZone: TimeZone = .current,
                                redact: (String) -> String = { $0 }) -> [SystemNotice] {
-        guard reminders.count > burstLimit else { return reminders.map { notice(for: $0, now: now, timeZone: timeZone, redact: redact) } }
-        let head = reminders.prefix(burstLimit - 1).map { notice(for: $0, now: now, timeZone: timeZone, redact: redact) }
-        let rest = Array(reminders.dropFirst(burstLimit - 1))
-        let names = rest.prefix(3).map { NotificationCategory(kind: $0.kind)?.displayName ?? $0.title }
-        var unique: [String] = []
-        for name in names where !unique.contains(name) { unique.append(name) }
-        let summary = SystemNotice(key: "summary", tab: rest[0].tab, subtitle: "另有 \(rest.count) 条提醒",
-                                   body: unique.joined(separator: "、") + (rest.count > 3 ? "等" : "") + "，打开面板查看全部提醒",
-                                   sound: rest.contains { $0.level == .severe })
-        return head + [summary]
+        reminders.map { notice(for: $0, now: now, timeZone: timeZone, redact: redact) }
     }
 
     public static func notice(for reminder: Reminder, now: Date, timeZone: TimeZone = .current,
                               redact: (String) -> String = { $0 }) -> SystemNotice {
         let category = NotificationCategory(kind: reminder.kind)
+        // 网络黄色提醒不是故障，副标题写“网络提醒”。
+        let subtitle = reminder.kind == .network && reminder.level < .severe ? "网络提醒" : category?.displayName ?? reminder.title
         return SystemNotice(key: reminder.id, tab: reminder.tab,
-                            subtitle: category?.displayName ?? reminder.title,
+                            subtitle: subtitle,
                             body: body(for: reminder, now: now, timeZone: timeZone, redact: redact),
                             sound: reminder.level == .severe)
     }
@@ -206,9 +201,9 @@ public enum NotificationContent {
             if let reset = reminder.resetAt { text += "，" + time(reset, now: now, timeZone: timeZone) + " 才重置" }
             return text
         case .disk:
-            guard let fraction = facts.diskRemainingFraction else { return "磁盘剩余不足，可在系统页清理" }
+            guard let fraction = facts.diskRemainingFraction else { return "磁盘剩余不足，可在系统页打开清理" }
             let bytes = facts.diskAvailableBytes.map { "（" + ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) + "）" } ?? ""
-            return "磁盘可用 " + percent(fraction * 100) + bytes + "，可在系统页清理"
+            return "磁盘可用 " + percent(fraction * 100) + bytes + "，可在系统页打开清理"
         case .process:
             var text = (facts.subject ?? "某个进程") + (facts.cpuPercent.map { " 占用 CPU " + percent($0) } ?? " CPU 持续偏高")
             if let duration = facts.duration { text += "，已持续 " + MetricFormat.duration(duration) }

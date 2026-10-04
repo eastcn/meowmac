@@ -92,9 +92,15 @@ public final class NotificationCoordinator {
     }
 
     /// 每次提醒 reconcile 之后调用。记录有变化才写盘。
-    public func process(_ tracker: ReminderTracker, now: Date, redact: (String) -> String = { $0 }) {
+    /// `batch` 是这一轮的检测结果：只有它确认过的键才算恢复，刚启动没有数据时不会把记录误判为恢复。
+    public func process(_ tracker: ReminderTracker, batch: ReminderBatch?, now: Date, redact: (String) -> String = { $0 }) {
         let decision = NotificationDecider.decide(reminders: tracker.sorted(), isSnoozed: { tracker.isSnoozed($0, now: now) },
-                                                  records: records, settings: settings, now: now)
+                                                  records: records, settings: settings, now: now,
+                                                  confirmsRecovery: { key in
+            guard let batch else { return true }
+            guard let kind = key.split(separator: ".", maxSplits: 1).first.flatMap({ ReminderKind(rawValue: String($0)) }) else { return true }
+            return batch.confirms(key, kind: kind)
+        })
         if decision.records != records {
             records = decision.records
             persist()
@@ -103,9 +109,11 @@ public final class NotificationCoordinator {
     }
 
     /// TunCanary 的出口告警：IP 变化和地域超出范围发通知，地域恢复不发。
-    public func process(_ alert: EgressAlert, redact: (String) -> String) {
+    /// IP 变化的告警不带地区，从出口历史里取同一目标、同一 IP 的最近地区。
+    public func process(_ alert: EgressAlert, history: [EgressObservation] = [], redact: (String) -> String) {
         guard alert.kind != .regionRecovered, settings.allows(.egress) else { return }
-        let place = alert.countryCode.map(EgressRegions.name) ?? ""
+        let latest = history.last { $0.result.target == alert.target && $0.result.isSuccess && $0.geo?.ip == $0.result.ip }
+        let place = (alert.countryCode ?? latest?.geo?.countryCode).map(EgressRegions.name) ?? ""
         let body = redact("\(alert.target.displayName)（\(alert.target.host)）" + (place.isEmpty ? "" : "：" + place))
         let violation = alert.kind == .regionViolation
         send(SystemNotice(key: "egress." + (violation ? "region" : "ip"), tab: .network,

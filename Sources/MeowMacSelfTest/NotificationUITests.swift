@@ -21,15 +21,18 @@ enum NotificationUITests {
         var value = ReminderTracker(); value.reconcile(ReminderBatch(reminders: reminders), now: now); return value
     }
 
-    /// 用 TunCanary 的真实出口状态机生成告警：IP 变化、地域超出范围、地域恢复。
-    static func egressAlerts() -> [EgressAlert] {
+    static func egressAlerts() -> [EgressAlert] { egressRun().map(\.0) }
+
+    /// 用 TunCanary 的真实出口状态机生成告警：IP 变化、地域超出范围、地域恢复。每条附上发出时的出口历史。
+    static func egressRun() -> [(EgressAlert, [EgressObservation])] {
         var state = EgressMonitorState(), settings = EgressMonitoringSettings()
         settings.notifyIPChanges = true
         settings.allowedRegions[EgressIPTarget.cloudflare.rawValue] = ["JP"]
-        func observe(_ ip: String, _ country: String, _ offset: TimeInterval) -> [EgressAlert] {
+        func observe(_ ip: String, _ country: String, _ offset: TimeInterval) -> [(EgressAlert, [EgressObservation])] {
             let at = now.addingTimeInterval(offset)
             let result = EgressIPResult(target: .cloudflare, checkedAt: at, ip: ip, ipVersion: .ipv4, location: nil, failure: nil)
-            return state.record(EgressObservation(result: result, geo: EgressGeo(ip: ip, countryCode: country, checkedAt: at)), settings: settings)
+            let alerts = state.record(EgressObservation(result: result, geo: EgressGeo(ip: ip, countryCode: country, checkedAt: at)), settings: settings)
+            return alerts.map { ($0, state.history) }
         }
         return observe("203.0.113.1", "JP", 0) + observe("203.0.113.2", "US", 300) + observe("203.0.113.2", "US", 600)
             + observe("203.0.113.3", "JP", 900)
@@ -85,38 +88,57 @@ enum NotificationUITests {
             var sent: [SystemNotice] = []
             let disk = NotificationTests.disk()
             let first = NotificationCoordinator(store: NotificationStore(rootURL: root)) { sent.append($0) }
-            first.process(tracker([disk]), now: now)
-            first.process(tracker([disk]), now: now.addingTimeInterval(60))
+            first.process(tracker([disk]), batch: nil, now: now)
+            first.process(tracker([disk]), batch: nil, now: now.addingTimeInterval(60))
             let restarted = NotificationCoordinator(store: NotificationStore(rootURL: root)) { sent.append($0) }
-            restarted.process(tracker([disk]), now: now.addingTimeInterval(120))
+            restarted.process(tracker([disk]), batch: nil, now: now.addingTimeInterval(120))
             guard sent.map(\.key) == ["disk.system"], sent[0].subtitle == "磁盘不足", sent[0].tab == .system else { return false }
             var off = restarted.settings; off.categories.remove(.network)
             guard restarted.update(off) else { return false }
             let reloaded = NotificationCoordinator(store: NotificationStore(rootURL: root)) { sent.append($0) }
             // 网络类关闭后不发，但记录照样维护；网络正文经过脱敏。
-            reloaded.process(tracker([disk, NotificationTests.network(level: .severe)]), now: now.addingTimeInterval(180),
+            reloaded.process(tracker([disk, NotificationTests.network(level: .severe)]), batch: nil, now: now.addingTimeInterval(180),
                              redact: { $0.replacingOccurrences(of: "代理", with: "[已隐藏]") })
             var on = reloaded.settings; on.categories.insert(.network); reloaded.update(on)
             let quota = NotificationTests.quota(resetAt: nil)
-            reloaded.process(tracker([disk, quota]), now: now.addingTimeInterval(240))
+            reloaded.process(tracker([disk, quota]), batch: nil, now: now.addingTimeInterval(240))
             return reloaded.settings.categories.contains(.network) && !reloaded.records.isEmpty
                 && reloaded.records["network.group.overseas"] != nil
                 && sent.map(\.key) == ["disk.system", "quotaLow.claude.primary"]
         }),
+        ("UI.Notifications/重启后未确认不算恢复", {
+            guard let root = try? temporaryRoot() else { return false }
+            defer { try? FileManager.default.removeItem(at: root) }
+            var sent: [SystemNotice] = []
+            let disk = NotificationTests.disk()
+            NotificationCoordinator(store: NotificationStore(rootURL: root)) { sent.append($0) }
+                .process(tracker([disk]), batch: ReminderBatch(reminders: [disk], confirmedKinds: [.disk]), now: now)
+            // 重启：还没有任何检测结果，空的 tracker 和空的 batch 不能把记录改成恢复。
+            let restarted = NotificationCoordinator(store: NotificationStore(rootURL: root)) { sent.append($0) }
+            restarted.process(ReminderTracker(), batch: ReminderBatch(reminders: []), now: now.addingTimeInterval(7200))
+            guard restarted.records["disk.system"]?.recoveredAt == nil else { return false }
+            restarted.process(tracker([disk]), batch: ReminderBatch(reminders: [disk], confirmedKinds: [.disk]), now: now.addingTimeInterval(7260))
+            guard sent.count == 1 else { return false }
+            // 磁盘检测确认恢复后才记为恢复。
+            restarted.process(ReminderTracker(), batch: ReminderBatch(reminders: [], confirmedKinds: [.disk]), now: now.addingTimeInterval(7320))
+            return restarted.records["disk.system"]?.recoveredAt != nil
+        }),
         ("UI.Notifications/出口告警：变化与超出范围发送，恢复不发", {
             guard let root = try? temporaryRoot() else { return false }
             defer { try? FileManager.default.removeItem(at: root) }
-            let alerts = egressAlerts()
+            let run = egressRun()
             var sent: [SystemNotice] = []
             let coordinator = NotificationCoordinator(store: NotificationStore(rootURL: root)) { sent.append($0) }
-            for alert in alerts { coordinator.process(alert, redact: { $0 }) }
+            for (alert, history) in run { coordinator.process(alert, history: history, redact: { $0 }) }
             var off = coordinator.settings; off.categories.remove(.egress); coordinator.update(off)
-            for alert in alerts { coordinator.process(alert, redact: { $0 }) }
+            for (alert, history) in run { coordinator.process(alert, history: history, redact: { $0 }) }
             let subtitles = sent.map(\.subtitle)
-            return alerts.count == 4
+            let prefix = "\(EgressIPTarget.cloudflare.displayName)（\(EgressIPTarget.cloudflare.host)）："
+            // IP 变化的告警本身不带地区，正文的地区来自同一 IP 的出口记录。
+            return run.count == 4 && run[0].0.countryCode == nil
                 && subtitles == ["出口 IP 已变化", "出口地域超出允许范围", "出口 IP 已变化"]
                 && sent[1].sound && !sent[0].sound && sent.allSatisfy { $0.tab == .network }
-                && sent[1].body.hasSuffix("：美国") && sent[1].body.contains(EgressIPTarget.cloudflare.host)
+                && sent.map(\.body) == [prefix + "美国", prefix + "美国", prefix + "日本"]
         }),
         ("UI.Notifications/网络接管：注入通知器、出口告警改道、故障走提醒", {
             guard let root = try? temporaryRoot() else { return false }
@@ -131,16 +153,13 @@ enum NotificationUITests {
             let alerts = egressAlerts()
             for alert in alerts { await bridge.model.deliverEgressAlert(alert) }
             guard received == alerts, spy.delivered == 0 else { return false }
-            // MeowMac 的通知器丢弃 TunCanary 的故障通知。
-            let mine = MeowMacNotifier(environment: AppBundleEnvironment(bundleIdentifier: nil, bundlePath: ""))
-            await mine.deliver(PendingNotification(key: "group.overseas", severity: .critical, title: "示例", body: "示例"))
             // 故障经 MeowMac 的提醒变成通知：严重档出声，正文经过脱敏。
             var sent: [SystemNotice] = []
             let coordinator = NotificationCoordinator(store: NotificationStore(rootURL: root)) { sent.append($0) }
             let state = PanelPreviewRenderer.syntheticState()
             state.networkModel = bridge.model
-            state.onRemindersRefreshed = { tracker in
-                coordinator.process(tracker, now: state.now(), redact: { $0.replacingOccurrences(of: "example.test", with: "[站点]") })
+            state.onRemindersRefreshed = { tracker, batch in
+                coordinator.process(tracker, batch: batch, now: state.now(), redact: { $0.replacingOccurrences(of: "example.test", with: "[站点]") })
             }
             bridge.model.apply(local: nil, connectivityFaults: [ConnectivityFault(key: "group.overseas", severity: .critical,
                 message: "海外站点 example.test 连续 3 轮探测失败", siteIDs: ["example"])], checkedAt: state.now())
@@ -175,7 +194,7 @@ enum NotificationUITests {
             let categoryItems = disabled.items.filter { item in NotificationCategory.allCases.contains { $0.displayName == item.title } }
             guard disabled.items.first?.title == "发送系统通知", categoryItems.count == 9, categoryItems.allSatisfy({ !$0.isEnabled }) else { return false }
             var refreshed: ReminderTracker?
-            state.onRemindersRefreshed = { refreshed = $0 }
+            state.onRemindersRefreshed = { tracker, _ in refreshed = tracker }
             state.refreshReminders()
             return prepared == 2 && refreshed != nil
         }),

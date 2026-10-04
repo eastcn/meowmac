@@ -100,6 +100,28 @@ enum NotificationTests {
             let sent = run([(0, [disk(), cooling, network(level: .severe), quota(resetAt: nil)])], records: &records)
             return sent == [["network.group.overseas", "disk.system", "quotaLow.claude.primary"]] && records["cooling.fan"] == nil
         }),
+        ("Core.Notifications/恢复后以较轻档位重现，再升级仍发", {
+            var records: [String: NotifiedRecord] = [:]
+            // 严重 → 恢复 → 冷却内以提醒档重现（不发）→ 升为严重（发）。
+            let sent = run([(0, [network(level: .severe)]), (60, []), (120, [network(level: .warn)]),
+                            (7320, [network(level: .severe)])], records: &records)
+            return sent == [["network.group.overseas"], [], [], ["network.group.overseas"]]
+        }),
+        ("Core.Notifications/没有检测结果时不算恢复", {
+            var records: [String: NotifiedRecord] = [:]
+            _ = run([(0, [disk()])], records: &records)
+            // 启动后还没有数据：不在列表里，但没有确认恢复，记录保持进行中。
+            let unknown = NotificationDecider.decide(reminders: [], isSnoozed: { _ in false }, records: records,
+                                                     settings: NotificationSettings(), now: now.addingTimeInterval(7200),
+                                                     confirmsRecovery: { _ in false })
+            let later = NotificationDecider.decide(reminders: [disk()], isSnoozed: { _ in false }, records: unknown.records,
+                                                   settings: NotificationSettings(), now: now.addingTimeInterval(7260))
+            let confirmed = NotificationDecider.decide(reminders: [], isSnoozed: { _ in false }, records: records,
+                                                       settings: NotificationSettings(), now: now.addingTimeInterval(60),
+                                                       confirmsRecovery: { $0 == "disk.system" })
+            return unknown.records["disk.system"]?.recoveredAt == nil && later.reminders.isEmpty
+                && confirmed.records["disk.system"]?.recoveredAt != nil
+        }),
         ("Core.Notifications/记录清理与上限", {
             var records: [String: NotifiedRecord] = [:]
             for index in 0..<300 {
@@ -137,7 +159,7 @@ enum NotificationTests {
             let checks = [
                 body(quota(resetAt: reset)) == "Claude 5 小时窗口剩余 12%，\(expectedReset) 重置",
                 body(pace) == "Codex 7 天窗口按当前速度约 2 小时 10 分后用完，\(paceReset) 才重置",
-                body(disk()).hasPrefix("磁盘可用 8%（") && body(disk()).hasSuffix("），可在系统页清理"),
+                body(disk()).hasPrefix("磁盘可用 8%（") && body(disk()).hasSuffix("），可在系统页打开清理"),
                 body(process) == "BTLEServer 占用 CPU 98%，已持续 12 分钟",
                 body(memory) == "内存压力 82%，已持续 15 分钟",
                 body(thermal) == "热状态 serious，温度偏高，未发现异常进程，建议降温或用 AI 诊断",
@@ -150,7 +172,7 @@ enum NotificationTests {
             ]
             return !checks.contains(false)
         }),
-        ("Core.Notifications/时间写法与同轮汇总", {
+        ("Core.Notifications/时间写法与每条单发", {
             let base = Date(timeIntervalSince1970: 1_800_000_000)   // 2027-01-15 08:00 UTC，周五
             let sameDay = NotificationContent.time(base.addingTimeInterval(3 * 3600), now: base, timeZone: utc)
             let week = NotificationContent.time(base.addingTimeInterval(6 * 86400), now: base, timeZone: utc)
@@ -158,10 +180,11 @@ enum NotificationTests {
             let reminders = [network(level: .severe), disk(), quota(resetAt: nil),
                              Reminder(kind: .memory, object: "system", tab: .system, title: "内存压力持续偏高")]
             let notices = NotificationContent.notices(for: reminders, now: base, timeZone: utc)
-            let three = NotificationContent.notices(for: Array(reminders.prefix(3)), now: base, timeZone: utc)
+            let warn = NotificationContent.notice(for: network(level: .warn), now: base)
             return sameDay == "11:00" && week == "周四 08:00" && far == "1月25日 08:00"
-                && notices.count == 3 && notices[2].subtitle == "另有 2 条提醒" && notices[2].body == "额度不足、内存压力持续偏高，打开面板查看全部提醒"
-                && three.count == 3 && three.allSatisfy { $0.key != "summary" }
+                && notices.map(\.key) == reminders.map(\.id)
+                && notices.map(\.subtitle) == ["网络故障", "磁盘不足", "额度不足", "内存压力持续偏高"]
+                && warn.subtitle == "网络提醒" && warn.body == "海外站点连续 3 轮探测失败。检查代理是否运行" && !warn.sound
         }),
         ("Core.Notifications/提醒带上具体数值", {
             let window = QuotaWindow(usedPercent: 88, windowMinutes: 300, resetsAt: now.addingTimeInterval(3600), resetDescription: nil)
