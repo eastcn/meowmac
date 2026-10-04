@@ -41,6 +41,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var observers: [NSObjectProtocol] = []
     private let configResult = ConfigStore.load()
     private let loginItem = MainAppLoginItemController()
+    private let notifier = MeowMacNotifier()
+    private var notificationCoordinator: NotificationCoordinator?
 
     public static func run() {
         let application = NSApplication.shared
@@ -52,6 +54,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         CatRuntime.initialize(state: panelState, store: catStore)
+        startNotifications()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = CatRenderer.image(cat: panelState.selectedCat, display: panelState.catDisplay(), frame: 0)
         item.button?.target = self
@@ -217,6 +220,57 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private func energyFailed(_ error: Error) {
         panelState.failures["energy", default: 0] += 1
         logger.error("能耗采样失败：\(error.localizedDescription, privacy: .private)")
+    }
+
+    /// D41：提醒变化时发系统通知；点通知打开面板对应页。
+    private func startNotifications() {
+        let coordinator = NotificationCoordinator(store: NotificationStore(rootURL: catStore.rootURL)) { [weak self] notice in
+            guard let notifier = self?.notifier else { return }
+            Task { await notifier.deliver(notice) }
+        }
+        notificationCoordinator = coordinator
+        panelState.notificationSettings = coordinator.settings
+        panelState.onSetNotificationSettings = { [weak self] next in
+            guard let self, let coordinator = self.notificationCoordinator, coordinator.update(next) else { return }
+            self.panelState.notificationSettings = coordinator.settings
+        }
+        panelState.onPrepareNotificationMenu = { [weak self] in self?.refreshNotificationAuthorization(request: false) }
+        panelState.onOpenNotificationSystemSettings = {
+            let id = MeowMacCore.AppIdentity.bundleID
+            if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+        panelState.onRemindersRefreshed = { [weak self] tracker in
+            guard let self, let coordinator = self.notificationCoordinator else { return }
+            let redactor = self.panelState.networkModel?.redactor
+            coordinator.process(tracker, now: self.panelState.now(), redact: { redactor?.redact($0) ?? $0 })
+        }
+        notifier.onOpen = { [weak self] tab in self?.openPanel(at: tab) }
+        refreshNotificationAuthorization(request: true)
+        panelState.refreshReminders()
+    }
+
+    private func refreshNotificationAuthorization(request: Bool) {
+        Task { @MainActor [weak self] in
+            guard let notifier = self?.notifier else { return }
+            var status = await notifier.authorizationStatus()
+            if request && status == .notDetermined {
+                _ = await notifier.requestAuthorization()
+                status = await notifier.authorizationStatus()
+            }
+            self?.panelState.notificationsAuthorized = status == .authorized ? true : status == .denied ? false : nil
+        }
+    }
+
+    private func openPanel(at tab: PanelTab) {
+        guard let button = statusItem?.button, let popover else { return }
+        if !popover.isShown {
+            panelState.open()
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
+        panelState.showingReminders = false
+        panelState.select(tab)
     }
 
     @objc private func togglePopover() {

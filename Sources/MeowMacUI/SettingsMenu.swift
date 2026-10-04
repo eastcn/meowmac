@@ -43,6 +43,9 @@ public enum SettingsMenu {
         let terminalItem = NSMenuItem(title: "清理终端", action: nil, keyEquivalent: "")
         terminalItem.submenu = cleanTerminalMenu(state: state)
         menu.addItem(terminalItem)
+        let notificationItem = NSMenuItem(title: "系统通知", action: nil, keyEquivalent: "")
+        notificationItem.submenu = notificationMenu(state: state)
+        menu.addItem(notificationItem)
         if state.showsCodexBarImport { add("导入 CodexBar 历史…", action: state.onImportCodexBarHistory) }
         add("开机启动", checked: state.loginEnabled) { state.onToggleLogin(!state.loginEnabled) }
         menu.addItem(.separator())
@@ -65,6 +68,36 @@ public enum SettingsMenu {
             item.isEnabled = terminal == .automatic || state.availableCleanTerminals.contains(terminal)
             menu.addItem(item)
             if terminal == .automatic { menu.addItem(.separator()) }
+        }
+        return menu
+    }
+
+    /// D41：总开关加各类开关。未授权时第一项引导到系统设置。
+    public static func notificationMenu(state: PanelState) -> NSMenu {
+        state.onPrepareNotificationMenu()
+        let menu = NSMenu(title: "系统通知"); menu.autoenablesItems = false
+        func add(_ title: String, enabled: Bool = true, checked: Bool = false, action: @escaping () -> Void) {
+            let target = Action(action)
+            let item = NSMenuItem(title: title, action: #selector(Action.invoke), keyEquivalent: "")
+            item.target = target; item.representedObject = target
+            item.isEnabled = enabled; item.state = checked ? .on : .off
+            menu.addItem(item)
+        }
+        let settings = state.notificationSettings
+        if state.notificationsAuthorized == false {
+            add("未授权，打开系统设置…", action: state.onOpenNotificationSystemSettings)
+            menu.addItem(.separator())
+        }
+        add("发送系统通知", checked: settings.enabled) {
+            var next = settings; next.enabled.toggle(); state.onSetNotificationSettings(next)
+        }
+        menu.addItem(.separator())
+        for category in NotificationCategory.allCases {
+            add(category.displayName, enabled: settings.enabled, checked: settings.categories.contains(category)) {
+                var next = settings
+                if next.categories.contains(category) { next.categories.remove(category) } else { next.categories.insert(category) }
+                state.onSetNotificationSettings(next)
+            }
         }
         return menu
     }

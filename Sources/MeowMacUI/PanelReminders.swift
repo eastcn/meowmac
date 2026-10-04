@@ -62,6 +62,7 @@ public extension PanelState {
         if let id = activeSnoozeID, value.current[id]?.canSnooze != true || value.current[id].map({ value.isSnoozed($0, now: now()) }) == true {
             activeSnoozeID = nil
         }
+        onRemindersRefreshed(value)
         if before != value.records { reminderPersistenceDirty = true }
         guard reminderPersistenceDirty, let store = reminderStore,
               reminderSaveAttempt.map({ now().timeIntervalSince($0) >= 60 }) ?? true else { return }

@@ -138,6 +138,14 @@ public final class PanelState: ObservableObject {
     public var onShowLayoutSettings: () -> Void = {}
     public var onShowStyleSettings: () -> Void = {}
     public var onImportCodexBarHistory: () -> Void = {}
+    /// 系统通知（D41）：开关、授权状态（nil 表示未知）和菜单回调。
+    @Published public var notificationSettings = NotificationSettings()
+    @Published public var notificationsAuthorized: Bool?
+    public var onSetNotificationSettings: (NotificationSettings) -> Void = { _ in }
+    public var onOpenNotificationSystemSettings: () -> Void = {}
+    public var onPrepareNotificationMenu: () -> Void = {}
+    /// 每次提醒 reconcile 之后调用，由通知协调器接收。
+    public var onRemindersRefreshed: (ReminderTracker) -> Void = { _ in }
     /// 历史导入是一次性功能，导入完成后菜单不再显示入口。
     @Published public var showsCodexBarImport = true
     public var onCatChanged: () -> Void = {}

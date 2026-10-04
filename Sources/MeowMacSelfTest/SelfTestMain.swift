@@ -112,6 +112,7 @@ enum SelfTestMain {
         tests.append(("UI.Cleaning.Live/实际 Ghostty 启动假工具", { await CleanTerminalTests.liveGhostty() }))
         tests.append(("UI.Cleaning/原生缺失状态容器", { await CleanTerminalTests.nativeLayout() }))
         tests.append(contentsOf: NotificationTests.tests)
+        tests.append(contentsOf: NotificationUITests.tests)
         tests.append(contentsOf: CodexResetTests.tests)
         tests.append(contentsOf: CodexResetUITests.tests)
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }
@@ -221,12 +222,13 @@ enum SelfTestMain {
                 let item = cats.items[index]
                 guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
             }
-            let historyItem = menu.items[7]
+            let historyItem = menu.items[8]
             guard historyItem.title == "导入 CodexBar 历史…", let historyAction = historyItem.action,
                   NSApplication.shared.sendAction(historyAction, to: historyItem.target, from: historyItem) else { return false }
-            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "样式…", "清理终端", "导入 CodexBar 历史…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
-                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].isEnabled && menu.items[8].state == .on
-                && menu.items[2].isSeparatorItem && menu.items[9].isSeparatorItem && menu.items[11].keyEquivalent == "q"
+            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "样式…", "清理终端", "系统通知", "导入 CodexBar 历史…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
+                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].isEnabled && menu.items[9].state == .on
+                && menu.items[7].submenu != nil
+                && menu.items[2].isSeparatorItem && menu.items[10].isSeparatorItem && menu.items[12].keyEquivalent == "q"
                 && selected == "builtin.round" && imported && shown && importedHistory
                 && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
