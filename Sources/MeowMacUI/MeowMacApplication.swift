@@ -18,6 +18,13 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var resetCoordinator: CodexResetCoordinator?
     private let panelState = PanelState()
     private let catStore = CatStore()
+    private lazy var cleaningController = CleaningController(state: panelState,
+        openConfig: { [weak self] in self?.openConfig() },
+        chooseTerminal: { [weak self] in
+            guard let self, let button = self.statusItem?.button else { return }
+            self.popover?.performClose(nil)
+            SettingsMenu.presentCleanTerminals(state: self.panelState, anchor: button)
+        })
     private lazy var layoutSettings = LayoutSettingsController(state: panelState)
     private lazy var styleSettings = StyleSettingsController(state: panelState)
     private let logger = Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "app")
@@ -77,7 +84,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".\(provider.rawValue)")
             NSWorkspace.shared.activateFileViewerSelecting([url])
         }
-        panelState.onClean = { [weak self] in self?.openCleanCommand() }
+        panelState.onClean = { [weak self] in self?.cleaningController.clean() }
+        panelState.onSelectCleanTerminal = { [weak self] in self?.cleaningController.select($0) }
+        panelState.onPrepareCleanTerminalMenu = { [weak self] in self?.cleaningController.refreshTerminals() }
+        _ = cleaningController
         panelState.onOpenConfig = { [weak self] in self?.openConfig() }
         panelState.onShowConfigFolder = { [weak self] in self?.showConfigFolder() }
         panelState.onSelectCat = { [weak self] id in self?.selectCat(id) }
@@ -218,21 +228,20 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func openCleanCommand() {
-        let directory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/MeowMac/tmp", isDirectory: true)
-        let file = directory.appendingPathComponent("clean.command")
-        do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try Data("mo clean\n".utf8).write(to: file, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: file.path)
-            if !NSWorkspace.shared.open(file) { logger.error("终端未打开清理脚本") }
-        } catch { logger.error("清理入口打开失败：\(error.localizedDescription, privacy: .private)") }
-    }
-
     private func updateCleaningHistory() {
-        do { panelState.lastCleaning = try MoHistoryReader.latest(executable: configResult.config.moPath) }
-        catch { logger.error("清理历史读取失败：\(error.localizedDescription, privacy: .private)") }
+        do {
+            switch try MoHistoryReader.read(configuredPath: configResult.config.moPath) {
+            case .notInstalled:
+                panelState.lastCleaning = nil
+                panelState.cleaningHistoryMessage = "未找到 Mole · 清理需要先安装"
+            case .available(let record):
+                panelState.lastCleaning = record
+                panelState.cleaningHistoryMessage = nil
+            }
+        } catch {
+            panelState.cleaningHistoryMessage = "清理记录读取失败"
+            logger.error("清理历史读取失败：\(error.localizedDescription, privacy: .private)")
+        }
     }
 
     private func openConfig() {

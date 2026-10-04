@@ -215,7 +215,7 @@ struct DiskCard: View {
                     Text(String(format: "%.0f", Double(available) / 1_000_000_000)).font(Design.metric)
                     Text("GB 可用").font(Design.caption).foregroundStyle(Design.secondary)
                 } else { Text("容量不可用").font(Design.caption).foregroundStyle(Design.secondary) }
-                Spacer(); CapsuleAction(title: "清理…", action: state.onClean)
+                Spacer(); CapsuleAction(title: "清理…", action: state.onClean).disabled(state.cleanLaunching)
             }
             if let available = state.snapshot?.diskAvailableBytes, let total = state.snapshot?.diskTotalBytes, total > 0 {
                 LineBar(fraction: 1 - Double(available) / Double(total), color: Double(available) / Double(total) < 0.1 ? Design.orange : Design.gray)
@@ -224,7 +224,7 @@ struct DiskCard: View {
                     Text(String(format: "共 %.0f GB", Double(total) / 1_000_000_000))
                 }.font(Design.caption).foregroundStyle(Design.secondary)
             }
-            Text(state.lastCleaning.map { "上次清理：" + DisplayDate.format($0.startedAt, pattern: "M 月 d 日") + " · 释放 " + $0.sizeDescription } ?? "暂无清理记录").font(Design.caption).foregroundStyle(Design.secondary)
+            Text(state.cleaningHistoryMessage ?? state.lastCleaning.map { "上次清理：" + DisplayDate.format($0.startedAt, pattern: "M 月 d 日") + " · 释放 " + $0.sizeDescription } ?? "暂无清理记录").font(Design.caption).foregroundStyle(Design.secondary)
         }
     }
 }

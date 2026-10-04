@@ -2,6 +2,11 @@ import Foundation
 import MeowMacCore
 
 public enum MoHistoryReader {
+    public static func read(configuredPath: String, searchPath: String = ProcessInfo.processInfo.environment["PATH"] ?? "") throws -> CleaningHistoryResult {
+        guard let path = MoExecutable.resolve(configuredPath: configuredPath, searchPath: searchPath) else { return .notInstalled }
+        return .available(try latest(executable: path))
+    }
+
     public static func latest(executable: String) throws -> CleaningRecord? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
