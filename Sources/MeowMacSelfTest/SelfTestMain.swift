@@ -113,6 +113,8 @@ enum SelfTestMain {
         tests.append(("UI.Cleaning/原生缺失状态容器", { await CleanTerminalTests.nativeLayout() }))
         tests.append(contentsOf: SystemTrendTests.tests)
         tests.append(contentsOf: DiskTrendTests.tests)
+        tests.append(("UI.SystemTrend/真实弹出面板鼠标与首屏", { await SystemTrendNativeTests.popover() }))
+        tests.append(("UI.SystemTrend/全状态及三页浅深色预览", { SystemTrendNativeTests.previews() }))
         tests.append(contentsOf: NotificationTests.tests)
         tests.append(contentsOf: NotificationUITests.tests)
         tests.append(contentsOf: CodexResetTests.tests)

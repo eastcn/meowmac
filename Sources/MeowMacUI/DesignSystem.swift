@@ -79,6 +79,24 @@ extension EnvironmentValues {
     }
 }
 
+/// 三个标签页、总览和底栏共用一个表面；原生玻璃由 NSPopover 提供。
+struct PanelSurface: View {
+    @Environment(\.previewMaterial) private var previewMaterial
+    @Environment(\.colorScheme) private var colorScheme
+    var body: some View {
+        Group {
+            if previewMaterial {
+                if colorScheme == .light {
+                    // 仅为离线预览模拟网络设计稿的玻璃透色。
+                    LinearGradient(colors: [Color(red: 227 / 255, green: 232 / 255, blue: 238 / 255),
+                                            Color(red: 239 / 255, green: 234 / 255, blue: 228 / 255)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                } else { Design.background }
+            } else if #available(macOS 26, *) { Color.clear }
+            else { Rectangle().fill(.regularMaterial) }
+        }.allowsHitTesting(false)
+    }
+}
+
 struct GlassSurface: ViewModifier {
     @Environment(\.previewMaterial) private var previewMaterial
     var warning = false

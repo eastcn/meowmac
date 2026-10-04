@@ -379,6 +379,7 @@ public struct PanelView: View {
             }.fixedSize(horizontal: false, vertical: true).measurePanelHeight(.footer)
         }.frame(width: Design.panelWidth)
             .frame(height: expanded ? nil : measurements.panelHeight, alignment: .top)
+            .background(PanelSurface())
             .foregroundStyle(Design.label).focusEffectDisabled()
             .coordinateSpace(name: PanelInteractionFrameKey.space)
             .onPreferenceChange(PanelInteractionFrameKey.self) { measurements.updateInteractions($0) }
