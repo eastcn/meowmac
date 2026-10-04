@@ -17,12 +17,16 @@ public struct QuotaSchedule {
     }
 
     public mutating func sessionUpdate(_ sessions: [SessionActivity], at now: Date, config: LocalConfig) {
-        for provider in [QuotaProvider.claude, .codex] {
-            let active = sessions.contains { $0.provider == provider && $0.active }
-            if wasActive[provider] == true && !active { pendingFinish[provider] = now.addingTimeInterval(config.sessionFinishDelaySeconds) }
-            if active { pendingFinish.removeValue(forKey: provider) }
-            wasActive[provider] = active
+        for provider in SessionPoller.providers {
+            sessionUpdate(provider: provider, active: sessions.contains { $0.provider == provider && $0.active }, at: now, config: config)
         }
+    }
+
+    /// 只更新一个渠道。两个渠道的数据来源不同（扫描或 CLI）时用它，没更新的渠道保留上一次的状态。
+    public mutating func sessionUpdate(provider: QuotaProvider, active: Bool, at now: Date, config: LocalConfig) {
+        if wasActive[provider] == true && !active { pendingFinish[provider] = now.addingTimeInterval(config.sessionFinishDelaySeconds) }
+        if active { pendingFinish.removeValue(forKey: provider) }
+        wasActive[provider] = active
     }
 
     public mutating func dueFinishRefresh(at now: Date) -> [QuotaProvider] {

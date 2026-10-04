@@ -12,7 +12,9 @@ public final class QuotaCoordinator {
     private let config: LocalConfig
     private let state: PanelState
     private let logger = Logger(subsystem: AppIdentity.bundleID, category: "quota-schedule")
+    private let scanner: AgentActivityScanner
     private var schedule = QuotaSchedule()
+    private var sessionPoller = SessionPoller()
     private var refreshTimer: Timer?
     private var sessionTimer: Timer?
     private var lastPrunedAt: Date?
@@ -21,8 +23,9 @@ public final class QuotaCoordinator {
     private var observers: [NSObjectProtocol] = []
 
     public init(state: PanelState, config: LocalConfig, history: QuotaHistoryStore = QuotaHistoryStore(),
-                importSource: URL = CodexBarHistoryImport.defaultSource) {
+                importSource: URL = CodexBarHistoryImport.defaultSource, scanner: AgentActivityScanner = AgentActivityScanner()) {
         self.state = state; self.config = config; self.history = history; self.importSource = importSource
+        self.scanner = scanner
         self.client = CodexBarClient(path: config.codexBarCLIPath)
     }
 
@@ -177,16 +180,38 @@ public final class QuotaCoordinator {
         }
     }
 
+    /// 会话活跃检测（D8）：本地扫描 transcript 的修改时间，不调用 CLI。
+    /// 只有某个渠道的目录读不了时，才对它退回 `sessions`，且间隔不少于 5 分钟。
     private func pollSessions() {
         guard !sleeping else { return }
+        let scanner = self.scanner
+        Task.detached { [weak self] in
+            let scan = scanner.scan(now: Date())
+            await MainActor.run { [weak self] in self?.applySessionScan(scan) }
+        }
+    }
+
+    private func applySessionScan(_ scan: [QuotaProvider: AgentActivity]) {
+        guard !sleeping else { return }
+        let now = Date()
+        let plan = sessionPoller.plan(scan, at: now)
+        for (provider, active) in plan.updates {
+            schedule.sessionUpdate(provider: provider, active: active, at: now, config: config)
+        }
+        guard !plan.fallback.isEmpty else { return }
+        logger.warning("会话扫描不可用，退回 CLI：\(plan.fallback.map(\.rawValue).joined(separator: ","), privacy: .public)")
         let client = self.client
         Task.detached { [weak self] in
             do {
                 let sessions = try client.sessions()
                 await MainActor.run { [weak self] in
-                    self?.schedule.sessionUpdate(sessions, at: Date(), config: self?.config ?? LocalConfig())
+                    guard let self else { return }
+                    for (provider, active) in SessionPoller.states(for: plan.fallback, from: sessions) {
+                        self.schedule.sessionUpdate(provider: provider, active: active, at: Date(), config: self.config)
+                    }
                 }
             } catch {
+                // 失败时保留上一次的状态，不当作 idle。
                 await MainActor.run { [weak self] in
                     self?.logger.error("会话轮询失败：\(error.localizedDescription, privacy: .private)")
                 }

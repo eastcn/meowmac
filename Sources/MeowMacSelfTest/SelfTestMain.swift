@@ -40,12 +40,20 @@ enum SelfTestMain {
             ("Core.Energy/短样本沿用失控进程结论", { EnergyTrackerTests.shortSampleKeepsRunaway() }),
             ("Core.Energy/断档阈值边界", { EnergyTrackerTests.gapBoundary() }),
             ("System.Energy/采样间隔校验与 top 参数", { EnergyTrackerTests.sampleSecondsValidation() }),
+            ("Quota.Activity/120 秒窗口与渠道独立", { AgentActivityTests.window() }),
+            ("Quota.Activity/Claude 子 Agent 记录", { AgentActivityTests.claudeSubagents() }),
+            ("Quota.Activity/Codex 最近三个日期目录", { AgentActivityTests.codexRecentDates() }),
+            ("Quota.Activity/未安装与结构异常", { AgentActivityTests.availability() }),
+            ("Quota.Activity/符号链接", { AgentActivityTests.symbolicLinks() }),
+            ("Quota.Activity/CLI 兜底间隔", { AgentActivityTests.pollerFallback() }),
+            ("Quota.Activity/调度保留未更新的渠道", { AgentActivityTests.scheduleKeepsUnupdatedProvider() }),
             ("Core.Energy/忽略三小时休眠断言", { MemoryTests.ignoredAssertions() }),
             ("System.Metrics/活动监视器内存口径", { MemoryTests.usage() }),
             ("UI.System/内存压力百分比", { MemoryTests.pressure() }),
             ("System.Live.Energy/进程", { SelfTestMain.liveEnergy() }),
             ("System.Live.Energy.Rusage/跨用户读取", { SelfTestMain.liveRusage() }),
             ("Quota.Live/四渠道刷新", { SelfTestMain.liveQuota() }),
+            ("Quota.Live.Activity/本机扫描与 sessions 对照", { SelfTestMain.liveActivity() }),
             ("Quota.Live.Cost/Codex 花费", { SelfTestMain.liveCodexCost() }),
             ("Quota.Live.Cost/Claude 花费", { SelfTestMain.liveClaudeCost() }),
             ("Core.Health/信号与排序", { SelfTestMain.healthSignals() }),
@@ -334,6 +342,23 @@ enum SelfTestMain {
             print("ri_energy_nj \(label)：\(code == 0 ? "可读" : "不可读")，errno=\(code == 0 ? 0 : errno)")
         }
         return true
+    }
+
+    /// 本机扫描：记录耗时，并和 `sessions --json-v2` 的 active/idle 对照。两者语义不同（见 D8），差异只打印不判失败。
+    private static func liveActivity() -> Bool {
+        let scanner = AgentActivityScanner()
+        var scan: [QuotaProvider: AgentActivity] = [:]
+        let started = Date()
+        for _ in 0..<5 { scan = scanner.scan(now: Date()) }
+        let milliseconds = Date().timeIntervalSince(started) * 200
+        print("会话扫描：claude=\(scan[.claude] ?? .unavailable) codex=\(scan[.codex] ?? .unavailable)，单次约 \(Int(milliseconds)) ms")
+        do {
+            let sessions = try CodexBarClient(path: LocalConfig().codexBarCLIPath).sessions()
+            for provider in SessionPoller.providers {
+                print("  CLI \(provider.rawValue) active=\(sessions.contains { $0.provider == provider && $0.active })")
+            }
+        } catch { print("  CLI 对照失败：\(error)") }
+        return scan.values.allSatisfy { $0 != .unavailable } && milliseconds < 50
     }
 
     private static func liveQuota() -> Bool {
