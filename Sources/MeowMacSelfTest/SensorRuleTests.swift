@@ -31,7 +31,7 @@ enum SensorRuleTests {
             && FanHighTracker.next(since: start, readings: nil, at: now, config: config) == start
             && FanHighTracker.next(since: start, readings: .unavailable("无法连接"), at: now, config: config) == start
             && FanHighTracker.next(since: start, readings: snapshot(fans: [FanReading(rpm: 6000, maxRPM: nil)]).sensors, at: now, config: config) == start
-            && FanHighTracker.next(since: nil, readings: snapshot(fans: []).sensors, at: now, config: config) == nil
+            && FanHighTracker.next(since: start, readings: snapshot(fans: []).sensors, at: now, config: config) == nil
     }
 
     static func reminders() -> Bool {
@@ -129,6 +129,21 @@ enum SensorRuleTests {
         let early = PanelPreviewRenderer.sensorState(.cooling); early.fanHighSince = early.now().addingTimeInterval(-120)
         guard !early.health.coolingHint, early.sensorDisplay.columns[2].tone == .normal,
               early.coolingLegend == "热状态 fair 及以上的时段" else { return false }
+        // 风扇触发后读不到：提醒保留，但文案写待确认，不再累计“已持续”。
+        let pending = PanelPreviewRenderer.sensorState(.cooling)
+        let readable = pending.snapshot!
+        pending.snapshot = SystemSnapshot(timestamp: readable.timestamp.addingTimeInterval(2), cpuUsage: readable.cpuUsage, memoryPressure: readable.memoryPressure,
+                                          swapUsedBytes: readable.swapUsedBytes, diskAvailableBytes: readable.diskAvailableBytes, diskTotalBytes: readable.diskTotalBytes,
+                                          networkReceivedBytesPerSecond: 0, networkSentBytesPerSecond: 0, battery: readable.battery, thermal: readable.thermal,
+                                          memoryUsedBytes: readable.memoryUsedBytes, memoryTotalBytes: readable.memoryTotalBytes,
+                                          memoryPressurePercent: readable.memoryPressurePercent,
+                                          sensors: SensorReadings(cpuAverageCelsius: 80, cpuMaxCelsius: 85, cpuSource: .smc, gpuAverageCelsius: 70, fans: nil))
+        guard pending.health.coolingHint, pending.fanCoolingMinutes == nil,
+              pending.coolingLegend == "风扇读数暂不可用，‘建议降温’待确认",
+              pending.sensorDisplay.footer == "风扇读数暂不可用，“建议降温”待确认",
+              pending.sensorDisplay.columns[2].tone == .unavailable else {
+            print("待确认：\(pending.coolingLegend) \(pending.sensorDisplay)"); return false
+        }
         // 热状态和风扇同时满足时写热状态。
         let both = PanelPreviewRenderer.sensorState(.cooling)
         both.fairSince = both.now().addingTimeInterval(-600)

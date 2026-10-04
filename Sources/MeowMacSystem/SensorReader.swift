@@ -151,7 +151,7 @@ public final class SensorReader {
         }
         if keys == nil {
             if let next = nextEnumeration, now < next { return fallback(failure: "读不到键清单") }
-            guard let all = smc.allKeys() else {
+            guard let all = smc.allKeys(), !all.isEmpty else {
                 smc.close()
                 nextEnumeration = now.addingTimeInterval(Self.enumerationRetrySeconds)
                 return fallback(failure: "读不到键清单")

@@ -18,10 +18,19 @@ public struct SensorCardDisplay: Codable, Equatable {
 public extension PanelState {
     /// 风扇持续高转速、已达到“建议降温”条件的分钟数；未达到时为 nil。
     var fanCoolingMinutes: Int? {
-        guard let since = fanHighSince else { return nil }
+        guard let since = fanHighSince, fanJudgeable else { return nil }
         let seconds = now().timeIntervalSince(since)
         guard seconds >= configResult.config.fanHighSeconds else { return nil }
         return max(1, Int(seconds / 60))
+    }
+
+    /// 当前读数能否判定风扇是否超过阈值。
+    var fanJudgeable: Bool { snapshot?.sensors?.fanHigh(threshold: configResult.config.fanHighFraction) != nil }
+
+    /// 风扇触发的降温提醒还在，但当前读不到风扇，不能把读不到的时段算作持续超阈值（D40）。
+    var fanCoolingPending: Bool {
+        guard health.coolingHint, !fanJudgeable, let since = fanHighSince else { return false }
+        return now().timeIntervalSince(since) >= configResult.config.fanHighSeconds
     }
 
     var coolingLegend: String {
@@ -31,6 +40,7 @@ public extension PanelState {
         if health.coolingHint, let minutes = fanCoolingMinutes {
             return "风扇超过最大值 \(Self.percent(configResult.config.fanHighFraction)) 已持续 \(minutes) 分钟，达到‘建议降温’条件"
         }
+        if fanCoolingPending { return "风扇读数暂不可用，‘建议降温’待确认" }
         if health.coolingHint {
             return "热状态 fair 已持续 \(Int(now().timeIntervalSince(fairSince ?? now()) / 60)) 分钟，达到‘建议降温’条件"
         }
@@ -76,6 +86,8 @@ public extension PanelState {
         let footer: String
         if let failure = sensors.failure {
             footer = "读不到 SMC：\(failure)。其他系统数据不受影响"
+        } else if fanCoolingPending {
+            footer = "风扇读数暂不可用，“建议降温”待确认"
         } else if let cooling {
             footer = "风扇超过最大值 \(Self.percent(configResult.config.fanHighFraction)) 已持续 \(cooling) 分钟，达到“建议降温”条件"
         } else if sensors.cpuSource == .iohid {
