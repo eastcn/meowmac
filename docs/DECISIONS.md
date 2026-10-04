@@ -33,7 +33,9 @@
 **D8　刷新策略。**
 
 - 每 30 分钟刷新一次全部渠道，不区分是否活跃。
-- 每 60 秒调用一次 `sessions --json-v2`。某个渠道的会话从 active 全部变成 idle 后，5 分钟后补刷这个渠道一次。
+- 每 60 秒扫描一次本地会话记录的修改时间，休眠时暂停。Claude 取 `~/.claude/projects` 下含子目录的所有 jsonl；Codex 取 `~/.codex/sessions` 下按名称排序最新的 3 个日期目录里的 jsonl。最近 120 秒内有写入算 active。某个渠道从 active 变成 idle 后，5 分钟后补刷这个渠道一次。
+- 2026-10-04 修改（原为每 60 秒调用一次 `sessions --json-v2`）：`sessions` 与 `usage --provider codex` 每次都会触发 `spctl` 评估 ChatGPT.app，造成 `syspolicyd` 约 2.5 秒的满核峰值，`sessions` 又没有按渠道过滤的参数。语义随之变化：active 从“会话存活”变成“最近 120 秒有写入”，所以一次超过约 7 分钟的停顿也会触发一次补刷。
+- 渠道的根目录不存在，视为未安装，按 idle 处理，不调用 CLI。根目录存在但读不了，或结构不符合预期，该渠道退回每 5 分钟调用一次 `sessions --json-v2`，并写一条不含路径的日志。120 秒和 300 秒是代码常量，补刷延迟仍由 `sessionFinishDelaySeconds` 决定。
 - 支持手动刷新。距上次刷新不到 1 分钟的请求合并成一次。
 - 打开面板只显示缓存和数据时间，不触发刷新。
 - 休眠时暂停；唤醒后如果距上次刷新超过 30 分钟，立即补刷一次。
@@ -162,19 +164,19 @@ v0.1 第一轮交付的界面不合格，原因是规划里没有视觉要求。
 
 以下事实在 2026-09-29 于作者的 MacBook Pro（Apple M5，16 GB，macOS 26.6.2）上验证。
 
-**CodexBarCLI 0.60.5**，路径 `/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI`。
+**CodexBarCLI 0.60.5**（2026-10-04 实测已是 0.70.0），路径 `/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI`。
 
 - CodexBar.app 退出后仍能正常工作。
 - `usage --provider <p> --json` 的耗时：Claude 12～14 秒，Codex 4～6 秒，DeepSeek 1 秒，OpenCodeGo 1～2 秒。每次都实时请求，不读缓存。
 - 返回一个数组，每项有 `provider`、`source` 和 `usage`。`usage` 里有 `primary`、`secondary`、`tertiary` 三个窗口，每个窗口有 `usedPercent`、`windowMinutes`、`resetsAt` 和 `resetDescription`，字段可能缺失。有的渠道还有 `pace`，含 `summary`、`willLastToReset` 等字段。Codex 另有 `credits` 和 `usage.providerCost`。
 - `dashboard` 一次返回所有已启用的渠道，单个渠道失败会作为这一行的错误返回；支持 `--timeout` 和 `--output`。耗时未测。
 - `cost --provider <claude|codex> --days N --breakdown --json` 读本地日志，耗时不到 1 秒。返回 `daily[]`，每项有 `date`、各类 token 数、`totalCost` 和 `modelBreakdowns`。Codex 另有 `projects[]`。
-- `sessions --json-v2` 耗时约 1 秒。每个会话有 `provider`、`state`（`active` 或 `idle`）、`lastActivityAt`、`startedAt`、`pid` 等字段。只覆盖 Claude Code、Codex、pi 和 OMP。
+- `sessions --json-v2` 耗时约 1 秒（2026-10-04 实测约 2.5 秒，其间会启动 `spctl --assess` 评估 ChatGPT.app；`usage --provider codex` 同样会，`cost` 不会）。每个会话有 `provider`、`state`（`active` 或 `idle`）、`lastActivityAt`、`startedAt`、`pid` 等字段。只覆盖 Claude Code、Codex、pi 和 OMP。
 - CodexBar.app 的额度历史在 `~/Library/Application Support/com.steipete.codexbar/history/<provider>.json`，由应用写入，CLI 不能导出。
 
 **系统数据。**
 
-- `top -l 2 -s 1 -o power -stats pid,command,cpu,power` 不需要 sudo，能列出所有用户的进程，包括 `WindowServer`。进程名最多显示 16 个字符。
+- `top -l 2 -s 1 -o power -stats pid,command,cpu,power` 不需要 sudo，能列出所有用户的进程，包括 `WindowServer`。第二次采样的 %CPU 是 `-s` 指定的这段时间的平均值；能耗判定用 `-s 60`，窗口等于采样间隔，首尾相接（2026-10-04）。进程名最多显示 16 个字符。
 - IORegistry 的 `AppleSmartBattery` 不需要 sudo 就能读：`Temperature` 是百分之一摄氏度（3051 表示 30.51°C）；`PowerTelemetryData` 里有 `SystemLoad` 等功耗字段，单位待核对。
 - SDK 头文件里 `rusage_info_v6` 有 `ri_energy_nj` 字段。
 - `mo status --json` 在 M5 上的 `cpu_temp` 和 `fan_speed` 都是 0。
