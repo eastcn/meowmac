@@ -54,6 +54,7 @@ public extension PanelState {
 
 /// 仅用于系统页，额度图的连续累计曲线沿用原组件。
 struct SystemTrendGraph: View {
+    @Environment(\.previewMaterial) private var previewMaterial
     @ObservedObject var state: PanelState
     let kind: String
     let series: [[TrendValue]]
@@ -119,16 +120,13 @@ struct SystemTrendGraph: View {
                 }
             }.contentShape(Rectangle())
                 .preference(key: PanelInteractionFrameKey.self, value: ["graph." + kind: proxy.frame(in: .named(PanelInteractionFrameKey.space))])
-                .onContinuousHover { phase in
-                    switch phase {
-                    case .active(let location):
+                .background { if !previewMaterial { TrendMouseSurface(kind: kind) { location in
+                    if let location {
                         let fraction = min(1, max(0, location.x / max(1, proxy.size.width)))
                         state.chartHoverDate = state.trendDomain.lowerBound.addingTimeInterval(fraction * state.trendDomain.upperBound.timeIntervalSince(state.trendDomain.lowerBound))
                         state.chartHoverKind = kind
-                    case .ended:
-                        if state.chartHoverKind == kind { state.chartHoverDate = nil; state.chartHoverKind = nil }
-                    }
-                }
+                    } else if state.chartHoverKind == kind { state.chartHoverDate = nil; state.chartHoverKind = nil }
+                } } }
                 .overlay(alignment: .topLeading) {
                     if state.chartHoverKind == kind, let date = state.chartCursorDate {
                         let fraction = date.timeIntervalSince(state.trendDomain.lowerBound) / max(1, state.trendDomain.upperBound.timeIntervalSince(state.trendDomain.lowerBound))
@@ -144,5 +142,32 @@ struct SystemTrendGraph: View {
                     }
                 }
         }.frame(height: height)
+    }
+}
+
+/// 使用原生 tracking area，弹出面板未成为键盘焦点时也能查看历史。
+private struct TrendMouseSurface: NSViewRepresentable {
+    let kind: String
+    let moved: (CGPoint?) -> Void
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView(); view.identifier = NSUserInterfaceItemIdentifier("trend." + kind); view.moved = moved
+        return view
+    }
+    func updateNSView(_ view: TrackingView, context: Context) { view.moved = moved }
+    final class TrackingView: NSView {
+        var moved: ((CGPoint?) -> Void)?
+        override var isFlipped: Bool { true }
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            for area in trackingAreas { removeTrackingArea(area) }
+            addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect], owner: self))
+        }
+        override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
+        override func mouseMoved(with event: NSEvent) {
+            let point = convert(event.locationInWindow, from: nil)
+            moved?(bounds.contains(point) ? point : nil)
+        }
+        override func mouseExited(with event: NSEvent) { moved?(nil) }
     }
 }
