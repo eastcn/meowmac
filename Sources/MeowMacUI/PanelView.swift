@@ -42,6 +42,8 @@ public enum PanelCardRegistry {
                 case "quota.cost": return state.costDisplay(state.selectedProvider) != nil
                 case "quota.storage": return [.claude, .codex].contains(state.selectedProvider) && state.localStorage[state.selectedProvider] != nil
                 case "network.checks", "network.sites", "network.egress": return state.networkModel != nil
+                // 界面在下一个提交接入，之前不渲染。
+                case "network.traffic": return false
                 default: return true
                 }
             }, render: { state in

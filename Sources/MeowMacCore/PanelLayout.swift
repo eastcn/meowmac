@@ -13,7 +13,8 @@ public enum PanelLayoutCatalog {
     public static let definitions: [PanelTab: [PanelCardDefinition]] = [
         .system: [.init("system.chart", "系统趋势", canHide: false), .init("system.energy", "能耗排行"), .init("system.disk", "磁盘")],
         .quota: [.init("quota.trend", "用量趋势"), .init("quota.cost", "花费"), .init("quota.storage", "本地存储")],
-        .network: [.init("network.checks", "连接检查"), .init("network.sites", "站点连通性"), .init("network.egress", "出口 IP")],
+        .network: [.init("network.checks", "连接检查"), .init("network.sites", "站点延迟"),
+                   .init("network.traffic", "上下行速率"), .init("network.egress", "出口 IP")],
     ]
 }
 
@@ -166,10 +167,20 @@ public struct PanelLayout: Codable, Equatable {
 
     /// 已删除的功能块。v0.3 第 1 轮写入过 `system.sensors`，读取时去掉，其余顺序和显隐不变。
     static let removedCards: Set<String> = ["system.sensors"]
+    static let addedNetworkCard = "network.traffic"
 
     static func migrated(_ cards: [String: [PanelCardPlacement]]) -> [String: [PanelCardPlacement]] {
         var result = cards
         result[PanelTab.system.rawValue] = cards[PanelTab.system.rawValue]?.filter { !removedCards.contains($0.id) }
+        // 2026-10-04 新增 `network.traffic`。旧文件网络页恰好只缺这一块时，以可见状态插到站点之后（没有站点时插到出口之前）。
+        if var network = cards[PanelTab.network.rawValue] {
+            let ids = network.map(\.id), expected = (PanelLayoutCatalog.definitions[.network] ?? []).map(\.id)
+            if !ids.contains(addedNetworkCard), ids.count == Set(ids).count, Set(ids + [addedNetworkCard]) == Set(expected) {
+                let index = ids.firstIndex(of: "network.sites").map { $0 + 1 } ?? ids.firstIndex(of: "network.egress") ?? ids.count
+                network.insert(PanelCardPlacement(id: addedNetworkCard), at: index)
+                result[PanelTab.network.rawValue] = network
+            }
+        }
         return result
     }
 }

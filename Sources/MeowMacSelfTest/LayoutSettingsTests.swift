@@ -214,12 +214,12 @@ enum LayoutSettingsTests {
             click(window, x: 425, fromBottom: energy.y + 149)
             guard model.selectedTab == .network else { print("网络标签未触发"); return false }
             optionArrow(window, code: 123, character: "\u{F702}")
-            guard model.draft.tabs == [.system, .network, .quota], checks().count == 7 else { return false }
+            guard model.draft.tabs == [.system, .network, .quota], checks().count == 8 else { return false }
             check(4)
             let network = point(checks()[4])
             click(window, x: 45, fromBottom: network.y)
             optionArrow(window, code: 125, character: "\u{F701}")
-            guard model.draft.placements(for: .network).map(\.id) == ["network.sites", "network.checks", "network.egress"] else { return false }
+            guard model.draft.placements(for: .network).map(\.id) == ["network.sites", "network.checks", "network.traffic", "network.egress"] else { return false }
             click(window, x: 475, fromBottom: 49)
             guard controller.window == nil, state.panelLayout.overview.order == [.memory, .cpu, .quota, .network],
                   !state.panelLayout.placements(for: .network)[1].visible else { return false }
