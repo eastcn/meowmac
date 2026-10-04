@@ -31,6 +31,10 @@ public struct SystemPanelSnapshot: Codable {
     public let domain: ClosedRange<Date>
     public let warmPeriods: [ClosedRange<Date>]
     public let lastCleaning: CleaningRecord?
+    /// v0.3 实验传感器的显示值、趋势图图例和风扇持续高转速的开始时刻。
+    public var sensors: SensorCardDisplay? = nil
+    public var coolingLegend: String? = nil
+    public var fanHighSince: Date? = nil
 }
 public struct QuotaCycleDisplay: Codable {
     public let window: QuotaWindow
@@ -66,7 +70,8 @@ public struct PanelSnapshot: Codable {
         overview = OverviewSnapshot(capturedAt: state.now(), health: state.health, metrics: state.overviewMetrics, quotaUpdatedAt: state.quotaUpdatedAt)
         tabs = TabsSnapshot(levels: Dictionary(uniqueKeysWithValues: zip(PanelTab.allCases.map(\.rawValue), state.tabLevels)), defaultTab: DefaultPanelLayout.openingTab(summary: state.health, lastViewed: state.selectedTab))
         system = SystemPanelSnapshot(latest: state.snapshot, diagnosis: state.diagnosisRows, energy: state.energy, trends: state.systemTrends,
-            chartMinutes: state.chartMinutes, domain: state.trendDomain, warmPeriods: state.warmPeriods, lastCleaning: state.lastCleaning)
+            chartMinutes: state.chartMinutes, domain: state.trendDomain, warmPeriods: state.warmPeriods, lastCleaning: state.lastCleaning,
+            sensors: state.sensorDisplay, coolingLegend: state.coolingLegend, fanHighSince: state.fanHighSince)
         quota = QuotaProvider.allCases.map { state.channelDisplay($0) }
         var networkDisplay = state.networkModel?.meowMacDisplay
         networkDisplay?.capture = state.networkCapture

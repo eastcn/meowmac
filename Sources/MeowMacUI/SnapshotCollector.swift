@@ -37,6 +37,7 @@ public enum SnapshotCollector {
         let latest = system.sample(); state.snapshot = latest; state.chartHistory.append(latest, force: true)
         state.lastRefreshedAt = latest.timestamp
         if latest.thermal == .fair { state.fairSince = latest.timestamp }
+        state.fanHighSince = FanHighTracker.next(since: nil, readings: latest.sensors, at: latest.timestamp, config: config)
         let energy = try await Task.detached {
             let processes = try EnergySampler.processes { raw.write($0, name: "top.txt") }
             var tracker = EnergyTracker()

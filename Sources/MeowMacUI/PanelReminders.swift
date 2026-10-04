@@ -15,7 +15,7 @@ public extension PanelState {
             quotaUsedPercent: quotas.values.flatMap { $0.windows.map(\.usedPercent) }, network: networkTone,
             failedSources: failures, fairSince: fairSince, now: now(), quotaSnapshots: Array(quotas.values),
             networkSignals: signals, networkConfirmed: completed, networkCheckedAt: networkModel?.lastCheckedAt,
-            energyUpdatedAt: energyUpdatedAt), config: configResult.config)
+            energyUpdatedAt: energyUpdatedAt, fanHighSince: fanHighSince), config: configResult.config)
     }
     var projectedReminders: ReminderTracker {
         var value = reminderTracker; value.reconcile(reminderBatch, now: now()); return value

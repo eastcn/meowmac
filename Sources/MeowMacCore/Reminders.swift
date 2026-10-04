@@ -104,6 +104,7 @@ public enum ReminderCollector {
                                  detail: "可用空间占 \(Int((remaining * 100).rounded()))%", sampledAt: system.timestamp))
                 }
             }
+            var thermalCooling = false
             if system.thermal != .unavailable {
                 batch.confirmedKinds.formUnion([.thermal, .cooling])
                 if system.thermal == .serious || system.thermal == .critical {
@@ -112,10 +113,16 @@ public enum ReminderCollector {
                                  title: noProcess ? "温度偏高，未发现异常进程，建议降温或用 AI 诊断" : "系统已降频，建议用 AI 诊断",
                                  detail: "热状态 \(system.thermal.rawValue)", sampledAt: system.timestamp))
                 }
-                if system.thermal == .fair && input.fairSince.map({ input.now.timeIntervalSince($0) >= config.fairThermalSeconds }) == true {
-                    add(Reminder(kind: .cooling, object: "system", tab: .system, level: .normal,
-                                 title: "建议降温", detail: "热状态 fair 持续偏高", sampledAt: system.timestamp))
-                }
+                thermalCooling = system.thermal == .fair && input.fairSince.map({ input.now.timeIntervalSince($0) >= config.fairThermalSeconds }) == true
+            }
+            // v0.3：风扇超过最大转速的阈值并持续，同样算“建议降温”（D14）。读不到风扇时不判定。
+            let fanHigh = system.sensors?.fanHigh(threshold: config.fanHighFraction)
+            if fanHigh != nil { batch.confirmedKinds.insert(.cooling) }
+            let fanCooling = fanHigh == true && input.fanHighSince.map({ input.now.timeIntervalSince($0) >= config.fanHighSeconds }) == true
+            if thermalCooling || fanCooling {
+                add(Reminder(kind: .cooling, object: "system", tab: .system, level: .normal, title: "建议降温",
+                             detail: thermalCooling ? "热状态 fair 持续偏高" : "风扇转速持续超过最大值的 \(Int((config.fanHighFraction * 100).rounded()))%",
+                             sampledAt: system.timestamp))
             }
         }
         if let energy = input.energy {

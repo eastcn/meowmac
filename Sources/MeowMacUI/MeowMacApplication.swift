@@ -142,6 +142,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         if latest.thermal == .fair {
             if panelState.fairSince == nil { panelState.fairSince = latest.timestamp }
         } else { panelState.fairSince = nil }
+        let fanHighSince = FanHighTracker.next(since: panelState.fanHighSince, readings: latest.sensors, at: latest.timestamp, config: configResult.config)
+        if fanHighSince != panelState.fanHighSince { panelState.fanHighSince = fanHighSince }
         frameInterval = panelState.catDisplay().frameInterval
     }
 

@@ -40,6 +40,7 @@ public struct HealthInputs {
     public let network: NetworkTone
     public let failedSources: [String: Int]
     public let fairSince: Date?
+    public let fanHighSince: Date?
     public let now: Date
     public let quotaSnapshots: [QuotaSnapshot]
     public let networkSignals: [NetworkReminderSignal]?
@@ -50,12 +51,13 @@ public struct HealthInputs {
     public init(system: SystemSnapshot?, energy: EnergyDiagnosis?, quotaUsedPercent: [Double], network: NetworkTone,
                 failedSources: [String: Int], fairSince: Date?, now: Date, quotaSnapshots: [QuotaSnapshot] = [],
                 networkSignals: [NetworkReminderSignal]? = nil, networkConfirmed: Bool = true,
-                networkCheckedAt: Date? = nil, energyUpdatedAt: Date? = nil) {
+                networkCheckedAt: Date? = nil, energyUpdatedAt: Date? = nil, fanHighSince: Date? = nil) {
         self.system = system; self.energy = energy; self.quotaUsedPercent = quotaUsedPercent
         self.network = network; self.failedSources = failedSources; self.fairSince = fairSince; self.now = now
         self.quotaSnapshots = quotaSnapshots
         self.networkSignals = networkSignals; self.networkConfirmed = networkConfirmed
         self.networkCheckedAt = networkCheckedAt; self.energyUpdatedAt = energyUpdatedAt
+        self.fanHighSince = fanHighSince
     }
 }
 
