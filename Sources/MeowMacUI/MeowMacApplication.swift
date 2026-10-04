@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import MeowMacCore
 import MeowMacSystem
 import SwiftUI
@@ -11,6 +12,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var networkBridge: NetworkBridge?
+    private var networkRecorder: NetworkHistoryRecorder?
+    private var siteHistorySubscription: AnyCancellable?
     private var quotaCoordinator: QuotaCoordinator?
     private var resetCoordinator: CodexResetCoordinator?
     private let panelState = PanelState()
@@ -54,6 +57,11 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         let bridge = NetworkBridge { [weak panelState] tone in panelState?.networkTone = tone }
         networkBridge = bridge
         panelState.networkModel = bridge.model
+        let recorder = NetworkHistoryRecorder { [weak panelState] history in panelState?.networkHistory = history }
+        networkRecorder = recorder
+        siteHistorySubscription = bridge.model.$siteHistory.dropFirst().sink { [weak recorder] history in
+            Task { @MainActor in recorder?.record(siteHistory: history, now: Date()) }
+        }
         bridge.start()
         let quota = QuotaCoordinator(state: panelState, config: configResult.config)
         quotaCoordinator = quota
@@ -136,6 +144,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         }
         hasSystemBaseline = true
         panelState.chartHistory.append(latest, force: thermalChanged)
+        networkRecorder?.record(received: latest.networkReceivedBytesPerSecond, sent: latest.networkSentBytesPerSecond, at: latest.timestamp)
         panelState.lastRefreshedAt = latest.timestamp
         if latest.thermal == .fair {
             if panelState.fairSince == nil { panelState.fairSince = latest.timestamp }

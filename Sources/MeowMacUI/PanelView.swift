@@ -91,6 +91,9 @@ public final class PanelState: ObservableObject {
     @Published public private(set) var selectedCostDate: String?
     @Published public var loginEnabled = false
     @Published public var networkModel: AppModel? { didSet { refreshReminders() } }
+    /// 站点轮次和速率的本机历史，最近 24 小时。
+    @Published public var networkHistory = NetworkHistory()
+    @Published public var networkRange: NetworkTrendRange = .hour
     public var networkCapture: NetworkCaptureInfo?
     @Published public var lastCleaning: CleaningRecord?
     @Published public var selectedCat: LoadedCat? = CatPackageLoader.defaultCat

@@ -106,6 +106,7 @@ enum SelfTestMain {
         tests.append(contentsOf: CodexResetTests.tests)
         tests.append(contentsOf: CodexResetUITests.tests)
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }
+        for test in NetworkHistoryTests.tests { tests.append((test.0, { test.1() })) }
         for test in CodexBarImportTests.tests { tests.append((test.0, { test.1() })) }
         tests.append(("UI.System/两类诊断与持续时间", { DiagnosisTests.rows() }))
         tests.append(("UI.Snapshot/八部分与关键字段编码", { @MainActor in
@@ -156,6 +157,20 @@ enum SelfTestMain {
                 let otherChecks = (other?["items"] as? [[String: Any]])?.compactMap { $0["severity"] as? String }
                 return own?["status"] as? String == other?["status"] as? String && ownChecks == otherChecks
             } catch { print("网络对照失败：\(error)"); return false }
+        }))
+        tests.append(("Network.History.Live/真实一轮写入与读回", { @MainActor in
+            do {
+                let dir = URL(fileURLWithPath: "build/acceptance/network")
+                try? FileManager.default.removeItem(at: dir.appendingPathComponent("history"))
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                let value = try await NetworkBridge.collectOnce(historyFile: dir.appendingPathComponent("egress-history.json"))
+                let rows = NetworkRoundBuilder.rows(from: value.model.siteHistory)
+                let store = NetworkHistoryStore(directory: dir.appendingPathComponent("history"))
+                try store.append(sites: rows)
+                let loaded = store.load(now: Date())
+                print("分组：" + loaded.sites.map { "\($0.group.title) \($0.passed)/\($0.total) \($0.medianMilliseconds.map { String(format: "%.0f ms", $0) } ?? "—")" }.joined(separator: "，"))
+                return rows.count == 3 && loaded.sites == rows && rows.contains { $0.total > 0 }
+            } catch { print("网络历史实测失败：\(error)"); return false }
         }))
         tests.append(("UI.Network/等待总超时与完成", { @MainActor in
             do {
