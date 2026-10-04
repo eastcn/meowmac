@@ -75,7 +75,7 @@ public extension PanelState {
         }
         let footer: String
         if let failure = sensors.failure {
-            footer = "传感器不可用：\(failure)。其他系统数据不受影响"
+            footer = "读不到 SMC：\(failure)。其他系统数据不受影响"
         } else if let cooling {
             footer = "风扇超过最大值 \(Self.percent(configResult.config.fanHighFraction)) 已持续 \(cooling) 分钟，达到“建议降温”条件"
         } else if sensors.cpuSource == .iohid {

@@ -134,9 +134,13 @@ public enum SensorAggregator {
 }
 
 /// 风扇持续高转速的计时。与 `fairSince` 一样只保存开始时刻。
+/// 回落时重置；读不到或无法判定时保持原样，采集失败不代表恢复（D40）。
 public enum FanHighTracker {
     public static func next(since: Date?, readings: SensorReadings?, at time: Date, config: LocalConfig) -> Date? {
-        guard readings?.fanHigh(threshold: config.fanHighFraction) == true else { return nil }
-        return since ?? time
+        switch readings?.fanHigh(threshold: config.fanHighFraction) {
+        case true?: return since ?? time
+        case false?: return nil
+        case nil: return since
+        }
     }
 }

@@ -106,7 +106,8 @@ public enum ReminderCollector {
             }
             var thermalCooling = false
             if system.thermal != .unavailable {
-                batch.confirmedKinds.formUnion([.thermal, .cooling])
+                batch.confirmedKinds.insert(.thermal)
+                batch.confirmedKeys.insert(ReminderKind.cooling.rawValue + ".system")
                 if system.thermal == .serious || system.thermal == .critical {
                     let noProcess = input.energy?.runaway.isEmpty ?? true
                     add(Reminder(kind: .thermal, object: "system", tab: .system,
@@ -115,14 +116,18 @@ public enum ReminderCollector {
                 }
                 thermalCooling = system.thermal == .fair && input.fairSince.map({ input.now.timeIntervalSince($0) >= config.fairThermalSeconds }) == true
             }
-            // v0.3：风扇超过最大转速的阈值并持续，同样算“建议降温”（D14）。读不到风扇时不判定。
+            if thermalCooling {
+                add(Reminder(kind: .cooling, object: "system", tab: .system, level: .normal,
+                             title: "建议降温", detail: "热状态 fair 持续偏高", sampledAt: system.timestamp))
+            }
+            // v0.3：风扇超过最大转速的阈值并持续，同样算“建议降温”（D14）。按来源分别确认：
+            // 读不到风扇时不判定，也不当作恢复；与热状态同时满足时只保留热状态那一条。
             let fanHigh = system.sensors?.fanHigh(threshold: config.fanHighFraction)
-            if fanHigh != nil { batch.confirmedKinds.insert(.cooling) }
+            if fanHigh != nil || system.sensors?.fans == [] { batch.confirmedKeys.insert(ReminderKind.cooling.rawValue + ".fan") }
             let fanCooling = fanHigh == true && input.fanHighSince.map({ input.now.timeIntervalSince($0) >= config.fanHighSeconds }) == true
-            if thermalCooling || fanCooling {
-                add(Reminder(kind: .cooling, object: "system", tab: .system, level: .normal, title: "建议降温",
-                             detail: thermalCooling ? "热状态 fair 持续偏高" : "风扇转速持续超过最大值的 \(Int((config.fanHighFraction * 100).rounded()))%",
-                             sampledAt: system.timestamp))
+            if fanCooling && !thermalCooling {
+                add(Reminder(kind: .cooling, object: "fan", tab: .system, level: .normal, title: "建议降温",
+                             detail: "风扇转速持续超过最大值的 \(Int((config.fanHighFraction * 100).rounded()))%", sampledAt: system.timestamp))
             }
         }
         if let energy = input.energy {

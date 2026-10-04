@@ -65,9 +65,9 @@ enum SensorTests {
         // FNum 大于实际给出的风扇数时，只用读到的。
         let partial = SensorAggregator.make(smcTemperatures: [:], hidTemperatures: [:], fanCount: 3, fans: [(1200, 6000)])
         // 全部失败：保留调用方的原因。
-        let failed = SensorAggregator.make(smcTemperatures: [:], hidTemperatures: [:], fanCount: nil, fans: [], failure: "无法连接 SMC 传感器服务")
+        let failed = SensorAggregator.make(smcTemperatures: [:], hidTemperatures: [:], fanCount: nil, fans: [], failure: "无法连接传感器服务")
         return partial.fans?.count == 1
-            && failed == SensorReadings.unavailable("无法连接 SMC 传感器服务")
+            && failed == SensorReadings.unavailable("无法连接传感器服务")
             && FanReading(rpm: 0, maxRPM: 6000).fraction == 0
     }
 

@@ -25,13 +25,13 @@ enum SensorRuleTests {
         let low = snapshot(fans: [FanReading(rpm: 4800, maxRPM: 6000)]).sensors
         let start = FanHighTracker.next(since: nil, readings: high, at: now, config: config)
         let kept = FanHighTracker.next(since: start, readings: high, at: now.addingTimeInterval(60), config: config)
-        // 恰好等于阈值不算超过；回落、读不到、最大值缺失都重置计时。
+        // 恰好等于阈值不算超过，回落即重置；读不到、最大值缺失或无风扇时无法判定，计时保持原样（D40）。
         return start == now && kept == now
             && FanHighTracker.next(since: start, readings: low, at: now, config: config) == nil
-            && FanHighTracker.next(since: start, readings: nil, at: now, config: config) == nil
-            && FanHighTracker.next(since: start, readings: .unavailable("无法连接"), at: now, config: config) == nil
-            && FanHighTracker.next(since: start, readings: snapshot(fans: [FanReading(rpm: 6000, maxRPM: nil)]).sensors, at: now, config: config) == nil
-            && FanHighTracker.next(since: start, readings: snapshot(fans: []).sensors, at: now, config: config) == nil
+            && FanHighTracker.next(since: start, readings: nil, at: now, config: config) == start
+            && FanHighTracker.next(since: start, readings: .unavailable("无法连接"), at: now, config: config) == start
+            && FanHighTracker.next(since: start, readings: snapshot(fans: [FanReading(rpm: 6000, maxRPM: nil)]).sensors, at: now, config: config) == start
+            && FanHighTracker.next(since: nil, readings: snapshot(fans: []).sensors, at: now, config: config) == nil
     }
 
     static func reminders() -> Bool {
@@ -66,7 +66,44 @@ enum SensorRuleTests {
         var strict = config; strict.fanHighFraction = 0.9
         let strictCooling = ReminderCollector.collect(HealthInputs(system: high, energy: nil, quotaUsedPercent: [], network: .green, failedSources: [:],
             fairSince: nil, now: now, fanHighSince: now.addingTimeInterval(-600)), config: strict).reminders.contains { $0.kind == .cooling }
-        return both.count == 1 && both[0].detail == "热状态 fair 持续偏高" && !strictCooling
+        guard both.count == 1, both[0].id == "cooling.system", both[0].detail == "热状态 fair 持续偏高", !strictCooling else { return false }
+        return recovery()
+    }
+
+    /// 跨采样：采集失败、未知不代表恢复；确认恢复后才消除（D40）。
+    static func recovery() -> Bool {
+        let config = LocalConfig()
+        func batch(_ system: SystemSnapshot, fanSince: Date?, fairSince: Date? = nil) -> ReminderBatch {
+            ReminderCollector.collect(HealthInputs(system: system, energy: nil, quotaUsedPercent: [], network: .green, failedSources: [:],
+                                                   fairSince: fairSince, now: now, fanHighSince: fanSince), config: config)
+        }
+        let high = snapshot(fans: [FanReading(rpm: 5000, maxRPM: 6000)])
+        let fanStart = now.addingTimeInterval(-600)
+        // 风扇触发后，下一次风扇读不到：保留为待确认，不消除。
+        var tracker = ReminderTracker()
+        tracker.reconcile(batch(high, fanSince: fanStart), now: now)
+        guard tracker.current["cooling.fan"]?.confirmed == true else { print("风扇降温未建立"); return false }
+        tracker.reconcile(batch(snapshot(fans: nil), fanSince: fanStart), now: now)
+        guard tracker.current["cooling.fan"]?.confirmed == false else { print("读不到风扇被当作恢复"); return false }
+        // 风扇确认回落：消除。
+        tracker.reconcile(batch(snapshot(fans: [FanReading(rpm: 3000, maxRPM: 6000)]), fanSince: nil), now: now)
+        guard tracker.current["cooling.fan"] == nil else { print("风扇回落未消除"); return false }
+        // 热状态触发后，下一次热状态读不到、风扇可读且正常：热状态那条保留为待确认。
+        tracker.reconcile(batch(snapshot(fans: [FanReading(rpm: 0, maxRPM: 6000)], thermal: .fair), fanSince: nil, fairSince: now.addingTimeInterval(-600)), now: now)
+        guard tracker.current["cooling.system"]?.confirmed == true else { print("热状态降温未建立"); return false }
+        tracker.reconcile(batch(snapshot(fans: [FanReading(rpm: 0, maxRPM: 6000)], thermal: .unavailable), fanSince: nil), now: now)
+        guard tracker.current["cooling.system"]?.confirmed == false else { print("热状态读不到被当作恢复"); return false }
+        tracker.reconcile(batch(snapshot(fans: [FanReading(rpm: 0, maxRPM: 6000)]), fanSince: nil), now: now)
+        guard tracker.current["cooling.system"] == nil else { return false }
+        // 本机没有风扇时，风扇来源视为已确认，不留下待确认项。
+        var noFan = ReminderTracker()
+        noFan.reconcile(batch(high, fanSince: fanStart), now: now)
+        noFan.reconcile(batch(snapshot(fans: []), fanSince: nil), now: now)
+        // 两种同时满足：风扇那条被热状态那条取代，只剩一条。
+        var both = ReminderTracker()
+        both.reconcile(batch(high, fanSince: fanStart), now: now)
+        both.reconcile(batch(snapshot(fans: [FanReading(rpm: 5000, maxRPM: 6000)], thermal: .fair), fanSince: fanStart, fairSince: now.addingTimeInterval(-600)), now: now)
+        return noFan.current.isEmpty && both.current.keys.filter { $0.hasPrefix("cooling.") } == ["cooling.system"]
     }
 
     static func panel() -> Bool {

@@ -81,7 +81,7 @@ enum SensorUITests {
         guard gpu.1[1] == "GPU|不可用||没有匹配的传感器|unavailable", gpu.1[0].hasSuffix("|normal"), gpu.0.footer == source else { print("GPU：\(gpu)"); return false }
         guard noFan.1[2] == "风扇|无风扇||本机未报告风扇|unavailable", noFan.0.footer == source else { print("无风扇：\(noFan)"); return false }
         guard none.1 == ["CPU|不可用|||unavailable", "GPU|不可用|||unavailable", "风扇|不可用|||unavailable"],
-              none.0.footer == "传感器不可用：无法连接 SMC 传感器服务。其他系统数据不受影响" else { print("全部不可用：\(none)"); return false }
+              none.0.footer == "读不到 SMC：无法连接传感器服务。其他系统数据不受影响" else { print("全部不可用：\(none)"); return false }
         // 尚未采集时不显示“不可用”，只写等待。
         let waiting = PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil)).sensorDisplay
         return waiting.footer == "等待采集" && waiting.columns.allSatisfy { $0.value == "—" }

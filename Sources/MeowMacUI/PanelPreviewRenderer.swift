@@ -84,7 +84,7 @@ public enum PanelPreviewRenderer {
         case .cooling: rpm = 4600 + cpu * 700
         }
         switch variant {
-        case .unavailable: return .unavailable("无法连接 SMC 传感器服务")
+        case .unavailable: return .unavailable("无法连接传感器服务")
         case .noFan:
             return SensorReadings(cpuAverageCelsius: average, cpuMaxCelsius: average + 4.3, cpuSource: .smc, gpuAverageCelsius: average - 2.9, fans: [])
         case .gpuMissing:

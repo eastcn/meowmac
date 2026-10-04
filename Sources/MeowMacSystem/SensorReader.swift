@@ -139,21 +139,27 @@ public final class SensorReader {
     private let smc = SMCReader()
     private let hid = HIDTemperatureReader()
     private var keys: (cpu: [String], gpu: [String])?
+    /// 枚举失败后，到这个时刻之前不再重试，避免反复在采样线程上枚举两千多个键。
+    private var nextEnumeration: Date?
+    static let enumerationRetrySeconds: TimeInterval = 60
 
     public init() {}
 
-    public func sample() -> SensorReadings {
+    public func sample(at now: Date = Date()) -> SensorReadings {
         guard smc.open() else {
-            return fallback(failure: "无法连接 SMC 传感器服务")
+            return fallback(failure: "无法连接传感器服务")
         }
         if keys == nil {
+            if let next = nextEnumeration, now < next { return fallback(failure: "读不到键清单") }
             guard let all = smc.allKeys() else {
                 smc.close()
-                return fallback(failure: "读不到 SMC 键清单")
+                nextEnumeration = now.addingTimeInterval(Self.enumerationRetrySeconds)
+                return fallback(failure: "读不到键清单")
             }
             keys = (all.filter(SensorAggregator.isCPUKey), all.filter(SensorAggregator.isGPUKey))
+            nextEnumeration = nil
         }
-        guard let keys else { return fallback(failure: "读不到 SMC 键清单") }
+        guard let keys else { return fallback(failure: "读不到键清单") }
         var temperatures: [String: Double] = [:]
         for key in keys.cpu + keys.gpu {
             if let value = smc.read(key) { temperatures[key] = value }
@@ -163,12 +169,12 @@ public final class SensorReader {
         for index in 0..<min(fanCount ?? 0, 8) {
             fans.append((smc.read("F\(index)Ac"), smc.read("F\(index)Mx")))
         }
-        let cpuFound = temperatures.keys.contains(where: SensorAggregator.isCPUKey)
+        let cpuFound = temperatures.contains { SensorAggregator.isCPUKey($0.key) && SensorAggregator.validCelsius.contains($0.value) }
         let readings = SensorAggregator.make(smcTemperatures: temperatures, hidTemperatures: cpuFound ? [:] : hid.temperatures(),
                                              fanCount: fanCount, fans: fans)
         if temperatures.isEmpty && fanCount == nil {
-            // 连接可能已失效，下次重新打开并重新枚举。
-            smc.close(); self.keys = nil
+            // 连接可能已失效，下次重新打开；键清单保留，不重新枚举。
+            smc.close()
         }
         return readings
     }
