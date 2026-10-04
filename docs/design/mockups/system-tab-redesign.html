@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>系统页重新设计</title>
+<style>
+:root{--text:#1d1d1f;--sub:#6e6e73;--card:rgba(255,255,255,.6);--rule:rgba(0,0,0,.09);--glass:linear-gradient(170deg,#e3e8ee,#efeae4);
+--blue:#007AFF;--purple:#AF52DE;--teal:#30B0C7;--pink:#FF2D55;--indigo:#5856D6;--brown:#A2845E;--orange:#FF9500;--orangeText:#B25000;--green:#34C759;--warnCard:rgba(255,149,0,.13);--track:rgba(0,0,0,.07)}
+.dark{--text:#f5f5f7;--sub:#98989d;--card:rgba(44,44,46,.6);--rule:rgba(255,255,255,.1);--glass:linear-gradient(170deg,#1c2129,#26221f);
+--blue:#0A84FF;--purple:#BF5AF2;--teal:#40C8E0;--pink:#FF375F;--indigo:#5E5CE6;--brown:#AC8E68;--orange:#FF9F0A;--orangeText:#FF9F0A;--green:#30D158;--warnCard:rgba(255,159,10,.16);--track:rgba(255,255,255,.1)}
+*{box-sizing:border-box}
+body{margin:0;padding:32px;background:#d6d6db;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;-webkit-font-smoothing:antialiased}
+header{max-width:1560px;margin:0 auto 20px}h1{font-size:22px;margin:0 0 8px}header p{font-size:13px;color:#55555a;margin:4px 0;line-height:1.7}
+h2.option{max-width:1560px;margin:28px auto 6px;font-size:17px}p.option{max-width:1560px;margin:0 auto 14px;font-size:13px;color:#55555a;line-height:1.7}
+.grid{display:flex;flex-wrap:wrap;gap:24px;max-width:1560px;margin:0 auto}
+.sample h3{font-size:12px;font-weight:600;color:#55555a;margin:0 0 8px}
+.panel{position:relative;width:360px;background:var(--glass);color:var(--text);border-radius:16px;overflow:hidden}
+.fold{position:absolute;left:0;right:0;border-top:2px dashed #FF3B30;z-index:3}
+.fold span{position:absolute;right:6px;top:-18px;font-size:10px;color:#FF3B30;background:rgba(255,255,255,.8);padding:1px 4px;border-radius:4px}
+.below{position:absolute;left:0;right:0;bottom:0;background:repeating-linear-gradient(135deg,rgba(255,59,48,.05) 0 6px,transparent 6px 12px);z-index:2;pointer-events:none}
+.head{padding:14px 16px 0}.status{font-size:15px;font-weight:600;display:flex;gap:6px;align-items:center}.status .warn{color:var(--orangeText)}
+.allr{font-size:11px;color:var(--sub);margin-top:6px}
+.ov{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.ov .n{font-size:11px;color:var(--sub)}.ov .v{font-size:20px;font-weight:600}.ov .s{font-size:10px;color:var(--sub)}.ov .b{height:3px;border-radius:2px;background:var(--track);margin-top:4px}.ov .b i{display:block;height:3px;border-radius:2px}
+.tabs{display:flex;background:var(--track);border-radius:99px;padding:3px;margin-bottom:12px}.tabs div{flex:1;text-align:center;font-size:13px;padding:5px 0;border-radius:99px}.tabs .on{background:var(--card);font-weight:600}
+.dotc{display:inline-block;width:6px;height:6px;border-radius:3px;margin-right:5px;vertical-align:1px}
+.rule{border-top:1px solid var(--rule)}
+.content{padding:12px 16px;display:flex;flex-direction:column;gap:12px}
+.t{font-size:13px;font-weight:600}.tiny{font-size:10px;color:var(--sub)}.cap{font-size:11px;color:var(--sub)}
+.hrow{display:flex;justify-content:space-between;align-items:center}
+.seg{font-size:10px;display:flex;background:var(--track);border-radius:99px;padding:2px}.seg span{padding:2px 8px;border-radius:99px}.seg .on{background:var(--card);font-weight:600}
+.diag{background:var(--warnCard);border-radius:12px;padding:10px 12px}
+.drow{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:6px}.drow b{font-weight:600}.drow .v{margin-left:auto;color:var(--orangeText);font-weight:600}
+/* 方案 A：一行一指标 */
+.mrow{display:grid;grid-template-columns:104px 1fr 74px;gap:8px;align-items:center;height:38px}
+.mrow .nm{font-size:12px;display:flex;align-items:center;gap:5px}.mrow .sb{font-size:10px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.mrow .val{text-align:right;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.mrow .val small{display:block;font-size:10px;font-weight:400;color:var(--sub)}
+.mrow .val.warn{color:var(--orangeText)}
+svg{display:block;width:100%}
+/* 方案 B：指标格 */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{background:var(--card);border-radius:10px;padding:8px 10px}.tile .nm{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:4px}
+.tile .val{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.tile .val small{font-size:11px;font-weight:500}.tile .sb{font-size:10px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.warn .val,.tile.warn .sb{color:var(--orangeText)}
+.legend{display:flex;justify-content:space-between;gap:8px}
+.erow{display:grid;grid-template-columns:16px 1fr 56px 46px;font-size:12px;height:20px;align-items:center}.erow.hd{font-size:10px;color:var(--sub);height:16px}.erow .r{text-align:right;font-variant-numeric:tabular-nums}.erow.hot{color:var(--orangeText);font-weight:600}
+.disk .big{font-size:20px;font-weight:600}.bar{height:6px;border-radius:3px;background:var(--track);margin:6px 0}.bar i{display:block;height:6px;border-radius:3px;background:#8E8E93;width:64%}
+.notes{max-width:1560px;margin:28px auto 0;font-size:13px;color:#55555a;line-height:1.8}
+</style>
+<header>
+<h1>系统页重新设计</h1>
+<p>问题：提醒状态下固定区约 278 pt，内容可视区约 540 pt。现有的诊断卡（约 110 pt）和五行趋势图（约 340 pt）放在一起，能耗排行几乎被挤出首屏。传感器卡和趋势图的温度、风扇两行重复。</p>
+<p>两个方案都去掉“传感器”卡片：GPU 温度和最热核心并入温度那一项，诊断卡改紧凑。红色虚线是 820 pt 面板的首屏底边，斜纹区需要滚动。数据均为虚构，HTML 只模拟材质。</p>
+</header>
+<div id="root"></div>
+<div class="notes">
+<b>共同改动</b><br>
+· 删除 <code>system.sensors</code> 功能块。已保存的布局里如有该块，读取时自动去掉，其余不变。<br>
+· 能耗诊断每个问题一行：进程名、类型、数值和持续时长。AI 提示保留为一行小字。<br>
+· 温度一项：主值是 SoC 平均温度，副信息写“最热 x · GPU y”，图里画 SoC 和电池两条线。读不到时显示“—”，不单独占卡片。<br>
+· 风扇一项：副信息写“静止”或“最大值的 N%”，达到降温条件时转橙色；本机没有风扇时这一项不出现。<br>
+· 指标的量程不再单独写一列，改到悬停提示和快照里；时间刻度和底色带图例保留。
+</div>
+<script>
+const N=60;
+function series(base,amp,seed,trend=0,spike=0){const v=[];for(let i=0;i<N;i++){let x=base+amp*Math.sin(i/6+seed)+amp*.5*Math.sin(i/2.3+seed*2)+trend*i/N;if(spike&&i%9==3)x+=spike;v.push(x)}return v}
+function spark(lines,lo,hi,h,dash){let s=`<svg viewBox="0 0 200 ${h}" preserveAspectRatio="none" style="height:${h}px">`;
+ s+=`<line x1="0" x2="200" y1="${h-.5}" y2="${h-.5}" stroke="var(--rule)"/>`;
+ if(dash!=null){const y=h-1-(dash-lo)/(hi-lo)*(h-2);s+=`<line x1="0" x2="200" y1="${y}" y2="${y}" stroke="var(--sub)" stroke-width=".7" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`}
+ for(const [v,c,fill] of lines){const p=v.map((x,i)=>`${i?"L":"M"}${(i/(N-1)*200).toFixed(1)},${(h-1-(Math.min(hi,Math.max(lo,x))-lo)/(hi-lo)*(h-2)).toFixed(1)}`).join("");
+  if(fill)s+=`<path d="${p}L200,${h}L0,${h}Z" fill="var(${c})" opacity=".15"/>`;
+  s+=`<path d="${p}" fill="none" stroke="var(${c})" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`}
+ return s+"</svg>"}
+const D={cpu:series(18,6,0,0,10),mem:series(12.6,.15,1),pow:series(6,1.5,2),soc:series(36,1.5,3,0,4),bat:series(30.3,.2,1),fan:Array(N).fill(0)};
+const Dh={cpu:series(70,10,0,15),mem:series(12.8,.2,1),pow:series(26,4,2,6),soc:series(76,5,3,10),bat:series(34,.5,1,2),fan:series(4600,250,1,700)};
+function header(alert){return `<div class="head"><div class="status">${alert?'<span class="warn">提醒</span> · syspolicyd · 进程 CPU 持续偏高':'一切正常 <span class="tiny" style="font-weight:400">· 20:23 刷新</span>'}</div>
+ ${alert?'<div class="allr">全部提醒 · 2 项</div>':''}
+ <div class="ov">${[["CPU","14%","整机负载",14,"--blue"],["内存","52%","已用 13 / 16 GB",52,"--green"],["Claude","62%","5 小时 · 剩余",62,"--green"],["网络","↓24K","↑13.5K",100,"--green"]].map(x=>`<div><div class="n">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div><div class="b"><i style="width:${x[3]}%;background:var(${x[4]})"></i></div></div>`).join("")}</div>
+ <div class="tabs"><div class="on"><i class="dotc" style="background:var(${alert?'--orange':'--green'})"></i>系统</div><div><i class="dotc" style="background:var(--green)"></i>额度</div><div><i class="dotc" style="background:var(--green)"></i>网络</div></div></div><div class="rule"></div>`}
+function diag(){return `<div class="diag"><div class="hrow"><span class="t">能耗诊断</span><span class="tiny">1 项</span></div>
+ <div class="drow"><i class="dotc" style="background:var(--orange);margin:0"></i><b>syspolicyd</b><span class="tiny">失控进程 · 占满 1 核</span><span class="v">95%</span><span class="tiny">20 分钟</span></div>
+ <div class="tiny" style="margin-top:6px">建议用 AI 诊断：把进程名和数值交给 AI 助手排查</div></div>`}
+function energy(alert){const rows=alert?[["syspolicyd","95.4%","95.4",1],["ai-toolbox","48.3%","48.3"],["WindowServer","30.5%","31.9"],["Finder","4.2%","3.1"],["ExampleSync","2.0%","1.8"]]:[["WindowServer","12.4%","18.2"],["ExampleSync","5.8%","9.1"],["Finder","2.1%","3.4"],["kernel_task","1.4%","2.8"],["ExampleWorker","0.2%","0.4"]];
+ return `<div><div class="hrow" style="margin-bottom:4px"><span class="t">能耗排行</span><span class="tiny">前 5 名</span></div><div class="erow hd"><span></span><span>进程</span><span class="r">CPU</span><span class="r">影响分</span></div>
+ ${rows.map((r,i)=>`<div class="erow ${r[3]?'hot':''}"><span class="tiny" style="${r[3]?'color:inherit':''}">${i+1}</span><span>${r[0]}</span><span class="r">${r[1]}</span><span class="r">${r[2]}</span></div>`).join("")}</div>`}
+function disk(){return `<div class="disk"><div class="hrow"><span><span class="t">磁盘</span> <span class="big">186</span> <span class="cap">GB 可用</span></span><span class="seg"><span>清理…</span></span></div><div class="bar"><i></i></div>
+ <div class="hrow cap"><span>已用 326 GB</span><span>共 512 GB</span></div><div class="cap">上次清理：9 月 28 日 · 释放 8.4 GB</div></div>`}
+function legend(cool){return `<div class="hrow tiny" style="margin-top:2px"><span>20:08</span><span>20:15</span><span>20:23</span></div><div class="legend tiny"><span>▆ ${cool?'风扇超过最大值 80% 已持续 6 分钟，达到‘建议降温’条件':'热状态 fair 及以上的时段'}</span><span>同一时间轴</span></div>`}
+function trendA(d,alert){
+ const row=(dot,name,sub,val,valsub,lines,lo,hi,warn,dash)=>`<div class="mrow"><div><div class="nm">${dot}${name}</div><div class="sb">${sub}</div></div><div>${spark(lines,lo,hi,26,dash)}</div><div class="val ${warn?'warn':''}">${val}${valsub?`<small>${valsub}</small>`:''}</div></div>`;
+ const dot=c=>`<i class="dotc" style="background:var(${c});margin:0"></i>`;
+ const fanOn=alert;
+ return `<div><div class="hrow" style="margin-bottom:2px"><span class="t">系统趋势</span><span class="seg"><span class="on">15 分钟</span><span>1 小时</span></span></div>
+ ${row(dot("--blue"),"CPU","整机负载",alert?"86%":"14%","",[[d.cpu,"--blue"]],0,100)}
+ ${row(dot("--purple"),"内存","已用 / 16 GB",alert?"12.8 GB":"12.6 GB","",[[d.mem,"--purple",1]],0,16)}
+ ${row(dot("--teal"),"整机功耗","0–40 W",alert?"27.5 W":"4.6 W","",[[d.pow,"--teal"]],0,40)}
+ ${row(dot("--indigo")+dot("--pink"),"温度",alert?"最热 88.2 · GPU 71.0":"最热 40.1 · GPU 33.0",alert?"79.4 °C":"35.5 °C",alert?"电池 34.6":"电池 30.2",[[d.bat,"--pink"],[d.soc,"--indigo"]],28,alert?92:44)}
+ ${row(dot("--brown"),"风扇",fanOn?"87% · 已持续 6 分钟":"静止",fanOn?"5240 rpm":"0 rpm","",[[d.fan,"--brown"]],0,6000,fanOn,4800)}
+ ${legend(fanOn)}</div>`}
+function trendB(d,alert){
+ const tile=(dot,name,val,sub,lines,lo,hi,warn,dash)=>`<div class="tile ${warn?'warn':''}"><div class="nm">${dot}${name}</div><div class="val">${val}</div><div class="sb">${sub}</div>${spark(lines,lo,hi,22,dash)}</div>`;
+ const dot=c=>`<i class="dotc" style="background:var(${c});margin:0"></i>`;
+ const fanOn=alert;
+ return `<div><div class="hrow" style="margin-bottom:6px"><span class="t">系统趋势</span><span class="seg"><span class="on">15 分钟</span><span>1 小时</span></span></div><div class="tiles">
+ ${tile(dot("--blue"),"CPU",alert?"86<small>%</small>":"14<small>%</small>","整机负载",[[d.cpu,"--blue"]],0,100)}
+ ${tile(dot("--purple"),"内存",alert?"12.8<small> GB</small>":"12.6<small> GB</small>","已用 / 16 GB",[[d.mem,"--purple",1]],0,16)}
+ ${tile(dot("--teal"),"整机功耗",alert?"27.5<small> W</small>":"4.6<small> W</small>","0–40 W",[[d.pow,"--teal"]],0,40)}
+ ${tile(dot("--indigo")+dot("--pink"),"温度",alert?"79.4<small> °C</small>":"35.5<small> °C</small>",alert?"最热 88.2 · GPU 71.0 · 电池 34.6":"最热 40.1 · GPU 33.0 · 电池 30.2",[[d.bat,"--pink"],[d.soc,"--indigo"]],28,alert?92:44)}
+ ${tile(dot("--brown"),"风扇",fanOn?"5240<small> rpm</small>":"0<small> rpm</small>",fanOn?"87% · 已持续 6 分钟":"静止",[[d.fan,"--brown"]],0,6000,fanOn,4800)}
+ ${tile(dot("--sub"),"热状态",alert?"nominal":"nominal","fair 及以上时转橙",[[Array(N).fill(0),"--sub"]],0,1)}
+ </div>${legend(fanOn)}</div>`}
+function page(option,alert,dark){
+ const d=alert?Dh:D;
+ const trend=option=="A"?trendA(d,alert):trendB(d,alert);
+ const parts=[alert?diag():"",trend,'<div class="rule"></div>',energy(alert),'<div class="rule"></div>',disk()].filter(Boolean).join("");
+ return `<div class="panel ${dark?'dark':''}">${header(alert)}<div class="content">${parts}</div></div>`}
+const root=document.getElementById("root");
+const opts=[["A","方案 A：一行一指标（推荐）","每项一行：左边名称和副信息，中间迷你折线，右边当前值。五项共约 190 pt，比现在的约 340 pt 少一半左右。时间轴仍然共用，刻度在最下面。正常状态下，首屏能放下趋势、能耗排行和磁盘；有诊断时，首屏能放下诊断、趋势和完整的能耗排行。"],
+ ["B","方案 B：指标格","两列小格，每格有数值、副信息和迷你折线。第六格放热状态。数值最醒目，但每条折线只有约 150 pt 宽，看趋势的细节不如 A。总高度和 A 接近。"]];
+for(const [o,title,desc] of opts){
+ root.insertAdjacentHTML("beforeend",`<h2 class="option">${title}</h2><p class="option">${desc}</p><div class="grid" id="g${o}"></div>`);
+ const g=document.getElementById("g"+o);
+ for(const [alert,dark,label] of [[false,false,"正常 · 浅色"],[true,false,"能耗诊断 + 风扇降温 · 浅色"],[false,true,"正常 · 深色"],[true,true,"能耗诊断 + 风扇降温 · 深色"]]){
+  const s=document.createElement("section");s.className="sample";s.innerHTML=`<h3>${label}</h3>`+page(o,alert,dark);g.append(s);
+  requestAnimationFrame(()=>{const p=s.querySelector(".panel");const footer=44;const fold=820-footer;
+   if(p.offsetHeight>fold){p.insertAdjacentHTML("beforeend",`<div class="fold" style="top:${fold}px"><span>首屏底边（820 pt 减底栏）</span></div><div class="below" style="top:${fold}px"></div>`)}});
+ }
+}
+</script>
+</html>
