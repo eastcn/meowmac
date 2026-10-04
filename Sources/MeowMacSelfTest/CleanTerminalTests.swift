@@ -79,7 +79,7 @@ enum CleanTerminalTests {
             try JSONEncoder().encode(config).write(to: file)
             let state = PanelState(configResult: ConfigLoadResult(config: config, error: nil))
             var found = false; var available: Set<CleanTerminal> = [.ghostty, .iterm, .terminal]
-            var alerts: [String] = []; var response = NSApplication.ModalResponse.alertFirstButtonReturn
+            var alerts: [String] = []; var details: [String] = []; var response = NSApplication.ModalResponse.alertFirstButtonReturn
             var openedConfig = 0; var instructions = 0; var chosen = 0; var copied = ""
             var launches: [CleanTerminal] = []; var launchedScript = ""
             var finish: ((Error?) -> Void)?; var clock = Date(timeIntervalSince1970: 1234)
@@ -87,7 +87,7 @@ enum CleanTerminalTests {
                 findApplication: { available.contains($0) ? URL(fileURLWithPath: "/example/" + $0.name + ".app") : nil },
                 resolveExecutable: { found && $0 == config.moPath ? $0 : nil },
                 launch: { terminal, _, script, completion in launches.append(terminal); launchedScript = script; finish = completion },
-                present: { alerts.append($0.messageText); return response },
+                present: { alerts.append($0.messageText); details.append($0.informativeText); return response },
                 openConfig: { openedConfig += 1 }, openInstructions: { instructions += 1 },
                 copyCommand: { copied = $0 }, chooseTerminal: { chosen += 1 }, now: { clock })
             response = .alertSecondButtonReturn; controller.clean()
@@ -99,11 +99,12 @@ enum CleanTerminalTests {
             finish?(nil); controller.clean()
             guard launches.count == 1, !state.cleanLaunching else { return false }
             clock = clock.addingTimeInterval(3); response = .alertSecondButtonReturn; controller.clean()
-            finish?(CocoaError(.fileReadUnknown))
-            guard launches == [.ghostty, .ghostty], copied == "'/example/custom/mo' clean", alerts.last == "无法打开 Ghostty" else { return false }
+            let launchError = NSError(domain: "SyntheticLaunch", code: 1, userInfo: [NSLocalizedDescriptionKey: "合成启动错误：应用文件无法读取"])
+            finish?(launchError)
+            guard launches == [.ghostty, .ghostty], copied == "'/example/custom/mo' clean", alerts.last == "无法打开 Ghostty", details.last?.contains(launchError.localizedDescription) == true else { return false }
             controller.select(.ghostty); available = [.terminal]; clock = clock.addingTimeInterval(3)
             response = .alertThirdButtonReturn; controller.clean()
-            guard launches.count == 2, chosen == 1, state.cleanTerminalPreference == .ghostty else { return false }
+            guard launches.count == 2, chosen == 1, state.cleanTerminalPreference == .ghostty, details.last?.contains("未找到已安装的 Ghostty") == true else { return false }
             // 选择只保存，不立即重试；下一次清理才执行。
             controller.select(.terminal)
             guard launches.count == 2, ConfigStore.load(from: file).config.cleanTerminal == .terminal else { return false }
@@ -124,7 +125,7 @@ enum CleanTerminalTests {
               menu.items[0].state == .on, !menu.items[3].isEnabled, menu.items[2].isEnabled else { return false }
         menu.performActionForItem(at: 2)
         return selected == .ghostty && CleaningAlerts.missingMole().buttons.map(\.title) == ["取消", "打开配置文件…", "安装说明"]
-            && CleaningAlerts.launchFailed(terminal: .ghostty, command: "'/example/mo' clean").buttons.map(\.title) == ["取消", "复制命令", "选择终端…"]
+            && CleaningAlerts.launchFailed(terminal: .ghostty, command: "'/example/mo' clean", reason: "未找到已安装的 Ghostty。请安装它，或选择其他终端。").buttons.map(\.title) == ["取消", "复制命令", "选择终端…"]
     }
 
     static func nativeLayout() async -> Bool {
@@ -160,7 +161,7 @@ enum CleanTerminalTests {
                 guard missingAlerts == 1 else { print("清理按钮未触发，位置：\(point)，底边：\(diskBottom)"); return false }
                 if let path {
                     try capture(hosting.controller.view, at: URL(fileURLWithPath: path).appendingPathComponent("missing-system-" + (dark ? "dark" : "light") + ".png"))
-                    for (name, alert) in [("missing", CleaningAlerts.missingMole()), ("failure", CleaningAlerts.launchFailed(terminal: .ghostty, command: "'/example/mo' clean"))] {
+                    for (name, alert) in [("missing", CleaningAlerts.missingMole()), ("failure", CleaningAlerts.launchFailed(terminal: .ghostty, command: "'/example/mo' clean", reason: "未找到已安装的 Ghostty。请安装它，或选择其他终端。"))] {
                         let dialog = alert.window; dialog.isReleasedWhenClosed = false
                         dialog.appearance = window.appearance; alert.layout(); dialog.orderFront(nil)
                         RunLoop.main.run(until: Date().addingTimeInterval(0.08))

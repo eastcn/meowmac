@@ -15,11 +15,11 @@ public enum CleaningAlerts {
         return alert
     }
 
-    public static func launchFailed(terminal: CleanTerminal, command: String) -> NSAlert {
+    public static func launchFailed(terminal: CleanTerminal, command: String, reason: String) -> NSAlert {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = terminal == .automatic ? "没有可用的终端" : "无法打开 " + terminal.name
-        alert.informativeText = "清理命令尚未确认启动。你可以更换终端，或复制命令手动运行。\n\n" + command
+        alert.informativeText = "原因：" + reason + "\n\n清理命令尚未确认启动。你可以更换终端，或复制命令手动运行。\n\n" + command
         alert.addButton(withTitle: "取消")
         alert.addButton(withTitle: "复制命令")
         alert.addButton(withTitle: "选择终端…")
@@ -146,7 +146,9 @@ public final class CleaningController {
         let command = CleaningCommand.command(executable: executable)
         guard let terminal = preference.resolved(available: state.availableCleanTerminals),
               let application = findApplication(terminal) else {
-            reportFailure(terminal: preference, command: command)
+            let reason = preference == .automatic ? "未检测到可用的终端。请检查已安装的终端应用。"
+                : "未找到已安装的 " + preference.name + "。请安装它，或选择其他终端。"
+            reportFailure(terminal: preference, command: command, reason: reason)
             return
         }
         state.cleaningHistoryMessage = nil
@@ -155,12 +157,12 @@ public final class CleaningController {
         launch(terminal, application, CleaningCommand.script(executable: executable)) { [weak self] error in
             guard let self else { return }
             self.launching = false; self.state.cleanLaunching = false
-            if error != nil { self.reportFailure(terminal: terminal, command: command) }
+            if let error { self.reportFailure(terminal: terminal, command: command, reason: error.localizedDescription) }
         }
     }
 
-    private func reportFailure(terminal: CleanTerminal, command: String) {
-        switch present(CleaningAlerts.launchFailed(terminal: terminal, command: command)) {
+    private func reportFailure(terminal: CleanTerminal, command: String, reason: String) {
+        switch present(CleaningAlerts.launchFailed(terminal: terminal, command: command, reason: reason)) {
         case .alertSecondButtonReturn: copyCommand(command)
         case .alertThirdButtonReturn: chooseTerminal()
         default: break
