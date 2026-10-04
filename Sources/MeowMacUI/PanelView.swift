@@ -85,7 +85,11 @@ public final class PanelState: ObservableObject {
     @Published public var configResult: ConfigLoadResult
     @Published public var lastRefreshedAt: Date?
     @Published public var selectedTab: PanelTab = .system
-    @Published public var chartMinutes = 60
+    @Published public var chartHoverDate: Date?
+    @Published public var chartHoverKind: String?
+    @Published public var chartMinutes = 60 {
+        didSet { chartHoverDate = nil; chartHoverKind = nil }
+    }
     @Published public var selectedProvider: QuotaProvider = .codex {
         didSet { if oldValue != selectedProvider { selectedCostDate = nil } }
     }

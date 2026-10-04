@@ -26,8 +26,15 @@ public struct SystemTrend: Codable {
     public var warn: Bool = false
     /// 悬停提示：量程，以及读不到时的原因。
     public var help: String = ""
+    public var segments: [[TrendValue]]? = nil
+    public var secondarySegments: [[TrendValue]]? = nil
+    public var missingPeriods: [ClosedRange<Date>]? = nil
 }
 public extension PanelState {
+    var chartHoverPoint: ChartPoint? {
+        chartHoverDate.flatMap { ChartTimeline.selection(chartHistory.all, at: $0, in: trendDomain) }
+    }
+    var chartCursorDate: Date? { chartHoverPoint?.timestamp ?? chartHoverDate }
     var diagnosisRows: [DiagnosisRow] {
         guard let energy else { return [] }
         var rows = energy.runaway.map { process in
@@ -59,17 +66,24 @@ public extension PanelState {
         let temps = points.compactMap(\.batteryTemperatureCelsius) + points.compactMap(\.socTemperatureCelsius)
         let minTemp = floor((temps.min() ?? 20) / 2) * 2
         let maxTemp = max(minTemp + 2, ceil((temps.max() ?? 40) / 2) * 2)
-        func values(_ value: (ChartPoint) -> Double?) -> [TrendValue] {
-            points.compactMap { point in value(point).map { TrendValue(date: point.timestamp, value: $0) } }
+        func segments(_ value: (ChartPoint) -> Double?) -> [[TrendValue]] {
+            ChartTimeline.segments(points, in: trendDomain, value: value).map { $0.map { TrendValue(date: $0.date, value: $0.value) } }
         }
+        func values(_ value: (ChartPoint) -> Double?) -> [TrendValue] { segments(value).flatMap { $0 } }
         func trend(_ kind: String, _ name: String, _ lower: Double, _ upper: Double, _ range: String, _ current: String, _ detail: String, _ value: (ChartPoint) -> Double?) -> SystemTrend {
             var trend = SystemTrend(name: name, rangeLabel: range, current: current, lower: lower, upper: upper, points: values(value))
             trend.kind = kind; trend.detail = detail; trend.help = name + " · 量程 " + range
+            trend.segments = segments(value)
+            trend.missingPeriods = ChartTimeline.missingPeriods(points, in: trendDomain) { value($0)?.isFinite == true }
             return trend
         }
         var temperature = trend("temperature", "温度", minTemp, maxTemp, String(format: "%.0f–%.0f °C", minTemp, maxTemp),
             snapshot?.sensors?.cpuAverageCelsius.map { String(format: "%.1f °C", $0) } ?? "—", temperatureDetail, { $0.socTemperatureCelsius })
         temperature.secondaryPoints = values { $0.batteryTemperatureCelsius }
+        temperature.secondarySegments = segments { $0.batteryTemperatureCelsius }
+        temperature.missingPeriods = ChartTimeline.missingPeriods(points, in: trendDomain) {
+            $0.socTemperatureCelsius?.isFinite == true || $0.batteryTemperatureCelsius?.isFinite == true
+        }
         temperature.secondaryCurrent = "电池 " + (snapshot?.battery.temperatureCelsius.map { String(format: "%.1f", $0) } ?? "—")
         temperature.help += "\n靛蓝：SoC 平均温度；粉：电池温度\n" + sensorHelp
         var rows = [trend("cpu", "CPU", 0, 100, "0–100%", snapshot?.cpuUsage.map { String(format: "%.0f%%", $0 * 100) } ?? "—", "整机负载", { $0.cpuUsage.map { $0 * 100 } }),
@@ -141,34 +155,11 @@ struct SystemChartCard: View {
                 Text("系统趋势").font(Design.title); Spacer()
                 CapsuleSelector(titles: ["15 分钟", "1 小时"], selected: state.chartMinutes == 15 ? 0 : 1, compact: true) { state.chartMinutes = $0 == 0 ? 15 : 60 }
             }
-            // 一行一指标：左边名称和副信息，中间迷你折线，右边当前值（系统页重新设计方案 A）。
-            VStack(spacing: Design.smallGap) {
+            VStack(spacing: Design.tightGap) {
                 ForEach(state.systemTrends.indices, id: \.self) { index in
                     let trend = state.systemTrends[index]
-                    let color = Self.color(trend.kind)
-                    let tint = trend.warn ? Design.stateText(.warn) : Design.label
-                    HStack(spacing: Design.rowGap) {
-                        VStack(alignment: .leading, spacing: Design.tightGap) {
-                            HStack(spacing: Design.tightGap) {
-                                Circle().fill(color).frame(width: Design.dot, height: Design.dot)
-                                if trend.secondaryPoints != nil { Circle().fill(Design.pink).frame(width: Design.dot, height: Design.dot) }
-                                Text(trend.name).font(Design.body).padding(.leading, Design.tightGap)
-                            }
-                            Text(trend.detail).font(Design.tiny).foregroundStyle(trend.warn ? tint : Design.secondary).lineLimit(1).truncationMode(.tail)
-                        }.frame(width: Design.trendLabelWidth, alignment: .leading)
-                            .frame(maxHeight: .infinity, alignment: .top)
-                        MiniLineGraph(points: trend.points.map { GraphValue(date: $0.date, value: $0.value) }, domain: state.trendDomain,
-                            range: trend.lower...trend.upper, color: color, fill: trend.kind == "memory", warmPeriods: state.warmPeriods,
-                            overlay: trend.secondaryPoints.map { values in [(values.map { GraphValue(date: $0.date, value: $0.value) }, Design.pink)] } ?? [],
-                            threshold: trend.threshold)
-                        VStack(alignment: .trailing, spacing: Design.tightGap) {
-                            Text(trend.current).font(Design.title).monospacedDigit().foregroundStyle(tint).lineLimit(1)
-                            if let secondary = trend.secondaryCurrent {
-                                Text(secondary).font(Design.tiny).foregroundStyle(Design.secondary).monospacedDigit().lineLimit(1)
-                            }
-                        }.frame(width: Design.trendValueWidth, alignment: .trailing)
-                            .frame(maxHeight: .infinity, alignment: .top)
-                    }.frame(height: Design.trendRowHeight).contentShape(Rectangle()).help(trend.help)
+                    SystemTrendRow(state: state, trend: trend)
+                        .zIndex(state.chartHoverKind == trend.kind ? 10 : 0)
                 }
             }
             HStack {

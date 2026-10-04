@@ -100,7 +100,7 @@ enum SensorUITests {
               let temperature = rows.first(where: { $0.kind == "temperature" }), let fan = rows.last else { return false }
         let all = temperature.points.map(\.value) + (temperature.secondaryPoints ?? []).map(\.value)
         guard temperature.name == "温度", temperature.current.hasSuffix(" °C"), temperature.secondaryCurrent?.hasPrefix("电池 ") == true,
-              temperature.points.count == 15 || temperature.points.count == 16, temperature.secondaryPoints?.count == temperature.points.count,
+              temperature.points.count == 91, temperature.secondaryPoints?.count == temperature.points.count,
               let low = all.min(), let high = all.max(), temperature.lower <= low, temperature.upper >= high,
               temperature.lower.truncatingRemainder(dividingBy: 2) == 0, temperature.upper.truncatingRemainder(dividingBy: 2) == 0 else {
             print("温度行：\(temperature)"); return false

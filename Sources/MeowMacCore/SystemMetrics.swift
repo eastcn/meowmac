@@ -146,9 +146,14 @@ public struct ChartHistory {
     public var all: [ChartPoint] { points }
 
     public mutating func append(_ snapshot: SystemSnapshot, force: Bool = false) {
+        guard snapshot.timestamp.timeIntervalSince1970.isFinite else { return }
+        if let last = points.last {
+            guard snapshot.timestamp >= last.timestamp else { return }
+            if snapshot.timestamp == last.timestamp { points[points.count - 1] = ChartPoint(snapshot: snapshot); return }
+            if !force, snapshot.timestamp.timeIntervalSince(last.timestamp) < sampleSeconds { return }
+        }
         let cutoff = snapshot.timestamp.addingTimeInterval(-retentionSeconds)
         points.removeAll { $0.timestamp < cutoff }
-        if !force, let last = points.last, snapshot.timestamp.timeIntervalSince(last.timestamp) < sampleSeconds { return }
         points.append(ChartPoint(snapshot: snapshot))
     }
 }

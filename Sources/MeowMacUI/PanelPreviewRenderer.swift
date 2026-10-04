@@ -10,16 +10,16 @@ public enum PanelPreviewRenderer {
         let now = ISO8601DateFormatter().date(from: "2026-09-30T06:35:00Z")!
         state.now = { now }
         state.chartMinutes = 15
-        for index in 0..<60 {
-            let pointTime = now.addingTimeInterval(Double(index - 59) * 60)
-            let cpu = index == 59 ? (alert ? 0.71 : 0.24) : 0.25 + 0.15 * sin(Double(index) / 5)
+        for index in 0...360 {
+            let pointTime = now.addingTimeInterval(Double(index - 360) * 10)
+            let cpu = index == 360 ? (alert ? 0.71 : 0.24) : 0.25 + 0.15 * sin(Double(index) / 30)
             let snapshot = SystemSnapshot(timestamp: pointTime, cpuUsage: cpu, memoryPressure: .normal,
                                           swapUsedBytes: 1024 * 1024 * 1024,
                                           diskAvailableBytes: 120_000_000_000, diskTotalBytes: 500_000_000_000,
                                           networkReceivedBytesPerSecond: 2.4 * 1024 * 1024, networkSentBytesPerSecond: 128 * 1024,
                                           battery: BatteryMetrics(temperatureCelsius: 34 + cpu * 5,
                                                                   systemPowerWatts: 7 + cpu * 12),
-                                          thermal: alert && index >= 25 || (25...30).contains(index) ? .fair : .nominal,
+                                          thermal: alert && index >= 150 || (150...180).contains(index) ? .fair : .nominal,
                                           memoryUsedBytes: 11 * 1_073_741_824, memoryTotalBytes: 16 * 1_073_741_824, memoryPressurePercent: 55,
                                           sensors: syntheticSensors(.idle, cpu: cpu))
             state.chartHistory.append(snapshot)
@@ -103,14 +103,14 @@ public enum PanelPreviewRenderer {
         let now = state.now()
         var history = ChartHistory()
         var latest: SystemSnapshot?
-        for index in 0..<60 {
-            let time = now.addingTimeInterval(Double(index - 59) * 60)
-            let ramp = Double(index) / 59
+        for index in 0...360 {
+            let time = now.addingTimeInterval(Double(index - 360) * 10)
+            let ramp = Double(index) / 360
             let cpu: Double
             switch variant {
             case .spinning: cpu = 0.45 + 0.4 * ramp
-            case .cooling: cpu = 0.85 + 0.08 * sin(Double(index) / 4)
-            default: cpu = 0.15 + 0.08 * sin(Double(index) / 5)
+            case .cooling: cpu = 0.85 + 0.08 * sin(Double(index) / 24)
+            default: cpu = 0.15 + 0.08 * sin(Double(index) / 30)
             }
             let snapshot = SystemSnapshot(timestamp: time, cpuUsage: cpu, memoryPressure: .normal, swapUsedBytes: 1024 * 1024 * 1024,
                                           diskAvailableBytes: 120_000_000_000, diskTotalBytes: 500_000_000_000,

@@ -111,6 +111,7 @@ enum SelfTestMain {
         tests.append(("UI.Cleaning/原生菜单和提示按钮", { CleanTerminalTests.menu() }))
         tests.append(("UI.Cleaning.Live/实际 Ghostty 启动假工具", { await CleanTerminalTests.liveGhostty() }))
         tests.append(("UI.Cleaning/原生缺失状态容器", { await CleanTerminalTests.nativeLayout() }))
+        tests.append(contentsOf: SystemTrendTests.tests)
         tests.append(contentsOf: NotificationTests.tests)
         tests.append(contentsOf: NotificationUITests.tests)
         tests.append(contentsOf: CodexResetTests.tests)
