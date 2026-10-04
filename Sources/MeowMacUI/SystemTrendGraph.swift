@@ -118,6 +118,7 @@ struct SystemTrendGraph: View {
                     context.stroke(line, with: .color(Design.secondary), lineWidth: 0.8)
                 }
             }.contentShape(Rectangle())
+                .preference(key: PanelInteractionFrameKey.self, value: ["graph." + kind: proxy.frame(in: .named(PanelInteractionFrameKey.space))])
                 .onContinuousHover { phase in
                     switch phase {
                     case .active(let location):

@@ -34,6 +34,8 @@ public struct SystemPanelSnapshot: Codable {
     /// v0.3 趋势图图例和风扇持续高转速的开始时刻；传感器原值在 latest.sensors，显示值在 trends。
     public var coolingLegend: String? = nil
     public var fanHighSince: Date? = nil
+    public var diskTrend: SystemTrend? = nil
+    public var diskChange: String? = nil
 }
 public struct QuotaCycleDisplay: Codable {
     public let window: QuotaWindow
@@ -70,7 +72,7 @@ public struct PanelSnapshot: Codable {
         tabs = TabsSnapshot(levels: Dictionary(uniqueKeysWithValues: zip(PanelTab.allCases.map(\.rawValue), state.tabLevels)), defaultTab: DefaultPanelLayout.openingTab(summary: state.health, lastViewed: state.selectedTab))
         system = SystemPanelSnapshot(latest: state.snapshot, diagnosis: state.diagnosisRows, energy: state.energy, trends: state.systemTrends,
             chartMinutes: state.chartMinutes, domain: state.trendDomain, warmPeriods: state.warmPeriods, lastCleaning: state.lastCleaning,
-            coolingLegend: state.coolingLegend, fanHighSince: state.fanHighSince)
+            coolingLegend: state.coolingLegend, fanHighSince: state.fanHighSince, diskTrend: state.diskTrend, diskChange: state.diskChangeSummary)
         quota = QuotaProvider.allCases.map { state.channelDisplay($0) }
         var networkDisplay = state.networkModel?.meowMacDisplay
         networkDisplay?.capture = state.networkCapture

@@ -380,6 +380,8 @@ public struct PanelView: View {
         }.frame(width: Design.panelWidth)
             .frame(height: expanded ? nil : measurements.panelHeight, alignment: .top)
             .foregroundStyle(Design.label).focusEffectDisabled()
+            .coordinateSpace(name: PanelInteractionFrameKey.space)
+            .onPreferenceChange(PanelInteractionFrameKey.self) { measurements.updateInteractions($0) }
             .onPreferenceChange(PanelHeightKey.self) { measurements.update($0) }
     }
 
@@ -393,6 +395,12 @@ public struct PanelView: View {
         }.fixedSize(horizontal: false, vertical: true).coordinateSpace(name: PanelCardBottomKey.space).measurePanelHeight(.content)
             .onPreferenceChange(PanelCardBottomKey.self) { measurements.updateCards($0) }
     }
+}
+
+struct PanelInteractionFrameKey: PreferenceKey {
+    static let space = "panelInteractions"
+    static let defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) { value.merge(nextValue()) { _, new in new } }
 }
 
 private enum PanelPart: Hashable { case header, footer, content }
@@ -430,6 +438,7 @@ public final class PanelMeasurements: ObservableObject {
     @Published public private(set) var contentHeight: CGFloat = 0
     /// 系统页、网络页各功能块底边距内容顶部的距离。
     @Published public private(set) var cardBottoms: [String: CGFloat] = [:]
+    @Published public private(set) var interactionFrames: [String: CGRect] = [:]
     public init() {}
     public var fixedHeight: CGFloat { headerHeight + footerHeight }
     public var viewportHeight: CGFloat { min(contentHeight, max(0, Design.panelHeight - fixedHeight)) }
@@ -439,6 +448,10 @@ public final class PanelMeasurements: ObservableObject {
         if let height = values[.header], abs(height - headerHeight) > 0.01 { headerHeight = height }
         if let height = values[.footer], abs(height - footerHeight) > 0.01 { footerHeight = height }
         if let height = values[.content], abs(height - contentHeight) > 0.01 { contentHeight = height }
+    }
+
+    fileprivate func updateInteractions(_ values: [String: CGRect]) {
+        if values != interactionFrames { interactionFrames = values }
     }
 
     fileprivate func updateCards(_ values: [String: CGFloat]) {

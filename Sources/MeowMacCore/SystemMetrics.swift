@@ -111,6 +111,16 @@ public struct SystemSnapshot: Codable {
     }
 }
 
+public struct DiskCapacity: Equatable {
+    public let availableBytes: Int64
+    public let totalBytes: Int64
+    public var usedBytes: Int64 { totalBytes - availableBytes }
+    public init?(available: Int64?, total: Int64?) {
+        guard let available, let total, total > 0, available >= 0, available <= total else { return nil }
+        availableBytes = available; totalBytes = total
+    }
+}
+
 public struct ChartPoint: Identifiable, Codable {
     public var id: Date { timestamp }
     public let timestamp: Date
@@ -122,6 +132,9 @@ public struct ChartPoint: Identifiable, Codable {
     public let fanRPM: Double?
     public let fanMaxRPM: Double?
     public let thermal: ThermalLevel
+    public let diskAvailableBytes: Int64?
+    public let diskTotalBytes: Int64?
+    public var diskCapacity: DiskCapacity? { DiskCapacity(available: diskAvailableBytes, total: diskTotalBytes) }
 
     public init(snapshot: SystemSnapshot) {
         timestamp = snapshot.timestamp; cpuUsage = snapshot.cpuUsage; memoryUsedBytes = snapshot.memoryUsedBytes
@@ -131,6 +144,8 @@ public struct ChartPoint: Identifiable, Codable {
         let fan = snapshot.sensors?.leadingFan
         fanRPM = fan?.rpm; fanMaxRPM = fan?.maxRPM
         thermal = snapshot.thermal
+        let disk = DiskCapacity(available: snapshot.diskAvailableBytes, total: snapshot.diskTotalBytes)
+        diskAvailableBytes = disk?.availableBytes; diskTotalBytes = disk?.totalBytes
     }
 }
 

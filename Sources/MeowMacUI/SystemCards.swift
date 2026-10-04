@@ -35,6 +35,36 @@ public extension PanelState {
         chartHoverDate.flatMap { ChartTimeline.selection(chartHistory.all, at: $0, in: trendDomain) }
     }
     var chartCursorDate: Date? { chartHoverPoint?.timestamp ?? chartHoverDate }
+    var diskCapacity: DiskCapacity? { snapshot.flatMap { DiskCapacity(available: $0.diskAvailableBytes, total: $0.diskTotalBytes) } }
+    var diskTrend: SystemTrend {
+        let points = visibleChartPoints
+        let runs = ChartTimeline.segments(points, in: trendDomain, value: { $0.diskCapacity.map { Double($0.availableBytes) / 1_000_000_000 } },
+                                         breakBefore: { $0.diskTotalBytes != $1.diskTotalBytes })
+        let values = runs.flatMap { $0 }.map(\.value)
+        let low = max(0, floor((values.min() ?? 0) - 0.5))
+        let high = max(low + 1, ceil((values.max() ?? 0) + 0.5))
+        var trend = SystemTrend(name: "磁盘可用空间", rangeLabel: String(format: "%.0f–%.0f GB", low, high), current: "", lower: low, upper: high,
+                                points: runs.flatMap { $0 }.map { TrendValue(date: $0.date, value: $0.value) })
+        trend.kind = "disk"; trend.segments = runs.map { $0.map { TrendValue(date: $0.date, value: $0.value) } }
+        trend.missingPeriods = ChartTimeline.missingPeriods(points, in: trendDomain) { $0.diskCapacity != nil }
+        trend.help = "可用空间 · 局部量程 " + trend.rangeLabel + "；容量变化、缺测和休眠间隔处断线。斜纹表示无记录。"
+        return trend
+    }
+    var diskChangeSummary: String {
+        guard let run = diskTrend.segments?.last, run.count >= 2, let first = run.first, let last = run.last else { return "记录不足" }
+        let span = last.date.timeIntervalSince(first.date)
+        let full = first.date.timeIntervalSince(trendDomain.lowerBound) <= 10 && trendDomain.upperBound.timeIntervalSince(last.date) <= 10
+        let period = full ? (chartMinutes == 60 ? "近 1 小时" : "近 15 分钟") : "已记录 " + MetricFormat.duration(span)
+        let delta = last.value - first.value
+        let change = abs(delta) < 0.0005 ? "基本不变" : String(format: abs(delta) < 0.1 ? "%.0f MB" : "%.1f GB", abs(delta) * (abs(delta) < 0.1 ? 1000 : 1))
+        return period + " · " + (change == "基本不变" ? change : (delta < 0 ? "减少 " : "增加 ") + change)
+    }
+    var diskHoverText: [String] {
+        guard let point = chartHoverPoint else { return ["无记录"] }
+        guard let disk = point.diskCapacity else { return ["磁盘容量不可用"] }
+        return [String(format: "可用 %.1f GB", Double(disk.availableBytes) / 1_000_000_000),
+                String(format: "已用 %.1f GB · 共 %.1f GB", Double(disk.usedBytes) / 1_000_000_000, Double(disk.totalBytes) / 1_000_000_000)]
+    }
     var diagnosisRows: [DiagnosisRow] {
         guard let energy else { return [] }
         var rows = energy.runaway.map { process in
@@ -150,7 +180,7 @@ struct SystemChartCard: View {
         }
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: Design.rowGap) {
+        VStack(alignment: .leading, spacing: Design.smallGap) {
             HStack {
                 Text("系统趋势").font(Design.title); Spacer()
                 CapsuleSelector(titles: ["15 分钟", "1 小时"], selected: state.chartMinutes == 15 ? 0 : 1, compact: true) { state.chartMinutes = $0 == 0 ? 15 : 60 }
@@ -199,23 +229,37 @@ struct EnergyCard: View {
 struct DiskCard: View {
     @ObservedObject var state: PanelState
     var body: some View {
-        VStack(alignment: .leading, spacing: Design.gap) {
+        let trend = state.diskTrend
+        VStack(alignment: .leading, spacing: Design.tightGap) {
             HStack(alignment: .firstTextBaseline, spacing: Design.gap) {
                 Text("磁盘").font(Design.title)
-                if let available = state.snapshot?.diskAvailableBytes {
-                    Text(String(format: "%.0f", Double(available) / 1_000_000_000)).font(Design.metric)
+                if let disk = state.diskCapacity {
+                    Text(String(format: "%.0f", Double(disk.availableBytes) / 1_000_000_000)).font(Design.metric).monospacedDigit()
                     Text("GB 可用").font(Design.caption).foregroundStyle(Design.secondary)
                 } else { Text("容量不可用").font(Design.caption).foregroundStyle(Design.secondary) }
                 Spacer(); CapsuleAction(title: "清理…", action: state.onClean).disabled(state.cleanLaunching)
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: PanelInteractionFrameKey.self, value: ["disk.clean": proxy.frame(in: .named(PanelInteractionFrameKey.space))])
+                    })
             }
-            if let available = state.snapshot?.diskAvailableBytes, let total = state.snapshot?.diskTotalBytes, total > 0 {
-                LineBar(fraction: 1 - Double(available) / Double(total), color: Double(available) / Double(total) < 0.1 ? Design.orange : Design.gray)
+            HStack(spacing: Design.smallGap) {
+                Text(trend.rangeLabel).help(trend.help)
+                Spacer(minLength: 0)
+                Text(state.diskChangeSummary).monospacedDigit()
+            }.font(Design.tiny).foregroundStyle(Design.secondary)
+            SystemTrendGraph(state: state, kind: "disk", series: trend.segments ?? [], range: trend.lower...trend.upper,
+                             color: Design.gray, fill: true, missing: trend.missingPeriods ?? [], tooltip: state.diskHoverText)
+                .help(trend.help)
+            if let disk = state.diskCapacity {
+                LineBar(fraction: Double(disk.usedBytes) / Double(disk.totalBytes), color: Double(disk.availableBytes) / Double(disk.totalBytes) < 0.1 ? Design.orange : Design.gray)
+                    .padding(.top, Design.tightGap)
                 HStack {
-                    Text(String(format: "已用 %.0f GB", Double(total - available) / 1_000_000_000)); Spacer()
-                    Text(String(format: "共 %.0f GB", Double(total) / 1_000_000_000))
+                    Text(String(format: "已用 %.0f GB", Double(disk.usedBytes) / 1_000_000_000)); Spacer()
+                    Text(String(format: "共 %.0f GB", Double(disk.totalBytes) / 1_000_000_000))
                 }.font(Design.caption).foregroundStyle(Design.secondary)
             }
-            Text(state.cleaningHistoryMessage ?? state.lastCleaning.map { "上次清理：" + DisplayDate.format($0.startedAt, pattern: "M 月 d 日") + " · 释放 " + $0.sizeDescription } ?? "暂无清理记录").font(Design.caption).foregroundStyle(Design.secondary)
-        }
+            Text(state.cleaningHistoryMessage ?? state.lastCleaning.map { "上次清理：" + DisplayDate.format($0.startedAt, pattern: "M 月 d 日") + " · 释放 " + $0.sizeDescription } ?? "暂无清理记录")
+                .font(Design.caption).foregroundStyle(Design.secondary)
+        }.zIndex(state.chartHoverKind == "disk" ? 10 : 0)
     }
 }

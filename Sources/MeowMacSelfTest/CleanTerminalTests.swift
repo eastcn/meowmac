@@ -149,8 +149,9 @@ enum CleanTerminalTests {
                 let size = try await PanelPreviewRenderer.settleLayout(hosting.controller)
                 guard size.width == 360, size.height <= 820,
                       let diskBottom = hosting.measurements.cardBottoms["system.disk"] else { return false }
-                // SwiftUI 玻璃按钮不出现在本进程的辅助功能树里。按真实测量的磁盘底边定位第一行，分发鼠标事件。
-                let point = NSPoint(x: 315, y: size.height - (hosting.measurements.headerHeight + diskBottom - 61))
+                // 按实际按钮矩形定位，磁盘趋势增高后仍走同一个原生鼠标入口。
+                guard let button = hosting.measurements.interactionFrames["disk.clean"] else { return false }
+                let point = NSPoint(x: button.midX, y: size.height - button.midY)
                 for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
                     guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
                         timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,

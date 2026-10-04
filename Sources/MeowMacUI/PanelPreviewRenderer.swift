@@ -15,7 +15,7 @@ public enum PanelPreviewRenderer {
             let cpu = index == 360 ? (alert ? 0.71 : 0.24) : 0.25 + 0.15 * sin(Double(index) / 30)
             let snapshot = SystemSnapshot(timestamp: pointTime, cpuUsage: cpu, memoryPressure: .normal,
                                           swapUsedBytes: 1024 * 1024 * 1024,
-                                          diskAvailableBytes: 120_000_000_000, diskTotalBytes: 500_000_000_000,
+                                          diskAvailableBytes: 116_000_000_000 - Int64(index) * 5_000_000 + (index >= 240 ? 6_000_000_000 : 0), diskTotalBytes: 500_000_000_000,
                                           networkReceivedBytesPerSecond: 2.4 * 1024 * 1024, networkSentBytesPerSecond: 128 * 1024,
                                           battery: BatteryMetrics(temperatureCelsius: 34 + cpu * 5,
                                                                   systemPowerWatts: 7 + cpu * 12),
