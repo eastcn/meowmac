@@ -8,8 +8,16 @@ target_app="$HOME/Applications/MeowMac.app"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$source_app/Contents/Info.plist")" == io.github.eastcn.meowmac ]] || { printf 'bundle id 不符\n' >&2; exit 1; }
 codesign --verify --deep --strict "$source_app"
 if pgrep -x MeowMac >/dev/null; then
-    printf 'MeowMac 正在运行；仓库规则禁止结束进程，本次安装已取消。\n' >&2
-    exit 1
+    printf '正在让 MeowMac 正常退出…\n'
+    osascript -e 'tell application id "io.github.eastcn.meowmac" to quit'
+    for ((attempt = 0; attempt < 10; attempt++)); do
+        if ! pgrep -x MeowMac >/dev/null; then break; fi
+        sleep 1
+    done
+    if pgrep -x MeowMac >/dev/null; then
+        printf 'MeowMac 未正常退出，本次安装已取消。\n' >&2
+        exit 1
+    fi
 fi
 apps_dir="$HOME/Applications"
 [[ ! -L "$apps_dir" && ! -L "$target_app" ]] || { printf '安装路径是符号链接\n' >&2; exit 1; }
