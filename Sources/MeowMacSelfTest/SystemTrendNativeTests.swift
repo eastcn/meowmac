@@ -32,7 +32,7 @@ enum SystemTrendNativeTests {
                   let window = hosting.controller.view.window,
                   hosting.measurements.interactionFrames["graph.cpu"] != nil,
                   let diskBottom = hosting.measurements.cardBottoms["system.disk"], diskBottom <= hosting.measurements.viewportHeight else { return false }
-            window.acceptsMouseMovedEvents = true
+            guard window.acceptsMouseMovedEvents else { print("生产窗口未启用鼠标移动"); return false }
             func tracker(_ kind: String, in view: NSView) -> NSView? {
                 if view.identifier?.rawValue == "trend." + kind { return view }
                 return view.subviews.lazy.compactMap { tracker(kind, in: $0) }.first

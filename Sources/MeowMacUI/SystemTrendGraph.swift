@@ -158,6 +158,10 @@ private struct TrendMouseSurface: NSViewRepresentable {
         var moved: ((CGPoint?) -> Void)?
         override var isFlipped: Bool { true }
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.acceptsMouseMovedEvents = true
+        }
         override func updateTrackingAreas() {
             super.updateTrackingAreas()
             for area in trackingAreas { removeTrackingArea(area) }
