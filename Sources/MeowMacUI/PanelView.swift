@@ -48,7 +48,6 @@ public enum PanelCardRegistry {
                 switch definition.id {
                 case "system.chart": return AnyView(SystemChartCard(state: state))
                 case "system.energy": return AnyView(EnergyCard(state: state))
-                case "system.sensors": return AnyView(SensorCard(state: state))
                 case "system.disk": return AnyView(DiskCard(state: state))
                 case "quota.trend": return AnyView(QuotaTrendView(state: state, provider: state.selectedProvider))
                 case "quota.cost":

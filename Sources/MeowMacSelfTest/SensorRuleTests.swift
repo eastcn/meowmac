@@ -108,18 +108,18 @@ enum SensorRuleTests {
 
     static func panel() -> Bool {
         let state = PanelPreviewRenderer.sensorState(.cooling)
-        let display = state.sensorDisplay
+        let fan = state.systemTrends.last
         guard state.health.coolingHint, state.health.level == .normal,
               state.coolingLegend == "风扇超过最大值 80% 已持续 6 分钟，达到‘建议降温’条件",
-              display.columns[2].tone == .warn, display.columns[2].detail.hasSuffix("% · 已持续 6 分钟"),
-              display.footer == "风扇超过最大值 80% 已持续 6 分钟，达到“建议降温”条件" else {
-            print("降温面板：\(state.coolingLegend) \(display)"); return false
+              fan?.kind == "fan", fan?.warn == true, fan?.detail.hasSuffix("% · 已持续 6 分钟") == true else {
+            print("降温面板：\(state.coolingLegend) \(String(describing: fan))"); return false
         }
         // 快照带上同一份显示值。
         guard let encoded = try? JSONEncoder().encode(PanelSnapshot(state: state)),
               let object = try? JSONSerialization.jsonObject(with: encoded) as? [String: Any],
-              let system = object["system"] as? [String: Any], let sensors = system["sensors"] as? [String: Any],
-              sensors["footer"] as? String == display.footer, system["coolingLegend"] as? String == state.coolingLegend,
+              let system = object["system"] as? [String: Any], let trends = system["trends"] as? [[String: Any]],
+              trends.last?["warn"] as? Bool == true, trends.last?["detail"] as? String == fan?.detail,
+              system["coolingLegend"] as? String == state.coolingLegend,
               system["fanHighSince"] != nil, ((system["latest"] as? [String: Any])?["sensors"] as? [String: Any])?["fans"] != nil else { return false }
         // 猫的形态不变：与同一负载的未触发状态相同。
         let calm = PanelPreviewRenderer.sensorState(.cooling); calm.fanHighSince = nil
@@ -127,7 +127,7 @@ enum SensorRuleTests {
         guard hot.level == base.level, hot.template == base.template, hot.stopped == base.stopped, !calm.health.coolingHint else { return false }
         // 未满 5 分钟不改写。
         let early = PanelPreviewRenderer.sensorState(.cooling); early.fanHighSince = early.now().addingTimeInterval(-120)
-        guard !early.health.coolingHint, early.sensorDisplay.columns[2].tone == .normal,
+        guard !early.health.coolingHint, early.systemTrends.last?.warn == false, early.systemTrends.last?.detail.hasPrefix("最大值的 ") == true,
               early.coolingLegend == "热状态 fair 及以上的时段" else { return false }
         // 风扇触发后读不到：提醒保留，但文案写待确认，不再累计“已持续”。
         let pending = PanelPreviewRenderer.sensorState(.cooling)
@@ -140,9 +140,9 @@ enum SensorRuleTests {
                                           sensors: SensorReadings(cpuAverageCelsius: 80, cpuMaxCelsius: 85, cpuSource: .smc, gpuAverageCelsius: 70, fans: nil))
         guard pending.health.coolingHint, pending.fanCoolingMinutes == nil,
               pending.coolingLegend == "风扇读数暂不可用，‘建议降温’待确认",
-              pending.sensorDisplay.footer == "风扇读数暂不可用，“建议降温”待确认",
-              pending.sensorDisplay.columns[2].tone == .unavailable else {
-            print("待确认：\(pending.coolingLegend) \(pending.sensorDisplay)"); return false
+              pending.systemTrends.last?.detail == "待确认", pending.systemTrends.last?.warn == false,
+              pending.systemTrends.last?.current == "—" else {
+            print("待确认：\(pending.coolingLegend) \(String(describing: pending.systemTrends.last))"); return false
         }
         // 热状态和风扇同时满足时写热状态。
         let both = PanelPreviewRenderer.sensorState(.cooling)

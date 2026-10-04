@@ -97,8 +97,9 @@ public enum PanelPreviewRenderer {
     }
 
     /// 只替换传感器读数和对应的趋势历史，其余沿用正常合成状态。
-    public static func sensorState(_ variant: SensorPreview) -> PanelState {
+    public static func sensorState(_ variant: SensorPreview, diagnosis: Bool = false) -> PanelState {
         let state = syntheticState()
+        if diagnosis { state.energy = syntheticState(alert: true).energy }
         let now = state.now()
         var history = ChartHistory()
         var latest: SystemSnapshot?
@@ -126,15 +127,10 @@ public enum PanelPreviewRenderer {
         return state
     }
 
-    /// 系统趋势和传感器两块，用于逐张对照设计稿；材质沿用预览退路。
-    public static func sensorPNG(state: PanelState, dark: Bool) -> Data? {
-        let view = VStack(alignment: .leading, spacing: Design.sectionGap) {
-            SystemChartCard(state: state)
-            SectionRule()
-            SensorCard(state: state)
-        }.padding(.horizontal, Design.inset).padding(.vertical, Design.sectionGap).frame(width: Design.panelWidth)
-        let measure = NSHostingView(rootView: view)
-        return renderPNG(view, width: Design.panelWidth, height: ceil(measure.fittingSize.height), dark: dark)
+    /// 展开的系统页整页，用于逐张对照 system-tab-redesign.html；材质沿用预览退路。
+    public static func systemPagePNG(state: PanelState, dark: Bool) -> Data? {
+        state.selectedTab = .system
+        return png(state: state, dark: dark)
     }
 
     public static func overviewPNG(alert: Bool, dark: Bool) -> Data? {

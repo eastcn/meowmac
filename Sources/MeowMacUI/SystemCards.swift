@@ -20,6 +20,12 @@ public struct SystemTrend: Codable {
     public var secondaryCurrent: String? = nil
     /// 虚线阈值；风扇行用它标降温阈值。
     public var threshold: Double? = nil
+    /// 名称下面的副信息。
+    public var detail: String = ""
+    /// 达到降温条件时，副信息和当前值转为橙色。
+    public var warn: Bool = false
+    /// 悬停提示：量程，以及读不到时的原因。
+    public var help: String = ""
 }
 public extension PanelState {
     var diagnosisRows: [DiagnosisRow] {
@@ -56,27 +62,33 @@ public extension PanelState {
         func values(_ value: (ChartPoint) -> Double?) -> [TrendValue] {
             points.compactMap { point in value(point).map { TrendValue(date: point.timestamp, value: $0) } }
         }
-        func trend(_ kind: String, _ name: String, _ lower: Double, _ upper: Double, _ range: String, _ current: String, _ value: (ChartPoint) -> Double?) -> SystemTrend {
+        func trend(_ kind: String, _ name: String, _ lower: Double, _ upper: Double, _ range: String, _ current: String, _ detail: String, _ value: (ChartPoint) -> Double?) -> SystemTrend {
             var trend = SystemTrend(name: name, rangeLabel: range, current: current, lower: lower, upper: upper, points: values(value))
-            trend.kind = kind
+            trend.kind = kind; trend.detail = detail; trend.help = name + " · 量程 " + range
             return trend
         }
         var temperature = trend("temperature", "温度", minTemp, maxTemp, String(format: "%.0f–%.0f °C", minTemp, maxTemp),
-            "SoC " + (snapshot?.sensors?.cpuAverageCelsius.map { String(format: "%.1f °C", $0) } ?? "—"), { $0.socTemperatureCelsius })
+            snapshot?.sensors?.cpuAverageCelsius.map { String(format: "%.1f °C", $0) } ?? "—", temperatureDetail, { $0.socTemperatureCelsius })
         temperature.secondaryPoints = values { $0.batteryTemperatureCelsius }
-        temperature.secondaryCurrent = "电池 " + (snapshot?.battery.temperatureCelsius.map { String(format: "%.1f °C", $0) } ?? "—")
-        var rows = [trend("cpu", "CPU", 0, 100, "0–100%", snapshot?.cpuUsage.map { String(format: "%.0f%%", $0 * 100) } ?? "—", { $0.cpuUsage.map { $0 * 100 } }),
-            trend("memory", "内存", 0, max(1, total), String(format: "0–%.0f GB", total), snapshot?.memoryUsedBytes.map { String(format: "%.1f GB", Double($0) / 1_073_741_824) } ?? "—", { $0.memoryUsedBytes.map { Double($0) / 1_073_741_824 } }),
-            trend("power", "整机功耗", 0, powerMax, String(format: "0–%.0f W", powerMax), snapshot?.battery.systemPowerWatts.map { String(format: "%.1f W", $0) } ?? "—", { $0.systemPowerWatts }),
+        temperature.secondaryCurrent = "电池 " + (snapshot?.battery.temperatureCelsius.map { String(format: "%.1f", $0) } ?? "—")
+        temperature.help += "\n靛蓝：SoC 平均温度；粉：电池温度\n" + sensorHelp
+        var rows = [trend("cpu", "CPU", 0, 100, "0–100%", snapshot?.cpuUsage.map { String(format: "%.0f%%", $0 * 100) } ?? "—", "整机负载", { $0.cpuUsage.map { $0 * 100 } }),
+            trend("memory", "内存", 0, max(1, total), String(format: "0–%.0f GB", total), snapshot?.memoryUsedBytes.map { String(format: "%.1f GB", Double($0) / 1_073_741_824) } ?? "—",
+                  String(format: "已用 / %.0f GB", total), { $0.memoryUsedBytes.map { Double($0) / 1_073_741_824 } }),
+            trend("power", "整机功耗", 0, powerMax, String(format: "0–%.0f W", powerMax), snapshot?.battery.systemPowerWatts.map { String(format: "%.1f W", $0) } ?? "—",
+                  String(format: "0–%.0f W", powerMax), { $0.systemPowerWatts }),
             temperature]
         // 本机报告没有风扇时不画风扇行；读不到时保留这一行，显示“—”。
         if snapshot?.sensors?.fans != [] {
             let knownMax = snapshot?.sensors?.leadingFan?.maxRPM ?? points.compactMap(\.fanMaxRPM).max()
             let fanMax = knownMax ?? max(1000, ceil((points.compactMap(\.fanRPM).max() ?? 0) / 1000) * 1000)
             let fanRange = knownMax == nil && !points.contains(where: { $0.fanRPM != nil }) ? "" : String(format: "0–%.0f rpm", fanMax)
+            let detail = fanDetail
             var fan = trend("fan", "风扇", 0, fanMax, fanRange,
-                snapshot?.sensors?.leadingFan.map { String(format: "%.0f rpm", $0.rpm) } ?? "—", { $0.fanRPM })
+                snapshot?.sensors?.leadingFan.map { String(format: "%.0f rpm", $0.rpm) } ?? "—", detail.text, { $0.fanRPM })
             fan.threshold = knownMax.map { $0 * configResult.config.fanHighFraction }
+            fan.warn = detail.warn
+            fan.help = fanRange.isEmpty ? "风扇 · " + sensorHelp : fan.help + "\n虚线：建议降温阈值（最大值的 " + Self.percent(configResult.config.fanHighFraction) + "）"
             rows.append(fan)
         }
         return rows
@@ -88,26 +100,24 @@ struct DiagnosisCard: View {
     var body: some View {
         if !state.diagnosisRows.isEmpty {
             GlassCard(warning: true) {
-                VStack(alignment: .leading, spacing: Design.rowGap) {
+                VStack(alignment: .leading, spacing: Design.smallGap + 1) {
                     SectionHeading(title: "能耗诊断", detail: "\(state.diagnosisRows.count) 项")
+                    // 每个问题一行：进程名、问题类型、数值和持续时长。
                     ForEach(state.diagnosisRows.indices, id: \.self) { index in
                         let row = state.diagnosisRows[index]
-                        if index > 0 { SectionRule() }
-                        HStack(alignment: .top, spacing: Design.rowGap) {
-                            Circle().fill(Design.state(row.level)).frame(width: Design.checkDot, height: Design.checkDot).padding(.top, Design.gap)
-                            VStack(alignment: .leading, spacing: Design.smallGap) {
-                                Text(row.name).font(Design.title)
-                                Text(row.detail).font(Design.caption).foregroundStyle(Design.secondary)
-                            }
+                        HStack(alignment: .firstTextBaseline, spacing: Design.gap) {
+                            Circle().fill(Design.state(row.level)).frame(width: Design.checkDot, height: Design.checkDot)
+                                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + Design.smallGap }
+                            Text(row.name).font(Design.title).lineLimit(1).layoutPriority(2)
+                            Text(row.detail).font(Design.caption).foregroundStyle(Design.secondary).lineLimit(1).truncationMode(.tail)
                             Spacer(minLength: Design.gap)
-                            VStack(alignment: .trailing, spacing: Design.smallGap) {
-                                Text(row.value).font(Design.title).foregroundStyle(Design.stateText(row.level))
-                                Text(row.duration).font(Design.caption).foregroundStyle(Design.secondary)
-                            }
-                        }
+                            Text(row.value).font(Design.title).foregroundStyle(Design.stateText(row.level)).monospacedDigit().layoutPriority(2)
+                            Text(row.duration.replacingOccurrences(of: "已持续 ", with: "")).font(Design.caption)
+                                .foregroundStyle(Design.secondary).monospacedDigit().lineLimit(1).layoutPriority(1)
+                        }.help(row.name + "：" + row.detail + "，" + row.duration)
                     }
-                    SectionRule()
-                    Text("建议用 AI 诊断：把进程名和上面的数值交给 AI 助手排查").font(Design.caption).foregroundStyle(Design.secondary)
+                    Text("建议用 AI 诊断：把进程名和数值交给 AI 助手排查").font(Design.caption).foregroundStyle(Design.secondary)
+                        .lineLimit(1).truncationMode(.tail)
                 }
             }
         }
@@ -131,27 +141,34 @@ struct SystemChartCard: View {
                 Text("系统趋势").font(Design.title); Spacer()
                 CapsuleSelector(titles: ["15 分钟", "1 小时"], selected: state.chartMinutes == 15 ? 0 : 1, compact: true) { state.chartMinutes = $0 == 0 ? 15 : 60 }
             }
-            ForEach(state.systemTrends.indices, id: \.self) { index in
-                let trend = state.systemTrends[index]
-                let color = Self.color(trend.kind)
-                VStack(spacing: Design.smallGap) {
-                    HStack(spacing: Design.gap) {
-                        HStack(spacing: Design.tightGap) {
-                            Circle().fill(color).frame(width: Design.dot, height: Design.dot)
-                            if trend.secondaryPoints != nil { Circle().fill(Design.pink).frame(width: Design.dot, height: Design.dot) }
-                        }
-                        Text(trend.name).font(Design.body)
-                        Text(trend.rangeLabel).font(Design.tiny).foregroundStyle(Design.secondary)
-                        Spacer(minLength: Design.gap)
-                        if let secondary = trend.secondaryCurrent {
-                            Text(secondary).font(Design.tiny).foregroundStyle(Design.secondary).monospacedDigit().lineLimit(1)
-                        }
-                        Text(trend.current).font(Design.title).monospacedDigit().lineLimit(1)
-                    }
-                    MiniLineGraph(points: trend.points.map { GraphValue(date: $0.date, value: $0.value) }, domain: state.trendDomain,
-                        range: trend.lower...trend.upper, color: color, fill: trend.kind == "memory", warmPeriods: state.warmPeriods,
-                        overlay: trend.secondaryPoints.map { values in [(values.map { GraphValue(date: $0.date, value: $0.value) }, Design.pink)] } ?? [],
-                        threshold: trend.threshold)
+            // 一行一指标：左边名称和副信息，中间迷你折线，右边当前值（系统页重新设计方案 A）。
+            VStack(spacing: Design.smallGap) {
+                ForEach(state.systemTrends.indices, id: \.self) { index in
+                    let trend = state.systemTrends[index]
+                    let color = Self.color(trend.kind)
+                    let tint = trend.warn ? Design.stateText(.warn) : Design.label
+                    HStack(spacing: Design.rowGap) {
+                        VStack(alignment: .leading, spacing: Design.tightGap) {
+                            HStack(spacing: Design.tightGap) {
+                                Circle().fill(color).frame(width: Design.dot, height: Design.dot)
+                                if trend.secondaryPoints != nil { Circle().fill(Design.pink).frame(width: Design.dot, height: Design.dot) }
+                                Text(trend.name).font(Design.body).padding(.leading, Design.tightGap)
+                            }
+                            Text(trend.detail).font(Design.tiny).foregroundStyle(trend.warn ? tint : Design.secondary).lineLimit(1).truncationMode(.tail)
+                        }.frame(width: Design.trendLabelWidth, alignment: .leading)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                        MiniLineGraph(points: trend.points.map { GraphValue(date: $0.date, value: $0.value) }, domain: state.trendDomain,
+                            range: trend.lower...trend.upper, color: color, fill: trend.kind == "memory", warmPeriods: state.warmPeriods,
+                            overlay: trend.secondaryPoints.map { values in [(values.map { GraphValue(date: $0.date, value: $0.value) }, Design.pink)] } ?? [],
+                            threshold: trend.threshold)
+                        VStack(alignment: .trailing, spacing: Design.tightGap) {
+                            Text(trend.current).font(Design.title).monospacedDigit().foregroundStyle(tint).lineLimit(1)
+                            if let secondary = trend.secondaryCurrent {
+                                Text(secondary).font(Design.tiny).foregroundStyle(Design.secondary).monospacedDigit().lineLimit(1)
+                            }
+                        }.frame(width: Design.trendValueWidth, alignment: .trailing)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                    }.frame(height: Design.trendRowHeight).contentShape(Rectangle()).help(trend.help)
                 }
             }
             HStack {

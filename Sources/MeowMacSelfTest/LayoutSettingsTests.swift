@@ -71,7 +71,7 @@ enum LayoutSettingsTests {
             model.setVisible(false, id: "system.energy", in: .system)
             model.setVisible(false, id: "system.chart", in: .system)
             guard model.isDirty, model.draft.tabs.first == .network,
-                  model.draft.placements(for: .system).map(\.id) == ["system.disk", "system.chart", "system.energy", "system.sensors"],
+                  model.draft.placements(for: .system).map(\.id) == ["system.disk", "system.chart", "system.energy"],
                   model.draft.placements(for: .system)[1].visible,
                   !model.draft.placements(for: .system)[2].visible,
                   state.panelLayout == .default,
@@ -178,7 +178,7 @@ enum LayoutSettingsTests {
             }
             SettingsControlTestSupport.settle(window)
             try SettingsControlTestSupport.capture(window, name: "layout-default")
-            guard checks().count == 7 else { print("布局复选框数量：\(checks().count)"); return false }
+            guard checks().count == 6 else { print("布局复选框数量：\(checks().count)"); return false }
             let pickers = buttons(view).compactMap { $0 as? NSPopUpButton }
             guard pickers.count == 2, let provider = pickers.first(where: { $0.title == "Claude" }) else { return false }
             guard let providerItem = provider.item(withTitle: "Codex"), let providerAction = providerItem.action,

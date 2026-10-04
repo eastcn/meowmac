@@ -10,7 +10,7 @@ enum Design {
     static let cardRadius: CGFloat = 12, cardInset: CGFloat = 12, cardVertical: CGFloat = 10
     static let rule: CGFloat = 1, miniBar: CGFloat = 3, bar: CGFloat = 6, barRadius: CGFloat = 3
     static let tickWidth: CGFloat = 2, tickHeight: CGFloat = 12
-    static let sensorValueHeight: CGFloat = 22
+    static let trendLabelWidth: CGFloat = 104, trendValueWidth: CGFloat = 74, trendRowHeight: CGFloat = 32
     static let dot: CGFloat = 6, checkDot: CGFloat = 7, legendDot: CGFloat = 8
     static let tabHeight: CGFloat = 28, tabPadding: CGFloat = 3
     static let trendHeight: CGFloat = 26, cycleHeight: CGFloat = 56, columnHeight: CGFloat = 40
@@ -29,7 +29,6 @@ enum Design {
     static let body = Font.system(size: 13)
     static let status = Font.system(size: 15, weight: .semibold)
     static let metric = Font.system(size: 20, weight: .semibold)
-    static let sensorValue = Font.system(size: 17, weight: .semibold)
     static let amount = Font.system(size: 20, weight: .semibold)
     static let button = Font.system(size: 12)
     static let caption = Font.system(size: 11)
