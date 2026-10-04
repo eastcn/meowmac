@@ -447,7 +447,8 @@ struct NetworkSparkline: View {
             }
             context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: Design.networkStroke, lineCap: .round, lineJoin: .round, dash: dashed ? [3, 2] : []))
             for point in row.points where point.failed {
-                let fx = x(point.date)
+                // × 宽 4pt，收进图框，最后一轮失败时不伸进数值列。
+                let fx = min(size.width - 2, max(2, x(point.date)))
                 context.fill(Path(CGRect(x: min(size.width - 3, max(0, fx - 1.5)), y: 0, width: 3, height: size.height)), with: .color(Design.red.opacity(0.14)))
                 var cross = Path()
                 cross.move(to: CGPoint(x: fx - 2, y: size.height - 6)); cross.addLine(to: CGPoint(x: fx + 2, y: size.height - 2))
@@ -589,7 +590,7 @@ struct EgressStrip: View {
     private func help(_ index: Int) -> String {
         let segment = segments[index]
         let pattern = "M/d HH:mm"
-        var text = DisplayDate.format(segment.start, pattern: pattern) + " 起" + (segment.region.map { " · " + $0 } ?? "") + "\n" + segment.ip
+        var text = DisplayDate.format(segment.start, pattern: pattern) + (index == segments.count - 1 ? " 起至今" : " – " + DisplayDate.format(segment.end, pattern: pattern)) + (segment.region.map { " · " + $0 } ?? "") + "\n" + segment.ip
         if index > 0 {
             let previous = segments[index - 1]
             text += "\n上一个：" + DisplayDate.format(previous.start, pattern: pattern) + " – " + DisplayDate.format(previous.end, pattern: pattern)

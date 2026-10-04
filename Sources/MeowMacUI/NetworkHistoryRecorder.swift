@@ -40,6 +40,9 @@ public final class NetworkHistoryRecorder {
         history.startedAt = now
         lastRewrite = now
         update(history)
+        // 启动时按已裁剪的内存历史重写一次，短时间运行也不会让文件越积越大。
+        let loaded = history
+        persist { try $0.rewrite(loaded) }
     }
 
     /// 站点结果变化时调用。同一批次（最新检测时间不变）只记一次。
