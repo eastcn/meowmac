@@ -108,6 +108,7 @@ enum SelfTestMain {
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }
         for test in NetworkHistoryTests.tests { tests.append((test.0, { test.1() })) }
         for test in NetworkLayoutTests.tests { tests.append((test.0, { test.1() })) }
+        tests.append(contentsOf: NetworkUITests.tests)
         for test in CodexBarImportTests.tests { tests.append((test.0, { test.1() })) }
         tests.append(("UI.System/两类诊断与持续时间", { DiagnosisTests.rows() }))
         tests.append(("UI.Snapshot/八部分与关键字段编码", { @MainActor in

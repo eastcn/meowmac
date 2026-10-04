@@ -24,7 +24,7 @@ enum PanelLayoutUITests {
             guard Set(PanelCardRegistry.cards.keys) == Set(PanelLayoutCatalog.definitions.values.flatMap { $0.map(\.id) }),
                   state.renderedCardIDs(for: .system) == ["system.chart", "system.energy", "system.disk"],
                   state.renderedCardIDs(for: .quota) == ["quota.trend", "quota.cost", "quota.storage"],
-                  state.renderedCardIDs(for: .network) == ["network.checks", "network.sites", "network.egress"] else { return false }
+                  state.renderedCardIDs(for: .network) == ["network.checks", "network.sites", "network.traffic", "network.egress"] else { return false }
             var changed = PanelLayout.default
             changed.tabs = [.network, .system, .quota]
             for tab in PanelTab.allCases { changed.cards[tab.rawValue]?.reverse() }
@@ -34,7 +34,7 @@ enum PanelLayoutUITests {
             try state.saveLayout(changed, for: "builtin.slim")
             guard state.renderedCardIDs(for: .system) == ["system.energy", "system.chart"],
                   state.renderedCardIDs(for: .quota) == ["quota.cost", "quota.trend"],
-                  state.renderedCardIDs(for: .network) == ["network.sites", "network.checks"] else { return false }
+                  state.renderedCardIDs(for: .network) == ["network.traffic", "network.sites", "network.checks"] else { return false }
             let snapshot = PanelSnapshot(state: state)
             let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as! [String: Any]
             let saved = object["layout"] as! [String: Any]

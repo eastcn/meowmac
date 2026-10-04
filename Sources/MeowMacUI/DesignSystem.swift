@@ -18,6 +18,10 @@ enum Design {
     static let numericColumn: CGFloat = 56, siteCountColumn: CGFloat = 64, siteLatencyColumn: CGFloat = 88
     static let providerHeight: CGFloat = 72
     static let providerIcon: CGFloat = 20, networkIcon: CGFloat = 32
+    // 网络页（2026-10-04 重新设计，见 mockups/network-redesign.html）。
+    static let verdictIcon: CGFloat = 28, badge: CGFloat = 14, groupRadius: CGFloat = 10, checkRowInset: CGFloat = 7
+    static let networkLabelWidth: CGFloat = 88, networkValueWidth: CGFloat = 72, networkChartHeight: CGFloat = 24
+    static let siteRowHeight: CGFloat = 32, trafficRowHeight: CGFloat = 24, egressStrip: CGFloat = 6, networkStroke: CGFloat = 1.4
     static let catWidth: CGFloat = 26, catHeight: CGFloat = 17
     static let headerTop: CGFloat = 14, footerInset: CGFloat = 10
     static let menuWidth: CGFloat = 260, menuRow: CGFloat = 26
@@ -32,6 +36,8 @@ enum Design {
     static let amount = Font.system(size: 20, weight: .semibold)
     static let button = Font.system(size: 12)
     static let caption = Font.system(size: 11)
+    static let checkName = Font.system(size: 12.5, weight: .semibold)
+    static let ip = Font.system(size: 12, weight: .semibold)
     static let tiny = Font.system(size: 10)
     static let iconInk = Color(nsColor: .white)
     static let label = Color(nsColor: .labelColor), secondary = Color(nsColor: .secondaryLabelColor)

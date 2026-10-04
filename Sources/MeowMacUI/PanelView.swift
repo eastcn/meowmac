@@ -41,9 +41,7 @@ public enum PanelCardRegistry {
                 case "quota.trend": return state.quotas[state.selectedProvider] != nil
                 case "quota.cost": return state.costDisplay(state.selectedProvider) != nil
                 case "quota.storage": return [.claude, .codex].contains(state.selectedProvider) && state.localStorage[state.selectedProvider] != nil
-                case "network.checks", "network.sites", "network.egress": return state.networkModel != nil
-                // 界面在下一个提交接入，之前不渲染。
-                case "network.traffic": return false
+                case "network.checks", "network.sites", "network.traffic", "network.egress": return state.networkModel != nil
                 default: return true
                 }
             }, render: { state in
@@ -56,8 +54,9 @@ public enum PanelCardRegistry {
                     return AnyView(state.costDisplay(state.selectedProvider).map { CostCard(state: state, value: $0, provider: state.selectedProvider) })
                 case "quota.storage":
                     return AnyView(state.localStorage[state.selectedProvider].map { StorageCard(state: state, provider: state.selectedProvider, value: $0) })
-                case "network.checks": return AnyView(state.networkModel.map { NetworkChecks(model: $0) })
-                case "network.sites": return AnyView(state.networkModel.map { NetworkSites(model: $0) })
+                case "network.checks": return AnyView(state.networkModel.map { NetworkChecks(model: $0, state: state) })
+                case "network.sites": return AnyView(state.networkModel.map { NetworkSites(model: $0, state: state) })
+                case "network.traffic": return AnyView(NetworkTraffic(state: state))
                 case "network.egress": return AnyView(state.networkModel.map { NetworkEgress(model: $0) })
                 default: return AnyView(EmptyView())
                 }
@@ -172,6 +171,11 @@ public final class PanelState: ObservableObject {
         try styleStore.save(settings)
         applyStyle(settings)
         styleRecoveryReason = nil
+    }
+
+    /// 站点和速率共用一条时间轴，画在两者中靠后显示的那一块下面。
+    var networkAxisOwner: String? {
+        renderedCardIDs(for: .network).last { $0 == "network.sites" || $0 == "network.traffic" }
     }
 
     public func renderedCardIDs(for tab: PanelTab) -> [String] {
@@ -387,12 +391,14 @@ private struct PanelCardBottomKey: PreferenceKey {
         value.merge(nextValue()) { _, new in new }
     }
 }
-private extension View {
+extension View {
     func measureCardBottom(_ id: String) -> some View {
         background(GeometryReader { proxy in
             Color.clear.preference(key: PanelCardBottomKey.self, value: [id: proxy.frame(in: .named(PanelCardBottomKey.space)).maxY])
         })
     }
+}
+private extension View {
     func measurePanelHeight(_ part: PanelPart) -> some View {
         background(GeometryReader { proxy in Color.clear.preference(key: PanelHeightKey.self, value: [part: proxy.size.height]) })
     }
@@ -403,7 +409,7 @@ public final class PanelMeasurements: ObservableObject {
     @Published public private(set) var headerHeight: CGFloat = 0
     @Published public private(set) var footerHeight: CGFloat = 0
     @Published public private(set) var contentHeight: CGFloat = 0
-    /// 系统页各功能块底边距内容顶部的距离。
+    /// 系统页、网络页各功能块底边距内容顶部的距离。
     @Published public private(set) var cardBottoms: [String: CGFloat] = [:]
     public init() {}
     public var fixedHeight: CGFloat { headerHeight + footerHeight }

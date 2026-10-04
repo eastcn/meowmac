@@ -74,6 +74,7 @@ public struct PanelSnapshot: Codable {
         quota = QuotaProvider.allCases.map { state.channelDisplay($0) }
         var networkDisplay = state.networkModel?.meowMacDisplay
         networkDisplay?.capture = state.networkCapture
+        networkDisplay?.trends = state.networkTrends
         network = networkDisplay
         cat = state.catDisplay()
         layout = PanelLayoutSnapshot(effective: state.panelLayout, fallback: state.layoutRecoveryReason != nil || state.selectedCat == nil)
