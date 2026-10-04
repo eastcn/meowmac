@@ -9,6 +9,8 @@ public struct LocalConfig: Codable, Equatable {
     public var sleepAssertionSeconds = 7200.0
     public var memoryPressureSeconds = 600.0
     public var fairThermalSeconds = 300.0
+    public var fanHighFraction = 0.8
+    public var fanHighSeconds = 300.0
     public var sourceFailureCount = 2
     public var memoryNormalLoad = 0.0
     public var memoryWarnLoad = 0.6
@@ -29,7 +31,7 @@ public struct LocalConfig: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, quotaRemainingWarn, diskRemainingWarn, runawayCPU, runawaySeconds
-        case sleepAssertionSeconds, memoryPressureSeconds, fairThermalSeconds, sourceFailureCount
+        case sleepAssertionSeconds, memoryPressureSeconds, fairThermalSeconds, fanHighFraction, fanHighSeconds, sourceFailureCount
         case memoryNormalLoad, memoryWarnLoad, memoryCriticalLoad, idleFrameSeconds, fullFrameSeconds
         case quotaRefreshSeconds, sessionPollSeconds, sessionFinishDelaySeconds, manualMergeSeconds
         case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath
@@ -46,6 +48,8 @@ public struct LocalConfig: Codable, Equatable {
         sleepAssertionSeconds = try fields.decodeIfPresent(Double.self, forKey: .sleepAssertionSeconds) ?? defaults.sleepAssertionSeconds
         memoryPressureSeconds = try fields.decodeIfPresent(Double.self, forKey: .memoryPressureSeconds) ?? defaults.memoryPressureSeconds
         fairThermalSeconds = try fields.decodeIfPresent(Double.self, forKey: .fairThermalSeconds) ?? defaults.fairThermalSeconds
+        fanHighFraction = try fields.decodeIfPresent(Double.self, forKey: .fanHighFraction) ?? defaults.fanHighFraction
+        fanHighSeconds = try fields.decodeIfPresent(Double.self, forKey: .fanHighSeconds) ?? defaults.fanHighSeconds
         sourceFailureCount = try fields.decodeIfPresent(Int.self, forKey: .sourceFailureCount) ?? defaults.sourceFailureCount
         memoryNormalLoad = try fields.decodeIfPresent(Double.self, forKey: .memoryNormalLoad) ?? defaults.memoryNormalLoad
         memoryWarnLoad = try fields.decodeIfPresent(Double.self, forKey: .memoryWarnLoad) ?? defaults.memoryWarnLoad

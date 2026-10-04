@@ -83,6 +83,8 @@ public struct SystemSnapshot: Codable {
     public let memoryUsedBytes: UInt64?
     public let memoryTotalBytes: UInt64?
     public let memoryPressurePercent: Double?
+    /// 实验传感器（v0.3）。nil 表示本次没有采集。
+    public let sensors: SensorReadings?
 
     public var memoryUsedFraction: Double? {
         guard let used = memoryUsedBytes, let total = memoryTotalBytes, total > 0 else { return nil }
@@ -92,13 +94,15 @@ public struct SystemSnapshot: Codable {
     public init(timestamp: Date, cpuUsage: Double?, memoryPressure: MemoryPressure, swapUsedBytes: UInt64?,
                 diskAvailableBytes: Int64?, diskTotalBytes: Int64?, networkReceivedBytesPerSecond: Double?,
                 networkSentBytesPerSecond: Double?, battery: BatteryMetrics, thermal: ThermalLevel,
-                memoryUsedBytes: UInt64? = nil, memoryTotalBytes: UInt64? = nil, memoryPressurePercent: Double? = nil) {
+                memoryUsedBytes: UInt64? = nil, memoryTotalBytes: UInt64? = nil, memoryPressurePercent: Double? = nil,
+                sensors: SensorReadings? = nil) {
         self.timestamp = timestamp; self.cpuUsage = cpuUsage; self.memoryPressure = memoryPressure
         self.swapUsedBytes = swapUsedBytes; self.diskAvailableBytes = diskAvailableBytes
         self.diskTotalBytes = diskTotalBytes; self.networkReceivedBytesPerSecond = networkReceivedBytesPerSecond
         self.networkSentBytesPerSecond = networkSentBytesPerSecond; self.battery = battery; self.thermal = thermal
         self.memoryUsedBytes = memoryUsedBytes; self.memoryTotalBytes = memoryTotalBytes
         self.memoryPressurePercent = memoryPressurePercent
+        self.sensors = sensors
     }
 
     public var diskRemainingFraction: Double? {
@@ -114,12 +118,18 @@ public struct ChartPoint: Identifiable, Codable {
     public let memoryUsedBytes: UInt64?
     public let systemPowerWatts: Double?
     public let batteryTemperatureCelsius: Double?
+    public let socTemperatureCelsius: Double?
+    public let fanRPM: Double?
+    public let fanMaxRPM: Double?
     public let thermal: ThermalLevel
 
     public init(snapshot: SystemSnapshot) {
         timestamp = snapshot.timestamp; cpuUsage = snapshot.cpuUsage; memoryUsedBytes = snapshot.memoryUsedBytes
         systemPowerWatts = snapshot.battery.systemPowerWatts
         batteryTemperatureCelsius = snapshot.battery.temperatureCelsius
+        socTemperatureCelsius = snapshot.sensors?.cpuAverageCelsius
+        let fan = snapshot.sensors?.leadingFan
+        fanRPM = fan?.rpm; fanMaxRPM = fan?.maxRPM
         thermal = snapshot.thermal
     }
 }

@@ -6,6 +6,7 @@ import MeowMacCore
 public final class SystemCollector {
     private var previousCPU: CPUTicks?
     private var previousNetwork: (counters: ByteCounters, time: Date)?
+    private let sensors = SensorReader()
 
     public init() {}
 
@@ -29,7 +30,7 @@ public final class SystemCollector {
                               diskTotalBytes: disk.total, networkReceivedBytesPerSecond: rates?.received,
                               networkSentBytesPerSecond: rates?.sent, battery: Self.batteryMetrics(),
                               thermal: Self.thermalLevel(), memoryUsedBytes: memory.used, memoryTotalBytes: memory.total,
-                              memoryPressurePercent: Self.memoryPressurePercent())
+                              memoryPressurePercent: Self.memoryPressurePercent(), sensors: sensors.sample())
     }
 
     public static func cpuTicks() -> CPUTicks? {
