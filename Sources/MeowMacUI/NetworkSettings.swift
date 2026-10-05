@@ -169,7 +169,7 @@ public struct NetworkSettingsView: View {
                             field("分组", $network.settingsDraft.sites[i].groupText, error: validation.siteErrors[i]?.group)
                         }
                         field("URL", $network.settingsDraft.sites[i].url, error: validation.siteErrors[i]?.url)
-                        field("ID", $network.settingsDraft.sites[i].siteID, error: validation.siteErrors[i]?.id)
+                        errorText(validation.siteErrors[i]?.id)
                     }.padding(4)
                 }
             }
@@ -178,7 +178,6 @@ public struct NetworkSettingsView: View {
             Divider()
             field("VPN 内网站点（可留空）", $network.settingsDraft.intranetURL, error: validation.intranetURLError)
             field("Tailnet 目标（IPv4:端口，可留空）", $network.settingsDraft.tailnetTarget, error: validation.tailnetTargetError)
-            Toggle("为失败的公开站点诊断代理", isOn: $network.settingsDraft.proxyDiagnosticsEnabled)
         }
     }
     private var egress: some View {
@@ -248,6 +247,9 @@ public struct NetworkSettingsView: View {
                 field("DNS 端口（可留空）", $network.settingsDraft.manualDNSPort, error: validation.manualDNSPortError)
                 field("核心进程名（可留空）", $network.settingsDraft.manualProcessName, error: validation.manualProcessNameError)
             }
+            NetworkSettingsButton(title: "站点失败时诊断代理", id: "network.proxyDiagnostics", checked: network.settingsDraft.proxyDiagnosticsEnabled) {
+                network.settingsDraft.proxyDiagnosticsEnabled.toggle()
+            }.frame(height: 24)
             Divider()
             Text("DNS 规则").font(.headline)
             Picker("VPN 断开时", selection: $network.settingsDraft.disconnectedDNSRule) {
@@ -280,6 +282,7 @@ private struct NetworkSettingsButton: NSViewRepresentable {
     var title: String, id: String
     var enabled = true, error = false, selected = false
     var key = ""
+    var checked: Bool? = nil
     var action: () -> Void
     final class Coordinator: NSObject {
         var action: () -> Void
@@ -290,12 +293,14 @@ private struct NetworkSettingsButton: NSViewRepresentable {
     func makeNSView(context: Context) -> NSButton {
         let button = NSButton(title: title, target: context.coordinator, action: #selector(Coordinator.invoke))
         button.bezelStyle = .rounded; button.setAccessibilityIdentifier(id)
+        if checked != nil { button.setButtonType(.switch) }
         button.keyEquivalent = key
         if key == "\u{1b}" { button.keyEquivalentModifierMask = [] }
         return button
     }
     func updateNSView(_ button: NSButton, context: Context) {
         context.coordinator.action = action; button.isEnabled = enabled
+        if let checked { button.state = checked ? .on : .off }
         button.bezelColor = selected ? .controlAccentColor : nil
         let color = !enabled ? NSColor.disabledControlTextColor : (selected ? NSColor.controlAccentColor : NSColor.labelColor)
         let text = NSMutableAttributedString(string: title, attributes: [.foregroundColor: color, .font: selected ? NSFont.boldSystemFont(ofSize: 13) : NSFont.systemFont(ofSize: 13)])

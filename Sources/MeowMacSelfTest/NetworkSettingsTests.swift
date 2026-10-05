@@ -128,6 +128,16 @@ enum NetworkSettingsTests {
         do {
             for tab in NetworkSettingsTab.allCases {
                 guard click(window, id: "network.tab.\(tab)"), controller.model.tab == tab else { return false }
+                if tab == .sites {
+                    guard SettingsControlTestSupport.element(window, id: "ID") == nil,
+                          SettingsControlTestSupport.element(window, id: "network.proxyDiagnostics") == nil else { print("站点页仍有额外字段"); return false }
+                }
+                if tab == .proxy {
+                    guard let toggle = SettingsControlTestSupport.element(window, id: "network.proxyDiagnostics") as? NSButton else { print("代理页诊断开关未定位"); return false }
+                    let previous = network.settingsDraft.proxyDiagnosticsEnabled
+                    toggle.state = previous ? .off : .on
+                    guard toggle.sendAction(toggle.action, to: toggle.target), network.settingsDraft.proxyDiagnosticsEnabled != previous else { return false }
+                }
                 if tab == .frequency {
                     guard let field = SettingsControlTestSupport.element(window, id: "network.localInterval") as? NSTextField else { return false }
                     field.stringValue = "4"
