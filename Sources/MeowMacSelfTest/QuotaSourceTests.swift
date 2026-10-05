@@ -79,8 +79,13 @@ enum QuotaSourceTests {
     static func overviewRemoval() -> Bool {
         let state = PanelPreviewRenderer.syntheticState()
         state.applyQuotaSources(QuotaSourceList(providers: [.codex]))
-        return state.overviewMetrics.first(where: { $0.item == .quota })?.title == "Codex"
-            && state.overviewMetrics.first(where: { $0.item == .quota })?.numericValue == 60
+        guard state.overviewMetrics.first(where: { $0.item == .quota })?.title == "Codex",
+              state.overviewMetrics.first(where: { $0.item == .quota })?.numericValue == 60 else { return false }
+        let other = PanelPreviewRenderer.syntheticState()
+        guard let old = other.quotas[.claude]?.windows.first(where: { $0.effectiveWindowMinutes == 300 }) else { return false }
+        let overview = PanelOverview(quota: OverviewQuota(provider: .claude, window: "id:" + old.identifier))
+        other.applyQuotaSources(QuotaSourceList(providers: [.codex]))
+        return other.quotas[.claude] == nil && other.overviewMetrics(for: overview).first(where: { $0.item == .quota })?.numericValue == 60
     }
     static func inFlightRemoval() async -> Bool {
         let state = PanelPreviewRenderer.syntheticState()

@@ -83,6 +83,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         let quota = QuotaCoordinator(state: panelState, config: configResult.config)
         quotaCoordinator = quota
         panelState.onQuotaSourcesRemoved = { [weak self] providers in self?.notificationCoordinator?.removeProviders(providers) }
+        let absent = QuotaCatalog.usageNames.keys.compactMap(QuotaProvider.init(rawValue:)).filter { !panelState.quotaProviders.contains($0) }
+        notificationCoordinator?.removeProviders(absent)
         quota.start()
         let reset = CodexResetCoordinator(state: panelState)
         resetCoordinator = reset

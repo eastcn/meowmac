@@ -74,8 +74,13 @@ public final class PanelState: ObservableObject {
     public var onQuotaSourcesRemoved: ([QuotaProvider]) -> Void = { _ in }
     public var quotaProviders: [QuotaProvider] { quotaSources.providers }
     public var quotaEmptyMessage: String { "还没有额度渠道，在 设置 → 额度源设置… 中添加" }
+    private var removedWindowKinds: [QuotaProvider: [String: (minutes: Int?, name: String)]] = [:]
     public func applyQuotaSources(_ list: QuotaSourceList) {
         let removed = quotaProviders.filter { !list.providers.contains($0) }
+        for provider in removed {
+            removedWindowKinds[provider] = Dictionary((quotas[provider]?.windows ?? []).map { ($0.identifier, ($0.effectiveWindowMinutes, $0.displayName)) }, uniquingKeysWith: { first, _ in first })
+        }
+        for provider in list.providers { removedWindowKinds.removeValue(forKey: provider) }
         quotaSources = list
         for provider in removed {
             quotaAttempts.removeValue(forKey: provider); quotas.removeValue(forKey: provider); quotaErrors.removeValue(forKey: provider)
@@ -84,7 +89,8 @@ public final class PanelState: ObservableObject {
         }
         if !quotaProviders.contains(selectedProvider), let first = quotaProviders.first { selectedProvider = first }
         if list.providers.isEmpty { failures["quota"] = 0 }
-        reminderTracker.removeProviders(removed)
+        let absent = QuotaCatalog.usageNames.keys.compactMap(QuotaProvider.init(rawValue:)).filter { !list.providers.contains($0) }
+        reminderTracker.removeProviders(absent)
         onQuotaSourcesRemoved(removed)
         refreshReminders()
     }
@@ -299,7 +305,18 @@ public extension PanelState {
         let memoryDetail = usedGB.flatMap { used in totalGB.map { "已用 \(used) / \($0) GB" } } ?? "内存用量不可用"
         let memoryLevel: HealthLevel = snapshot?.memoryPressure == .critical ? .severe : snapshot?.memoryPressure == .warn ? .warn : .normal
         var quotaConfig = overview.quota
-        if !quotaProviders.contains(quotaConfig.provider), let first = quotaProviders.first { quotaConfig.provider = first }
+        if !quotaProviders.contains(quotaConfig.provider), let first = quotaProviders.first {
+            if quotaConfig.window.hasPrefix("id:"), let kind = removedWindowKinds[quotaConfig.provider]?[String(quotaConfig.window.dropFirst(3))] {
+                let candidates = (quotas[first]?.windows ?? []).filter { window in
+                    if let minutes = kind.minutes { return window.effectiveWindowMinutes == minutes }
+                    return window.displayName == kind.name
+                }
+                if let match = candidates.first(where: { $0.displayName == kind.name }) ?? candidates.first {
+                    quotaConfig.window = "id:" + match.identifier
+                }
+            }
+            quotaConfig.provider = first
+        }
         let quota = quotaConfig.selectedWindow(in: quotas[quotaConfig.provider])
         let remaining = quota?.remainingPercent
         let shown = quota.map { quotaPercent($0) }

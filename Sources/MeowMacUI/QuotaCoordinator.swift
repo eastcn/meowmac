@@ -130,7 +130,7 @@ public final class QuotaCoordinator {
     public func replaceSources(_ list: QuotaSourceList) throws {
         try sourceStore.save(list)
         let removed = state.quotaProviders.filter { !list.providers.contains($0) }
-        for provider in removed { generations[provider, default: 0] += 1; pending.removeValue(forKey: provider) }
+        for provider in removed { generations[provider, default: 0] += 1; pending.removeValue(forKey: provider); explicitRequests.remove(provider) }
         state.applyQuotaSources(list)
     }
 
