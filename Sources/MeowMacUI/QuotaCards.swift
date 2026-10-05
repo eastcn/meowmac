@@ -95,9 +95,17 @@ struct ProviderLogo: View {
            let bundle = Bundle(url: url) { return bundle }
         return .module
     }
+    public static func image(_ provider: QuotaProvider, bundle: Bundle? = nil) -> NSImage? {
+        let runtime = URL(fileURLWithPath: "/Applications/CodexBar.app/Contents/Resources/ProviderIcon-\(provider.rawValue).svg")
+        if let image = NSImage(contentsOf: runtime) { return image }
+        return bundle?.url(forResource: "ProviderIcon-\(provider.rawValue)", withExtension: "svg", subdirectory: "Resources").flatMap(NSImage.init(contentsOf:))
+    }
     var body: some View {
-        if let url = resourceBundle.url(forResource: "ProviderIcon-\(provider.rawValue)", withExtension: "svg", subdirectory: "Resources"), let image = NSImage(contentsOf: url) {
+        if let image = Self.image(provider, bundle: resourceBundle) {
             Image(nsImage: image).renderingMode(.template).resizable().scaledToFit().frame(width: Design.providerIcon, height: Design.providerIcon)
+        } else {
+            Text(String(provider.displayName.prefix(1)).uppercased()).font(.system(size: 11, weight: .semibold))
+                .frame(width: Design.providerIcon, height: Design.providerIcon).background(Design.track, in: Circle())
         }
     }
 }
@@ -106,8 +114,12 @@ struct QuotaPage: View {
     private var provider: QuotaProvider { state.selectedProvider }
     var body: some View {
         VStack(alignment: .leading, spacing: Design.sectionGap) {
-            HStack(spacing: Design.gap) {
-                ForEach([QuotaProvider.claude, .codex, .deepseek, .opencodego], id: \.self) { item in
+            if let reason = state.quotaSourceRecoveryReason { Text(reason).font(Design.caption).foregroundStyle(Design.stateText(.warn)) }
+            if state.quotaProviders.isEmpty {
+                Text(state.quotaEmptyMessage).font(Design.body).foregroundStyle(Design.secondary).fixedSize(horizontal: false, vertical: true)
+            } else {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Design.gap), count: 4), spacing: Design.gap) {
+                ForEach(state.quotaProviders, id: \.self) { item in
                     Button { state.selectedProvider = item } label: {
                         VStack(spacing: Design.smallGap) {
                             ProviderLogo(provider: item)
@@ -155,6 +167,7 @@ struct QuotaPage: View {
             ForEach(ids, id: \.self) { id in
                 SectionRule()
                 PanelCardRegistry.cards[id]?.makeView(state: state)
+            }
             }
         }
     }

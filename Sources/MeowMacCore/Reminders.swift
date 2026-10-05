@@ -210,6 +210,7 @@ public enum ReminderCollector {
         let known = ["CPU": "cpu", "内存压力": "memory", "磁盘": "disk", "电池": "battery"]
         if let value = known[source] { return value }
         let permitted = ["energy", "system", "quota", "network", "quota.codex-resets"] + QuotaProvider.defaults.map { "quota." + $0.rawValue }
+        if source.hasPrefix("quota."), QuotaProvider(rawValue: String(source.dropFirst(6))) != nil { return source }
         return permitted.contains(source) ? source : "other"
     }
 }
@@ -253,6 +254,17 @@ public struct ReminderTracker {
     public var snoozes: [String: SnoozeRecord] = [:]
     public init() {}
     public var records: [SnoozeRecord] { snoozes.values.sorted { $0.key < $1.key } }
+    public mutating func removeProviders(_ providers: [QuotaProvider]) {
+        let removed = Set(providers)
+        let keys = Set(current.values.filter { $0.provider.map(removed.contains) == true }.map(\.id))
+        current = current.filter { !keys.contains($0.key) }
+        snoozes = snoozes.filter { key, _ in
+            !keys.contains(key) && !providers.contains { provider in
+                key.hasPrefix("quotaLow." + provider.rawValue + ".") || key.hasPrefix("quotaPace." + provider.rawValue + ".") || key == "source.quota." + provider.rawValue
+            }
+        }
+    }
+
     public mutating func reconcile(_ batch: ReminderBatch, now: Date) {
         let incoming = Dictionary(batch.reminders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for (key, old) in current where incoming[key] == nil {

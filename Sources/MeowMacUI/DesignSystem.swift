@@ -398,7 +398,11 @@ public enum QuotaPalette {
         case .claude: return NSColor(srgbRed: 217 / 255, green: 119 / 255, blue: 87 / 255, alpha: 1)
         case .deepseek: return NSColor(srgbRed: 77 / 255, green: 107 / 255, blue: 254 / 255, alpha: 1)
         case .opencodego: return .systemGray
-        default: return .systemGray
+        default:
+            let palette: [ThemeColor] = [.teal, .purple, .green, .pink, .blue, .orange]
+            let index = QuotaCatalog.usageNames.keys.sorted().firstIndex(of: provider.rawValue) ?? 0
+            var fallback = style; fallback.colors[provider.rawValue] = palette[index % palette.count]
+            return color(provider, style: fallback)
         }
     }
     public static func peakOpacity(usedPercent: Double, isCurrent: Bool) -> Double {

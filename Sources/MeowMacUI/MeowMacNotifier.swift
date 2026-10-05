@@ -123,6 +123,13 @@ public final class NotificationCoordinator {
                           subtitle: violation ? "出口地域超出允许范围" : "出口 IP 已变化", body: body, sound: violation))
     }
 
+    public func removeProviders(_ providers: [QuotaProvider]) {
+        records = records.filter { key, _ in !providers.contains { provider in
+            key.hasPrefix("quotaLow." + provider.rawValue + ".") || key.hasPrefix("quotaPace." + provider.rawValue + ".") || key == "source.quota." + provider.rawValue
+        } }
+        persist()
+    }
+
     /// 保存失败时不改内存里的开关，返回 false。
     @discardableResult
     public func update(_ next: NotificationSettings) -> Bool {

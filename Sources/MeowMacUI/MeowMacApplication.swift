@@ -82,6 +82,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         bridge.start()
         let quota = QuotaCoordinator(state: panelState, config: configResult.config)
         quotaCoordinator = quota
+        panelState.onQuotaSourcesRemoved = { [weak self] providers in self?.notificationCoordinator?.removeProviders(providers) }
         quota.start()
         let reset = CodexResetCoordinator(state: panelState)
         resetCoordinator = reset

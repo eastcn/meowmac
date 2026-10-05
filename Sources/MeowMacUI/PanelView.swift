@@ -69,8 +69,28 @@ public final class PanelState: ObservableObject {
     @Published public var snapshot: SystemSnapshot? { didSet { refreshReminders() } }
     @Published public var energy: EnergyDiagnosis? { didSet { refreshReminders() } }
     @Published public var chartHistory = ChartHistory()
+    @Published public private(set) var quotaSources = QuotaSourceList()
+    @Published public var quotaSourceRecoveryReason: String?
+    public var onQuotaSourcesRemoved: ([QuotaProvider]) -> Void = { _ in }
+    public var quotaProviders: [QuotaProvider] { quotaSources.providers }
+    public var quotaEmptyMessage: String { "还没有额度渠道，在 设置 → 额度源设置… 中添加" }
+    public func applyQuotaSources(_ list: QuotaSourceList) {
+        let removed = quotaProviders.filter { !list.providers.contains($0) }
+        quotaSources = list
+        for provider in removed {
+            quotaAttempts.removeValue(forKey: provider); quotas.removeValue(forKey: provider); quotaErrors.removeValue(forKey: provider)
+            quotaHistory.removeValue(forKey: provider); costs.removeValue(forKey: provider)
+            localStorage.removeValue(forKey: provider); failures.removeValue(forKey: "quota." + provider.rawValue)
+        }
+        if !quotaProviders.contains(selectedProvider), let first = quotaProviders.first { selectedProvider = first }
+        if list.providers.isEmpty { failures["quota"] = 0 }
+        reminderTracker.removeProviders(removed)
+        onQuotaSourcesRemoved(removed)
+        refreshReminders()
+    }
     @Published public var quotas: [QuotaProvider: QuotaSnapshot] = [:] { didSet { refreshReminders() } }
     @Published public var quotaHistory: [QuotaProvider: [QuotaHistoryLine]] = [:]
+    @Published public var quotaAttempts: [QuotaProvider: QuotaAttempt] = [:]
     @Published public var quotaErrors: [QuotaProvider: String] = [:]
     @Published public var codexResetState = CodexResetState()
     @Published public var localStorage: [QuotaProvider: LocalStorageSnapshot] = [:]
@@ -278,7 +298,8 @@ public extension PanelState {
         let totalGB = snapshot?.memoryTotalBytes.map { Int((Double($0) / 1_073_741_824).rounded()) }
         let memoryDetail = usedGB.flatMap { used in totalGB.map { "已用 \(used) / \($0) GB" } } ?? "内存用量不可用"
         let memoryLevel: HealthLevel = snapshot?.memoryPressure == .critical ? .severe : snapshot?.memoryPressure == .warn ? .warn : .normal
-        let quotaConfig = overview.quota
+        var quotaConfig = overview.quota
+        if !quotaProviders.contains(quotaConfig.provider), let first = quotaProviders.first { quotaConfig.provider = first }
         let quota = quotaConfig.selectedWindow(in: quotas[quotaConfig.provider])
         let remaining = quota?.remainingPercent
         let shown = quota.map { quotaPercent($0) }
@@ -286,7 +307,7 @@ public extension PanelState {
         let metrics: [OverviewItem: OverviewMetric] = [
             .cpu: OverviewMetric(item: .cpu, title: "CPU", value: cpu.map { "\(Int(($0 * 100).rounded()))%" } ?? "—", detail: "整机负载", fraction: cpu ?? 0, level: .normal, numericValue: cpu.map { $0 * 100 }),
             .memory: OverviewMetric(item: .memory, title: "内存", value: memory.map { "\(Int($0.rounded()))%" } ?? "—", detail: memoryDetail, fraction: (memory ?? 0) / 100, level: memoryLevel, numericValue: memory),
-            .quota: OverviewMetric(item: .quota, title: quotaConfig.provider.displayName, value: shown.map { "\(Int($0.rounded()))%" } ?? "—", detail: quotaName + " · " + quotaBasisLabel, fraction: (shown ?? 0) / 100, level: Design.quotaLevel(remaining ?? 0), numericValue: shown),
+            .quota: OverviewMetric(item: .quota, title: quotaProviders.isEmpty ? "额度" : quotaConfig.provider.displayName, value: quotaProviders.isEmpty ? "未添加" : shown.map { "\(Int($0.rounded()))%" } ?? "—", detail: quotaName + " · " + quotaBasisLabel, fraction: (shown ?? 0) / 100, level: quotaProviders.isEmpty ? .normal : Design.quotaLevel(remaining ?? 0), numericValue: shown),
             .network: OverviewMetric(item: .network, title: "网络", value: snapshot?.networkReceivedBytesPerSecond.map { "↓" + MetricFormat.rate($0) } ?? "—", detail: snapshot?.networkSentBytesPerSecond.map { "↑" + MetricFormat.rate($0) } ?? "—", fraction: 1, level: networkTone == .red ? .severe : networkTone == .yellow ? .warn : .normal, numericValue: snapshot?.networkReceivedBytesPerSecond),
         ]
         return overview.visible.compactMap { metrics[$0] }

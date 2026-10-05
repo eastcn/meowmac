@@ -149,7 +149,7 @@ public final class StyleSettingsController: NSObject, NSWindowDelegate {
         example = text("", small: true); example.setAccessibilityIdentifier("style.emailExample")
         let colors = text("渠道颜色"); colors.font = .systemFont(ofSize: 13, weight: .semibold)
         var colorRows: [NSView] = []
-        for provider in [QuotaProvider.claude, .codex, .deepseek, .opencodego] {
+        for provider in state.quotaProviders {
             let picks = ThemeColor.allCases.map { color -> StyleSwatch in
                 let button = StyleSwatch(provider: provider, color: color)
                 button.target = self; button.action = #selector(changeColor(_:))

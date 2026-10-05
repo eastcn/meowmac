@@ -78,7 +78,10 @@ public struct QuotaHistoryStore {
     public func prune(before cutoff: Date) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        for provider in QuotaProvider.defaults {
+        guard FileManager.default.fileExists(atPath: directory.path) else { return }
+        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        let providers = files.filter { $0.pathExtension == "jsonl" }.compactMap { QuotaProvider(rawValue: $0.deletingPathExtension().lastPathComponent) }
+        for provider in providers {
             let file = directory.appendingPathComponent("\(provider.rawValue).jsonl")
             guard FileManager.default.fileExists(atPath: file.path) else { continue }
             let kept = try read(provider).filter { $0.sampledAt >= cutoff }

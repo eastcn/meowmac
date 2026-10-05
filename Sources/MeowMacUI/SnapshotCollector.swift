@@ -24,6 +24,8 @@ public enum SnapshotCollector {
         let raw = try RawCapture(rawDirectory)
         let state = PanelState()
         CatRuntime.initialize(state: state, store: CatStore())
+        let sources = QuotaSourceStore().load()
+        state.applyQuotaSources(sources.list); state.quotaSourceRecoveryReason = sources.recoveryReason
         let config = state.configResult.config
         let client = CodexBarClient(path: config.codexBarCLIPath) { args, output, errors in
             let provider = args.indices.contains(2) ? args[2] : "all"
@@ -45,7 +47,7 @@ public enum SnapshotCollector {
         }.value
         state.energyUpdatedAt = Date()
         state.energy = energy
-        for provider in QuotaProvider.defaults {
+        for provider in state.quotaProviders {
             do {
                 state.quotas[provider] = try await Task.detached { try client.usage(provider) }.value
                 state.quotaHistory[provider] = try QuotaHistoryStore().read(provider)
@@ -55,7 +57,7 @@ public enum SnapshotCollector {
                 logger.error("快照额度采集失败：\(provider.rawValue, privacy: .public) \(error.localizedDescription, privacy: .private)")
             }
         }
-        for provider in [QuotaProvider.codex, .claude] {
+        for provider in [QuotaProvider.codex, .claude] where state.quotaProviders.contains(provider) {
             do { state.costs[provider] = try await Task.detached { try client.cost(provider) }.value }
             catch { logger.error("快照花费采集失败：\(provider.rawValue, privacy: .public) \(error.localizedDescription, privacy: .private)") }
             let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".\(provider.rawValue)")

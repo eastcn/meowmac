@@ -56,7 +56,8 @@ public struct StyleSettings: Codable, Equatable {
     public func color(for provider: QuotaProvider) -> ThemeColor { colors[provider.rawValue] ?? .default }
     public func validated() throws -> StyleSettings {
         guard schemaVersion == 1, [15, 60].contains(chartMinutes),
-              Set(colors.keys) == Set(QuotaProvider.defaults.map(\.rawValue)) else { throw StyleError.invalid("版本、范围或渠道颜色不完整") }
+              Set(QuotaProvider.defaults.map(\.rawValue)).isSubset(of: Set(colors.keys)),
+              colors.keys.allSatisfy({ QuotaCatalog.usageNames[$0] != nil }) else { throw StyleError.invalid("版本、范围或渠道颜色不完整") }
         return self
     }
     public static func parse(_ data: Data) throws -> StyleSettings {
@@ -69,7 +70,7 @@ public struct StyleSettings: Codable, Equatable {
               let basisName = root["quotaBasis"] as? String, let basis = QuotaBasis(rawValue: basisName),
               let emailName = root["email"] as? String, let email = EmailDisplay(rawValue: emailName),
               let rawColors = root["colors"] as? [String: String],
-              Set(rawColors.keys) == Set(QuotaProvider.defaults.map(\.rawValue)) else { throw fail() }
+              Set(QuotaProvider.defaults.map(\.rawValue)).isSubset(of: Set(rawColors.keys)) else { throw fail() }
         var result = StyleSettings()
         result.quotaBasis = basis; result.email = email; result.chartMinutes = minutes.intValue
         for (provider, value) in rawColors {

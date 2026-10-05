@@ -47,7 +47,7 @@ public struct QuotaWindow: Codable {
 
 public extension QuotaProvider {
     var displayName: String {
-        switch self { case .claude: return "Claude"; case .codex: return "Codex"; case .deepseek: return "DeepSeek"; case .opencodego: return "OpenCode Go"; default: return rawValue }
+        switch self { case .claude: return "Claude"; case .codex: return "Codex"; case .deepseek: return "DeepSeek"; case .opencodego: return "OpenCode Go"; default: return QuotaCatalog.displayNames[rawValue] ?? rawValue }
     }
 }
 
@@ -130,7 +130,7 @@ public enum CodexBarParser {
         var snapshots: [QuotaProvider: QuotaSnapshot] = [:]
         var errors: [QuotaProvider: String] = [:]
         for row in rows {
-            guard let id = row["id"] as? String, let provider = QuotaProvider(rawValue: id.lowercased()), QuotaProvider.defaults.contains(provider) else { continue }
+            guard let id = row["id"] as? String, let provider = QuotaProvider(rawValue: id.lowercased()) else { continue }
             if let error = row["error"] as? String { errors[provider] = error; continue }
             if let error = row["error"] as? [String: Any] { errors[provider] = error["message"] as? String ?? "采集失败"; continue }
             guard let windowRows = row["windows"] as? [[String: Any]] else {
@@ -160,7 +160,7 @@ public enum CodexBarParser {
         guard let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]], let row = rows.first else {
             throw QuotaParseError.invalidRoot
         }
-        guard let name = row["provider"] as? String, let provider = QuotaProvider(rawValue: name.lowercased()), QuotaProvider.defaults.contains(provider) else {
+        guard let name = row["provider"] as? String, let provider = QuotaCatalog.provider(forUsageName: name.lowercased()) ?? QuotaProvider(rawValue: name.lowercased()) else {
             throw QuotaParseError.missingProvider
         }
         guard let usage = row["usage"] as? [String: Any] else { throw QuotaParseError.missingUsage }
@@ -208,8 +208,8 @@ public enum CodexBarParser {
             throw QuotaParseError.invalidRoot
         }
         return rows.compactMap { row in
-            guard let name = row["provider"] as? String, let provider = QuotaProvider(rawValue: name.lowercased()), QuotaProvider.defaults.contains(provider),
-                  let state = row["state"] as? String else { return nil }
+            guard let name = row["provider"] as? String, let provider = QuotaCatalog.provider(forUsageName: name.lowercased()) ?? QuotaProvider(rawValue: name.lowercased()),
+                  QuotaProvider.defaults.contains(provider), let state = row["state"] as? String else { return nil }
             return SessionActivity(provider: provider, active: state == "active")
         }
     }

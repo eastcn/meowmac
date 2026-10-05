@@ -12,8 +12,8 @@ public extension PanelState {
         }
         let completed = networkModel.map { $0.checkProgress == nil && $0.lastCheckedAt != nil && !$0.overall.isSwitching } ?? true
         return ReminderCollector.collect(HealthInputs(system: snapshot, energy: energy,
-            quotaUsedPercent: quotas.values.flatMap { $0.windows.map(\.usedPercent) }, network: networkTone,
-            failedSources: failures, fairSince: fairSince, now: now(), quotaSnapshots: Array(quotas.values),
+            quotaUsedPercent: quotas.values.filter { quotaProviders.contains($0.provider) }.flatMap { $0.windows.map(\.usedPercent) }, network: networkTone,
+            failedSources: failures.filter { key, _ in !key.hasPrefix("quota.") || (key == "quota.codex-resets" && quotaProviders.contains(.codex)) || quotaProviders.contains(where: { "quota." + $0.rawValue == key }) }, fairSince: fairSince, now: now(), quotaSnapshots: quotas.values.filter { quotaProviders.contains($0.provider) },
             networkSignals: signals, networkConfirmed: completed, networkCheckedAt: networkModel?.lastCheckedAt,
             energyUpdatedAt: energyUpdatedAt, fanHighSince: fanHighSince), config: configResult.config)
     }
