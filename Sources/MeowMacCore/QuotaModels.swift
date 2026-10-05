@@ -87,13 +87,18 @@ public struct QuotaBalance: Codable, Equatable {
     public let amount: String
     public let detail: String?
     public init(amount: String, detail: String?) { self.amount = amount; self.detail = detail }
-    /// 金额里的数字，例如 “¥1,234.50” → 1234.5；解析不出时为 nil，不参与提醒。
+    /// 金额里第一个数字，例如 “¥1,234.50” → 1234.5、“¥8.20 (paid ¥5)” → 8.2；解析不出时为 nil，不参与提醒。
     public var value: Double? {
-        let digits = amount.filter { $0.isNumber || $0 == "." || $0 == "-" }
-        return digits.isEmpty ? nil : Double(digits)
+        guard let range = amount.range(of: #"-?\d[\d,]*(\.\d+)?"#, options: .regularExpression) else { return nil }
+        return Double(amount[range].replacingOccurrences(of: ",", with: ""))
     }
     /// 金额前的币种符号，例如 “¥”；没有时为空串。
     public var currency: String { String(amount.prefix { !$0.isNumber && $0 != "-" }).trimmingCharacters(in: .whitespaces) }
+    /// 阈值的显示，例如 “¥10”“CNY 10”：字母币种和数字之间加空格。
+    public func format(_ value: Double) -> String {
+        let symbol = currency
+        return symbol + (symbol.last?.isLetter == true ? " " : "") + MetricFormat.money(value)
+    }
     public static func isBalanceLabel(_ label: String?) -> Bool { label?.trimmingCharacters(in: .whitespaces).lowercased() == "balance" }
     public static func parse(_ description: String?) -> QuotaBalance? {
         guard let text = description?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }

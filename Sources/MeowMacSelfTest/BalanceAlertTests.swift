@@ -20,6 +20,8 @@ enum BalanceAlertTests {
             QuotaBalance(amount: "¥1,234.50", detail: nil).value == 1234.5 && QuotaBalance(amount: "¥1,234.50", detail: nil).currency == "¥"
                 && QuotaBalance(amount: "$5", detail: nil).value == 5 && QuotaBalance(amount: "$5", detail: nil).currency == "$"
                 && QuotaBalance(amount: "未知", detail: nil).value == nil
+                && QuotaBalance(amount: "¥8.20 (paid ¥5)", detail: nil).value == 8.2
+                && QuotaBalance(amount: "CNY 12", detail: nil).format(10) == "CNY 10" && QuotaBalance(amount: "¥12", detail: nil).format(10) == "¥10"
                 && MetricFormat.money(10) == "10" && MetricFormat.money(8.2) == "8.20"
         }),
         ("Core.Balance/低于默认阈值 10 提醒，等于或高于不提醒", {

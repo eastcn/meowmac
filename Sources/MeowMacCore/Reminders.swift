@@ -109,7 +109,7 @@ public enum ReminderCollector {
                 let object = snapshot.provider.rawValue + ".balance"
                 if sourceValid { batch.confirmedKeys.insert(ReminderKind.quotaLow.rawValue + "." + object) }
                 if threshold > 0 && value < threshold {
-                    let limit = balance.currency + MetricFormat.money(threshold)
+                    let limit = balance.format(threshold)
                     add(Reminder(kind: .quotaLow, object: object, tab: .quota, title: snapshot.provider.displayName + " 余额不足",
                                  detail: "余额 \(balance.amount)，低于 \(limit)", sampledAt: snapshot.updatedAt,
                                  resetAt: nil, confirmed: sourceValid, provider: snapshot.provider,

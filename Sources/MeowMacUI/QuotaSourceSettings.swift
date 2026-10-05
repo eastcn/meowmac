@@ -201,7 +201,9 @@ public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSess
                     try await Task.detached { try client.setEnabled(row.enabled, provider: provider) }.value
                 }
                 var successful = saved.filter { $0.provider != provider }; successful.append(row)
+                // 其他行沿用已保存的值，避免把同批尚未保存成功的草稿（例如阈值）提前写盘。
                 let ordered = desired.filter { item in successful.contains { $0.provider == item.provider } }
+                    .map { item in item.provider == provider ? row : (saved.first { $0.provider == item.provider } ?? item) }
                 try coordinator.replaceSources(sourceList(ordered))
                 saved = ordered; coordinator.sourceEnabled[provider] = row.enabled
                 failedKeys.remove(provider); errors.removeValue(forKey: provider)
