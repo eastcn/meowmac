@@ -119,11 +119,12 @@ enum CleanTerminalTests {
         state.availableCleanTerminals = [.ghostty, .terminal]
         var selected: CleanTerminal?
         state.onSelectCleanTerminal = { selected = $0 }
-        let settings = SettingsMenu.make(state: state)
-        guard let menu = settings.items.first(where: { $0.title == "清理终端" })?.submenu,
+        let menu = SettingsMenu.cleanTerminalMenu(state: state)
+        guard
               menu.items.map(\.title) == ["自动（当前：Ghostty）", "", "Ghostty", "iTerm2", "系统终端"],
               menu.items[0].state == .on, !menu.items[3].isEnabled, menu.items[2].isEnabled else { return false }
-        menu.performActionForItem(at: 2)
+        let item = menu.items[2]
+        guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
         return selected == .ghostty && CleaningAlerts.missingMole().buttons.map(\.title) == ["取消", "打开配置文件…", "安装说明"]
             && CleaningAlerts.launchFailed(terminal: .ghostty, command: "'/example/mo' clean", reason: "未找到已安装的 Ghostty。请安装它，或选择其他终端。").buttons.map(\.title) == ["取消", "复制命令", "选择终端…"]
     }

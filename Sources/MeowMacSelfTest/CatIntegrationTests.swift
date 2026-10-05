@@ -75,10 +75,10 @@ enum CatIntegrationTests {
                 try JSONSerialization.data(withJSONObject: value).write(to: manifest)
                 try store.importCat(from: source, state: state)
             }
-            guard let cats = SettingsMenu.make(state: state).items[3].submenu else { return false }
-            return cats.items[4].title == "重复名称（demo-one）" &&
-                cats.items[5].title == "重复名称（demo-two）" &&
-                cats.items[4].state == .on && cats.items[5].state == .off
+            let cats = ImmediateSettingsActions(state: state).cats
+            return cats[4].title == "重复名称（demo-one）" &&
+                cats[5].title == "重复名称（demo-two）" &&
+                cats[4].selected && !cats[5].selected
         } catch { print("重名菜单测试失败：\(error)"); return false }
     }
 }

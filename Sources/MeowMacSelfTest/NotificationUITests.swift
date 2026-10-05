@@ -6,7 +6,7 @@ import TunCanaryCore
 import TunCanaryUI
 import UserNotifications
 
-/// D41 的存储、发送请求、点击路由、协调器和设置菜单。只用合成数据和临时目录。
+/// D41 的存储、发送请求、点击路由、协调器和设置栏目。只用合成数据和临时目录。
 @MainActor
 enum NotificationUITests {
     static let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -184,31 +184,35 @@ enum NotificationUITests {
             return network.count == 1 && network[0].sound && network[0].tab == .network
                 && network[0].body == "海外站点 [站点] 连续 3 轮探测失败" && network[0].subtitle == "网络故障"
         }),
-        ("UI.Notifications/设置子菜单与提醒回调", {
+        ("UI.Notifications/设置栏与提醒回调", {
             let state = PanelPreviewRenderer.syntheticState()
             var saved: NotificationSettings?, opened = false, prepared = 0
-            state.onSetNotificationSettings = { saved = $0 }
+            state.onSetNotificationSettings = { saved = $0; state.notificationSettings = $0 }
             state.onOpenNotificationSystemSettings = { opened = true }
             state.onPrepareNotificationMenu = { prepared += 1 }
             state.notificationsAuthorized = false
-            let settingsMenu = SettingsMenu.make(state: state)
-            guard let menu = settingsMenu.items.first(where: { $0.title == "系统通知" })?.submenu else { return false }
-            // 直接经 NSApplication 发送菜单动作；performActionForItem 在单独运行时不会触发。
-            func press(_ index: Int) { _ = menu.items[index].action.map { NSApplication.shared.sendAction($0, to: menu.items[index].target, from: menu.items[index]) } }
-            let titles = menu.items.map(\.title)
-            let expected = ["未授权，打开系统设置…", "", "发送系统通知", ""] + NotificationCategory.allCases.map(\.displayName)
-            guard titles == expected, menu.items[2].state == .on,
-                  menu.items.first(where: { $0.title == "数据源失效" })?.state == .off,
-                  menu.items.first(where: { $0.title == "网络故障" })?.state == .on else { return false }
-            press(0)
-            press(titles.firstIndex(of: "数据源失效")!)
+            let controller = SettingsWindowController(state: state)
+            controller.open(section: .notifications, load: false)
+            defer { controller.closeWithoutConfirmation() }
+            guard let window = controller.window else { return false }
+            SettingsControlTestSupport.settle(window)
+            @MainActor func toggle(_ id: String) -> NSSwitch? { SettingsControlTestSupport.element(window, id: id) as? NSSwitch }
+            guard let global = toggle("settings.notifications"), global.state == .on,
+                  let source = toggle("settings.notification.source"), source.state == .off,
+                  toggle("settings.notification.network")?.state == .on,
+                  state.notificationsAuthorized == false else { return false }
+            state.onOpenNotificationSystemSettings()
+            source.state = .on; _ = source.sendAction(source.action, to: source.target)
             guard opened, saved?.categories.contains(.source) == true, saved?.enabled == true else { return false }
-            press(2)
+            global.state = .off; _ = global.sendAction(global.action, to: global.target)
             guard saved?.enabled == false else { return false }
-            state.notificationSettings.enabled = false; state.notificationsAuthorized = true
-            let disabled = SettingsMenu.notificationMenu(state: state)
-            let categoryItems = disabled.items.filter { item in NotificationCategory.allCases.contains { $0.displayName == item.title } }
-            guard disabled.items.first?.title == "发送系统通知", categoryItems.count == 9, categoryItems.allSatisfy({ !$0.isEnabled }) else { return false }
+            state.notificationsAuthorized = true
+            SettingsControlTestSupport.settle(window)
+            let categories = NotificationCategory.allCases.compactMap { toggle("settings.notification." + $0.rawValue) }
+            guard state.notificationsAuthorized == true, categories.count == 9,
+                  categories.allSatisfy({ !$0.isEnabled }) else { return false }
+            controller.open(section: .general, load: false)
+            controller.open(section: .notifications, load: false)
             var refreshed: ReminderTracker?
             state.onRemindersRefreshed = { tracker, _ in refreshed = tracker }
             state.refreshReminders()
