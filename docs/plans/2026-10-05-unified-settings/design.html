@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>统一设置窗口</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --page: light-dark(#e9e9ee, #161618);
+    --surface: light-dark(#f7f7f9, #252527);
+    --sidebar: light-dark(#ececf0cc, #2c2c2fcc);
+    --field: light-dark(#fff, #202022);
+    --text: light-dark(#1d1d1f, #f2f2f7);
+    --muted: light-dark(#66666c, #aaaab0);
+    --rule: light-dark(#dcdce0, #434348);
+    --blue: light-dark(#0069df, #70b0ff);
+    --selected: light-dark(#dfe9fb, #2b405d);
+    --red: light-dark(#c9342b, #ff6b60);
+    --green: light-dark(#2f8a3e, #5fd078);
+    --orange: light-dark(#b85e00, #ffae4d);
+    --shadow: light-dark(#00000024, #00000066);
+  }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); padding: 24px 16px 48px;
+    font: 13px/1.5 -apple-system, "SF Pro Text", "PingFang SC", system-ui, sans-serif; }
+  button, select, input { font: inherit; color: inherit; }
+  .top { max-width: 1000px; margin: 0 auto 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
+  .top h1 { font-size: 17px; margin: 0; }
+  .top p { margin: 0; color: var(--muted); font-size: 12px; flex: 1 1 320px; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; background: var(--field); }
+  .seg button { border: 0; background: transparent; padding: 4px 12px; min-height: 28px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--rule); }
+  .seg button[aria-pressed="true"] { background: var(--selected); color: var(--blue); font-weight: 600; }
+  .row-wrap { max-width: 1000px; margin: auto; display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  /* 窗口 */
+  .win { position: relative; width: 760px; max-width: 100%; height: 620px; background: var(--surface); border: 1px solid var(--rule);
+    border-radius: 12px; box-shadow: 0 16px 36px var(--shadow); overflow: hidden; display: flex; }
+  .side { width: 190px; flex: none; background: var(--sidebar); border-right: 1px solid var(--rule); padding: 38px 10px 10px; backdrop-filter: blur(20px); }
+  .lights { position: absolute; top: 13px; left: 14px; display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+  .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+  .nav { display: flex; align-items: center; gap: 9px; width: 100%; border: 0; background: transparent; padding: 6px 9px; border-radius: 7px; cursor: pointer; text-align: left; }
+  .nav .ic { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: #fff; font-size: 12px; flex: none; }
+  .nav[aria-current="true"] { background: var(--selected); color: var(--blue); font-weight: 600; }
+  .nav .dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .head { padding: 14px 24px 10px; border-bottom: 1px solid var(--rule); }
+  .head h2 { margin: 0; font-size: 15px; }
+  .head p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+  .body { flex: 1; overflow: auto; padding: 14px 24px 16px; }
+  .foot { border-top: 1px solid var(--rule); padding: 10px 20px; display: flex; gap: 8px; align-items: center; }
+  .foot .st { flex: 1; color: var(--muted); font-size: 11px; }
+  .act { border: 1px solid var(--rule); border-radius: 6px; padding: 4px 14px; min-height: 28px; background: var(--field); cursor: pointer; }
+  .pri { background: var(--blue); color: light-dark(#fff, #071c35); border-color: var(--blue); }
+  .act:disabled { opacity: .4; cursor: default; }
+  h3 { margin: 16px 0 2px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  h3:first-child { margin-top: 0; }
+  h3 small { color: var(--muted); font-size: 11px; font-weight: 400; }
+  .list { border: 1px solid var(--rule); border-radius: 8px; background: var(--field); margin-top: 8px; }
+  .row { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; flex-wrap: wrap; }
+  .row + .row { border-top: 1px solid var(--rule); }
+  .row .n { flex: 1; min-width: 120px; }
+  .row .n small { display: block; color: var(--muted); font-size: 11px; }
+  .row select { border: 1px solid var(--rule); border-radius: 6px; background: var(--field); padding: 3px 6px; min-height: 26px; }
+  .note { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+  .tog { position: relative; width: 32px; height: 18px; border-radius: 9px; background: var(--rule); border: 0; cursor: pointer; flex: none; }
+  .tog::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .12s; }
+  .tog[aria-checked="true"] { background: var(--blue); }
+  .tog[aria-checked="true"]::after { left: 16px; }
+  .tog:disabled { opacity: .4; }
+  .link { border: 0; background: transparent; color: var(--blue); cursor: pointer; padding: 0 4px; font-size: 12px; }
+  .radio { width: 15px; height: 15px; accent-color: var(--blue); }
+  .banner { border: 1px solid var(--orange); color: var(--orange); border-radius: 8px; padding: 8px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sw { display: flex; gap: 6px; }
+  .sw i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; border: 1px solid var(--rule); }
+  .chip { font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--rule); color: var(--muted); }
+  .drag { color: var(--muted); cursor: grab; }
+  .icon { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; flex: none; }
+  /* 确认框 */
+  .sheet { position: absolute; inset: 0; background: #0003; display: none; align-items: flex-start; justify-content: center; padding-top: 70px; }
+  .sheet.on { display: flex; }
+  .sheet .box { width: 340px; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px; box-shadow: 0 12px 28px var(--shadow); }
+  .sheet .box p { margin: 0 0 4px; font-weight: 600; } .sheet .box small { color: var(--muted); }
+  .sheet .box .b { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+  /* 菜单 */
+  .menu { width: 240px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 12px 28px var(--shadow); padding: 5px; }
+  .menu div { padding: 4px 10px; border-radius: 5px; display: flex; justify-content: space-between; }
+  .menu div:hover { background: var(--blue); color: #fff; }
+  .menu hr { border: 0; border-top: 1px solid var(--rule); margin: 4px 8px; }
+  .cap { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+  .spec { max-width: 1000px; margin: 24px auto 0; color: var(--muted); font-size: 12px; }
+  .spec li { margin: 3px 0; }
+  @media (max-width: 800px) { .win { flex-direction: column; height: auto; } .side { width: 100%; padding-top: 34px; display: flex; flex-wrap: wrap; gap: 4px; } .nav { width: auto; } .body { max-height: 560px; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>统一设置窗口 · 设计稿</h1>
+  <p>一个“设置”窗口（⌘,），左侧六栏。全部为合成数据；HTML 只用来确认结构、分栏和文案，材质与尺寸以实机为准。</p>
+  <span class="seg" id="theme"><button type="button" data-t="auto" aria-pressed="true">跟随系统</button><button type="button" data-t="light">浅色</button><button type="button" data-t="dark">深色</button></span>
+</div>
+
+<div class="row-wrap">
+  <div>
+    <p class="cap">设置窗口：760 × 620 pt，可调高度，侧栏 190 pt。macOS 26 侧栏用系统玻璃，14～15 用普通侧栏材质。</p>
+    <section class="win" aria-label="设置窗口">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <nav class="side" id="side"></nav>
+      <div class="main">
+        <div class="head"><h2 id="title"></h2><p id="sub"></p></div>
+        <div class="body" id="body"></div>
+        <div class="foot" id="foot"></div>
+      </div>
+      <div class="sheet" id="sheet"><div class="box">
+        <p id="sheet-title">“外观”有未保存的修改</p>
+        <small>切换栏目前，要保存这些修改吗？</small>
+        <div class="b"><button class="act" data-s="keep">继续编辑</button><button class="act" data-s="discard">放弃修改</button><button class="act pri" data-s="save">保存</button></div>
+      </div></div>
+    </section>
+  </div>
+  <div>
+    <p class="cap">面板底部“设置”按钮弹出的精简菜单</p>
+    <div class="menu">
+      <div><span>设置…</span><span>⌘,</span></div>
+      <hr>
+      <div><span>打开配置文件…</span></div>
+      <div><span>在访达中显示配置目录</span></div>
+      <hr>
+      <div><span>关于 MeowMac</span></div>
+      <div><span>退出 MeowMac</span><span>⌘Q</span></div>
+    </div>
+  </div>
+</div>
+
+<ul class="spec">
+  <li>通用、猫、通知：开关和单选点了就生效，栏底不显示保存按钮，只显示“更改立即生效”。</li>
+  <li>外观、网络、额度源：栏底“取消 / 保存”，作用于整栏。外观栏一次保存样式和当前猫的布局。</li>
+  <li>有未保存的修改时，侧栏该项右侧显示橙点；切换栏目或关闭窗口先弹确认：保存 / 放弃修改 / 继续编辑。保存失败时留在原栏，不切换。</li>
+  <li>面板里原本打开某个设置的入口（例如额度页空状态的“额度源设置…”、网络页的设置入口）改为打开设置窗口并定位到对应栏。</li>
+  <li>窗口单例；再次打开时提到前面，停在上次的栏目。网络栏和额度源栏的内部内容与已验收版本一致，只换容器。</li>
+</ul>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  $('#theme').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#theme button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    if (b.dataset.t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = b.dataset.t;
+  });
+  const tog = (on, k, dis) => `<button type="button" class="tog" role="switch" aria-checked="${on}" data-k="${k}" ${dis ? 'disabled' : ''}></button>`;
+  const sections = [
+    { id: 'general', name: '通用', ic: '⚙︎', color: '#8e8e93', form: false, sub: '更改立即生效' },
+    { id: 'look', name: '外观', ic: '◐', color: '#5e5ce6', form: true, sub: '样式所有猫共用；布局与显示属于当前猫“年糕”' },
+    { id: 'cat', name: '猫', ic: '🐾', color: '#ff9f0a', form: false, sub: '选择后立即切换菜单栏的猫' },
+    { id: 'network', name: '网络', ic: '◎', color: '#30b0c7', form: true, sub: '检测引擎：TunCanary。保存后立即重新检测' },
+    { id: 'quota', name: '额度源', ic: '▤', color: '#34c759', form: true, sub: '数据来源：CodexBarCLI。启用状态与 CodexBar 共用' },
+    { id: 'notify', name: '通知', ic: '🔔', color: '#ff3b30', form: false, sub: '由 MeowMac 统一发送，更改立即生效' },
+  ];
+  const st = {
+    cur: 'general', pending: null,
+    login: false, terminal: 'auto',
+    cat: 'nian', notify: { on: true, auth: false, cats: { '网络故障': true, '出口 IP': true, '额度不足': true, '额度偏快': true, '磁盘不足': true, '进程 CPU 持续偏高': true, '内存压力持续偏高': true, '系统已降频': true, '数据源失效': false } },
+    dirty: { look: false, network: false, quota: false }, look: { basis: 'remaining', range: '60' }, net: 'sites',
+  };
+  const saved = structuredClone(st.look);
+  function side() {
+    $('#side').innerHTML = sections.map(s => `<button type="button" class="nav" data-nav="${s.id}" aria-current="${s.id === st.cur}">
+      <span class="ic" style="background:${s.color}">${s.ic}</span>${s.name}${st.dirty[s.id] ? '<span class="dot" title="有未保存的修改"></span>' : ''}</button>`).join('');
+  }
+  const views = {
+    general: () => `
+      <h3>启动</h3>
+      <div class="list"><div class="row"><span class="n">登录时启动 MeowMac</span>${tog(st.login, 'login')}</div></div>
+      <h3>清理<small>点面板底部“清理”时打开的终端</small></h3>
+      <div class="list"><div class="row"><span class="n">清理终端</span>
+        <select data-f="terminal"><option value="auto">自动（当前：Ghostty）</option><option>Ghostty</option><option>iTerm2</option><option>系统终端</option></select></div></div>
+      <h3>数据</h3>
+      <div class="list">
+        <div class="row"><span class="n">导入 CodexBar 历史<small>一次性导入 CodexBar 已有的额度历史</small></span><button class="act">导入…</button></div>
+        <div class="row"><span class="n">配置文件<small>阈值等未在界面中提供的配置</small></span><button class="link">打开配置文件…</button><button class="link">在访达中显示</button></div>
+      </div>`,
+    look: () => `
+      <h3>样式<small>所有猫共用</small></h3>
+      <div class="list">
+        <div class="row"><span class="n">额度数字显示</span><span class="seg" data-g="basis"><button data-v="remaining" aria-pressed="${st.look.basis === 'remaining'}">剩余</button><button data-v="used" aria-pressed="${st.look.basis === 'used'}">已用</button></span></div>
+        <div class="row"><span class="n">账号邮箱</span><span class="seg"><button aria-pressed="true">完整</button><button>部分遮罩</button><button>隐藏</button></span></div>
+        <div class="row"><span class="n">系统趋势默认范围</span><span class="seg" data-g="range"><button data-v="15" aria-pressed="${st.look.range === '15'}">15 分钟</button><button data-v="60" aria-pressed="${st.look.range === '60'}">1 小时</button></span></div>
+        <div class="row"><span class="n">渠道颜色</span><span class="sw"><i style="background:#D97757"></i><i style="background:#1d1d1f"></i><i style="background:#4D6BFE"></i><i style="background:#8e8e93"></i></span><button class="link">逐个调整…</button></div>
+      </div>
+      <h3>布局与显示<small>当前猫：年糕 · 随猫包保存</small></h3>
+      <div class="list">
+        <div class="row"><span class="n">标签页顺序<small>拖动排序 · ⌥← / →</small></span><span class="chip">系统</span><span class="chip">额度</span><span class="chip">网络</span></div>
+        <div class="row"><span class="n">总览条<small>至少显示一格</small></span><span class="chip">CPU</span><span class="chip">内存</span><span class="chip">额度：Claude 5 小时</span><span class="chip">网络</span></div>
+        <div class="row"><span class="n">系统页功能</span><span class="drag">≡</span> 趋势 ${tog(true, 'x1')} <span class="drag">≡</span> 能耗 ${tog(true, 'x2')} <span class="drag">≡</span> 磁盘 ${tog(true, 'x3')}</div>
+        <div class="row"><span class="n">额度页功能</span><span class="drag">≡</span> 用量趋势 ${tog(true, 'x4')} <span class="drag">≡</span> 花费 ${tog(true, 'x5')} <span class="drag">≡</span> 本地存储 ${tog(false, 'x6')}</div>
+      </div>
+      <p class="note">布局区内容同现有“布局与显示”窗口，只换容器。“恢复默认”分别作用于样式和布局。</p>`,
+    cat: () => `
+      <h3>菜单栏的猫</h3>
+      <div class="list">${[['nian', '年糕', '导入 · 当前'], ['slim', '标准瘦身', '内置'], ['round', '圆润', '内置'], ['american', '圆润美短', '内置'], ['ow', '瘦身橘白', '内置']].map(([id, name, kind]) =>
+        `<label class="row"><input type="radio" class="radio" name="cat" data-cat="${id}" ${st.cat === id ? 'checked' : ''}><span class="n">${name}<small>${kind}</small></span><span style="font-size:18px">🐈</span></label>`).join('')}</div>
+      <div class="row" style="padding:10px 0 0"><button class="act">导入猫配置…</button><button class="link">在访达中显示猫配置</button></div>
+      <p class="note">猫包里的布局在“外观 → 布局与显示”中调整。</p>`,
+    network: () => `
+      <div style="text-align:center;margin-bottom:12px"><span class="seg" id="net">${[['sites', '站点'], ['egress', '出口 IP'], ['proxy', '代理与 DNS'], ['freq', '检测频率']].map(([k, v]) => `<button data-net="${k}" aria-pressed="${st.net === k}">${v}</button>`).join('')}</span></div>
+      <h3>公开站点<small>连续三轮失败提示需关注</small></h3>
+      <div class="list">
+        <div class="row">${tog(true, 'n1')}<span class="n">示例搜索<small>https://search.example.com/ · 常用</small></span><button class="link" data-dirty="network">编辑</button></div>
+        <div class="row">${tog(true, 'n2')}<span class="n">示例代码托管<small>https://code.example.org/ · 开发</small></span><button class="link" data-dirty="network">编辑</button></div>
+      </div>
+      <p class="note">四个分页的内容与已验收的“网络设置”窗口相同，只换容器。</p>`,
+    quota: () => `
+      <h3>渠道</h3>
+      <div class="list">${[['C', 'Claude', '#D97757', '使用本机登录 · 最近采集成功 21:40'], ['C', 'Codex', '#1d1d1f', '使用本机登录 · 最近采集成功 21:40'], ['D', 'DeepSeek', '#4D6BFE', '余额 ¥88.00 · token 已配置'], ['O', 'OpenCode Go', '#8e8e93', 'API key 已配置 · 最近采集成功 21:40']].map(([i, n, c, d]) =>
+        `<div class="row"><span class="icon" style="background:${c}">${i}</span><span class="n">${n}<small>${d}</small></span>${tog(true, 'q' + n)}<button class="link">测试</button><button class="link" data-dirty="quota">移除</button></div>`).join('')}</div>
+      <div class="row" style="padding:10px 0 0"><button class="link">＋ 添加渠道…</button></div>
+      <p class="note">内容与已验收的“额度源设置”窗口相同，只换容器。</p>`,
+    notify: () => `
+      ${st.notify.auth ? '' : '<div class="banner">系统通知未授权，MeowMac 发不出通知。<button class="link" data-auth>打开系统设置…</button></div>'}
+      <h3>系统通知</h3>
+      <div class="list"><div class="row"><span class="n">发送系统通知<small>提醒被确认出现时发送；同一问题持续期间只发一次</small></span>${tog(st.notify.on, 'notify')}</div></div>
+      <h3>类别<small>降温提示只保留标记，不通知</small></h3>
+      <div class="list">${Object.entries(st.notify.cats).map(([k, v]) => `<div class="row"><span class="n">${k}</span>${tog(v, 'cat:' + k, !st.notify.on)}</div>`).join('')}</div>`,
+  };
+  function render() {
+    const s = sections.find(x => x.id === st.cur);
+    side(); $('#title').textContent = s.name; $('#sub').textContent = s.sub; $('#body').innerHTML = views[s.id]();
+    if (s.id === 'general') $('#body').querySelector('[data-f=terminal]').value = st.terminal;
+    $('#foot').innerHTML = s.form
+      ? `<span class="st">${st.dirty[s.id] ? '有未保存的修改' : '尚未修改'}</span>${s.id === 'look' ? '<button class="act" data-a="reset">恢复默认…</button>' : ''}<button class="act" data-a="cancel" ${st.dirty[s.id] ? '' : 'disabled'}>取消</button><button class="act pri" data-a="save" ${st.dirty[s.id] ? '' : 'disabled'}>保存</button>`
+      : `<span class="st">更改立即生效</span>`;
+  }
+  function go(id) {
+    const cur = sections.find(x => x.id === st.cur);
+    if (cur.form && st.dirty[cur.id] && id !== cur.id) { st.pending = id; $('#sheet-title').textContent = `“${cur.name}”有未保存的修改`; $('#sheet').classList.add('on'); return; }
+    st.cur = id; render();
+  }
+  document.querySelector('.win').addEventListener('click', e => {
+    const b = e.target.closest('button, input'); if (!b) return;
+    if (b.dataset.nav) return go(b.dataset.nav);
+    if (b.dataset.s) {
+      $('#sheet').classList.remove('on');
+      if (b.dataset.s === 'keep') { st.pending = null; return; }
+      if (b.dataset.s === 'discard' && st.cur === 'look') st.look = structuredClone(saved);
+      st.dirty[st.cur] = false; st.cur = st.pending; st.pending = null; return render();
+    }
+    if (b.dataset.k) {
+      const k = b.dataset.k;
+      if (k === 'login') st.login = !st.login;
+      else if (k === 'notify') st.notify.on = !st.notify.on;
+      else if (k.startsWith('cat:')) st.notify.cats[k.slice(4)] = !st.notify.cats[k.slice(4)];
+      else { b.setAttribute('aria-checked', String(b.getAttribute('aria-checked') !== 'true')); const sec = sections.find(x => x.id === st.cur); if (sec.form) { st.dirty[st.cur] = true; } }
+      return render();
+    }
+    if (b.dataset.cat) { st.cat = b.dataset.cat; return; }
+    if (b.dataset.auth !== undefined) { st.notify.auth = true; return render(); }
+    if (b.dataset.net) { st.net = b.dataset.net; return render(); }
+    if (b.dataset.dirty) { st.dirty[b.dataset.dirty] = true; return render(); }
+    if (b.closest('[data-g]')) { st.look[b.closest('[data-g]').dataset.g] = b.dataset.v; st.dirty.look = JSON.stringify(st.look) !== JSON.stringify(saved); return render(); }
+    if (b.dataset.a === 'cancel') { if (st.cur === 'look') st.look = structuredClone(saved); st.dirty[st.cur] = false; return render(); }
+    if (b.dataset.a === 'save') { if (st.cur === 'look') Object.assign(saved, st.look); st.dirty[st.cur] = false; render(); $('#foot .st').textContent = '已保存'; return; }
+  });
+  document.querySelector('.win').addEventListener('change', e => { if (e.target.dataset.f === 'terminal') st.terminal = e.target.value; });
+  render();
+})();
+</script>
+</body>
+</html>
