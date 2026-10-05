@@ -186,6 +186,41 @@ enum QuotaSourceSettingsTests {
             return true
         } catch { print("临时 CodexBar 配置集成失败：\(error)"); return false }
     }
+    /// 用户反馈：移除 DeepSeek 并保存后，“添加渠道…”点不动；列表里还有已添加的渠道；不能搜索。
+    static func addAfterRemoveAndSearch() async -> Bool {
+        do {
+            let data = try JSONSerialization.data(withJSONObject: all.map { ["provider": $0.id, "displayName": $0.displayName, "enabled": true] as [String: Any] })
+            let (state, coordinator, _) = try prepare { _, args, _, _ in
+                if args.contains("providers") { return CLIOutput(stdout: data) }
+                if args.contains("dump") { return CLIOutput(stdout: Data(#"{"providers":[]}"#.utf8)) }
+                return output(args)
+            }
+            defer { try? FileManager.default.removeItem(at: root) }
+            let controller = QuotaSourceSettingsController(state: state, coordinator: coordinator)
+            controller.present(load: false)
+            guard let window = controller.window, let model = controller.model else { return false }
+            defer { window.close() }
+            await model.load()
+            let added = Set(model.draft.map(\.provider))
+            guard !model.available.contains(where: { added.contains($0.provider) }) else { print("可添加列表含已添加渠道"); return false }
+            model.remove(.deepseek); await model.save(); _ = await wait(coordinator)
+            SettingsControlTestSupport.settle(window)
+            // SwiftUI 按钮不在测试进程的辅助功能树里，窗口内点击由用户实机确认；这里断言按钮依赖的状态。
+            guard !model.busy, !model.isDirty, !state.quotaProviders.contains(.deepseek),
+                  model.available.contains(where: { $0.provider == .deepseek }) else { print("保存后 DeepSeek 未回到可添加列表"); return false }
+            model.add(.deepseek)
+            guard model.draft.contains(where: { $0.provider == .deepseek }), !model.available.contains(where: { $0.provider == .deepseek }) else { print("再次添加 DeepSeek 失败或仍可重复添加"); return false }
+            model.add(.deepseek)
+            guard model.draft.filter({ $0.provider == .deepseek }).count == 1 else { print("同一渠道被添加两次"); return false }
+            // DeepSeek 已在草稿里，搜 deep 只剩其他同名前缀的渠道。
+            guard !model.available(matching: "deep").isEmpty, !model.available(matching: "deep").contains(where: { $0.provider == .deepseek }),
+                  model.available(matching: "OPENR").map(\.provider) == [QuotaSourceTests.router],
+                  model.available(matching: "  ").count == model.available.count,
+                  model.available(matching: "不存在的渠道").isEmpty else { print("搜索结果不符"); return false }
+            model.cancel()
+            return true
+        } catch { print("添加渠道回归测试失败：\(error)"); return false }
+    }
     static func controlsAndPreviews() async -> Bool {
         do {
             let data = try JSONSerialization.data(withJSONObject: all.map { ["provider": $0.id, "displayName": $0.displayName, "enabled": true] as [String: Any] })

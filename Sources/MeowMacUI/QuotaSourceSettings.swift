@@ -41,6 +41,13 @@ public final class QuotaSourceSettingsModel: ObservableObject {
         if let reason = state.quotaSourceRecoveryReason { status = reason }
     }
     public var available: [QuotaCatalogEntry] { catalog.filter { entry in !draft.contains { $0.provider == entry.provider } } }
+    /// 按名称或 id 搜索可添加的渠道，忽略大小写；空关键词返回全部。
+    public func available(matching query: String) -> [QuotaCatalogEntry] {
+        let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let list = available.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+        guard !keyword.isEmpty else { return list }
+        return list.filter { $0.displayName.localizedCaseInsensitiveContains(keyword) || $0.provider.rawValue.localizedCaseInsensitiveContains(keyword) }
+    }
     public var isDirty: Bool { draft != saved || !keys.isEmpty || !failedKeys.isEmpty }
     public func rowDirty(_ provider: QuotaProvider) -> Bool {
         draft.first { $0.provider == provider } != saved.first { $0.provider == provider } || keys[provider] != nil || failedKeys.contains(provider)
@@ -225,6 +232,32 @@ public final class QuotaSourceSettingsController: NSObject, NSWindowDelegate {
 struct QuotaSourceSettingsView: View {
     @ObservedObject var model: QuotaSourceSettingsModel
     @ObservedObject var state: PanelState
+    @State private var adding = false
+    @State private var query = ""
+    private var addPicker: some View {
+        let matches = model.available(matching: query)
+        return VStack(alignment: .leading, spacing: 8) {
+            TextField("搜索渠道", text: $query).textFieldStyle(.roundedBorder).accessibilityIdentifier("quota-source.add.search")
+            if matches.isEmpty {
+                Text(model.available.isEmpty ? "CodexBarCLI 支持的渠道都已添加" : "没有匹配的渠道").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 60)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(matches) { entry in
+                            Button { model.add(entry.provider); adding = false } label: {
+                                HStack(spacing: 8) {
+                                    ProviderLogo(provider: entry.provider)
+                                    Text(entry.displayName)
+                                    Spacer()
+                                    Text(QuotaCatalog.entry(entry.provider)?.supportsAPIKey == true ? "API key" : "本机登录").font(.caption).foregroundStyle(.secondary)
+                                }.contentShape(Rectangle()).padding(.vertical, 5)
+                            }.buttonStyle(.plain).accessibilityIdentifier("quota-source.add." + entry.id)
+                        }
+                    }
+                }.frame(maxHeight: 280)
+            }
+        }.padding(12).frame(width: 300)
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack { Text("渠道").fontWeight(.semibold); Spacer(); Text("启用状态与 CodexBar 共用").font(.caption).foregroundStyle(.secondary) }.padding(.horizontal, 24).padding(.top, 18)
@@ -238,9 +271,10 @@ struct QuotaSourceSettingsView: View {
                         }
                     }.background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor)))
-                    Menu("＋ 添加渠道…") {
-                        ForEach(model.available) { entry in Button(entry.displayName) { model.add(entry.provider) } }
-                    }.menuStyle(.borderlessButton).fixedSize().disabled(model.busy || model.available.isEmpty).accessibilityIdentifier("quota-source.add")
+                    // 不用 SwiftUI Menu：它在保存、移除后不刷新禁用状态和菜单项。
+                    Button("＋ 添加渠道…") { query = ""; adding = true }
+                        .buttonStyle(.link).disabled(model.busy || model.available.isEmpty).accessibilityIdentifier("quota-source.add")
+                        .popover(isPresented: $adding, arrowEdge: .bottom) { addPicker }
                     Text("数据来源：CodexBarCLI 0.70.0。API key 只写进 CodexBar 配置，MeowMac 不保存、不显示、不记日志。其他渠道复用本机的 OAuth、浏览器 cookie 或 CLI 登录，由 CodexBarCLI 采集时读取。").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }.padding(24)
             }.onChange(of: model.editingKeys) { keys in
