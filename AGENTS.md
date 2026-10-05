@@ -67,7 +67,7 @@ scripts/install.sh    # 安装到 ~/Applications/MeowMac.app 并启动
 
 - 执行真正的清理，例如不带 `--dry-run` 的 `mo clean`。
 - 结束任何进程。唯一的例外：`scripts/install.sh` 可以让正在运行的 MeowMac 自己正常退出，例如 `osascript -e 'quit app id "io.github.eastcn.meowmac"'`，不能用 `kill`。
-- 启动或修改 CodexBar.app 及其配置。只调用 `/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI`。
+- 启动或修改 CodexBar.app 及其配置。只调用 `/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI`。例外（2026-10-05 用户批准）：应用的“额度源设置”可以在用户点保存后，通过 CodexBarCLI 的 `config enable`、`config disable` 和 `config set-api-key --stdin` 写 CodexBar 配置。开发和测试只能用 `CODEXBAR_CONFIG` 指向 `build/` 下的临时配置文件，不能写真实配置；真实配置的写入只由用户在实机验收时操作。
 - 调试时 Claude 额度的实时调用每 5 分钟最多 1 次，避免触发频率限制。
 - 开启开机启动，或者退出、修改用户正在运行的 TunCanary。
 - 推送到远程仓库。推送需要用户在对话里明确同意。
