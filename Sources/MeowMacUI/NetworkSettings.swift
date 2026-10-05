@@ -101,7 +101,8 @@ public final class NetworkSettingsController: NSObject, NSWindowDelegate {
     }
     public func windowWillClose(_ notification: Notification) {
         model.network.settingsDraft = SettingsDraft(settings: model.network.settings)
-        model.network.route = .main; window = nil
+        model.network.route = .main
+        window?.delegate = nil; window = nil
     }
 }
 

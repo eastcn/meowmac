@@ -111,14 +111,8 @@ enum NetworkSettingsTests {
     }
     static func click(_ window: NSWindow, id: String) -> Bool {
         SettingsControlTestSupport.settle(window)
-        guard let node = SettingsControlTestSupport.element(window, id: id) else { return false }
-        let frame = node.accessibilityFrame()
-        let point = window.convertPoint(fromScreen: NSPoint(x: frame.midX, y: frame.midY))
-        guard let down = NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1),
-              let up = NSEvent.mouseEvent(with: .leftMouseUp, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil, eventNumber: 2, clickCount: 1, pressure: 0) else { return false }
-        // NSButton 的按下事件同步等待释放；先把释放放进本进程事件队列。
-        NSApp.postEvent(up, atStart: true)
-        window.sendEvent(down)
+        guard let button = SettingsControlTestSupport.element(window, id: id) as? NSButton else { return false }
+        guard button.sendAction(button.action, to: button.target) else { return false }
         SettingsControlTestSupport.settle(window)
         return true
     }
