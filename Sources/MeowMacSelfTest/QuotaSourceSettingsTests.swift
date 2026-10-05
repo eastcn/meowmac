@@ -1,0 +1,194 @@
+import AppKit
+import Foundation
+import MeowMacCore
+import MeowMacQuota
+import MeowMacUI
+
+@MainActor
+enum QuotaSourceSettingsTests {
+    static let root = URL(fileURLWithPath: "build/acceptance/config-entries/settings-tests")
+    static let environment = ["CODEXBAR_CONFIG": root.appendingPathComponent("cli.json").path]
+    static let all = QuotaCatalog.usageNames.keys.sorted().compactMap { QuotaCatalog.entry(QuotaProvider(rawValue: $0)!) }
+    static func prepare(executor: @escaping CodexBarClient.Executor) throws -> (PanelState, QuotaCoordinator, QuotaSourceSettingsModel) {
+        if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
+        let state = PanelPreviewRenderer.syntheticState()
+        let client = CodexBarClient(path: "/synthetic/cli", environment: environment, executor: executor)
+        let coordinator = QuotaCoordinator(state: state, config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: client, sourceStore: QuotaSourceStore(root: root))
+        return (state, coordinator, QuotaSourceSettingsModel(state: state, coordinator: coordinator, catalog: all))
+    }
+    nonisolated static func output(_ args: [String]) -> CLIOutput {
+        if args.first == "cost" { return CLIOutput(stdout: Data(#"[{"daily":[]}]"#.utf8)) }
+        let name = args.count > 2 ? args[2] : "openrouter"
+        let provider = QuotaCatalog.provider(forUsageName: name) ?? QuotaSourceTests.router
+        return CLIOutput(stdout: QuotaSourceTests.fixture(provider))
+    }
+    static func wait(_ coordinator: QuotaCoordinator) async -> Bool {
+        for _ in 0..<100 where coordinator.isRefreshing { try? await Task.sleep(nanoseconds: 10_000_000) }
+        return !coordinator.isRefreshing
+    }
+    static func commands() async -> Bool {
+        do {
+            var calls: [([String], Data?)] = []; var leaks = 0
+            let secret = UUID().uuidString
+            let (state, coordinator, model) = try prepare { _, args, env, input in
+                guard env["CODEXBAR_CONFIG"]?.contains("/meowmac/build/") == true else { throw QuotaSourceError.invalid }
+                calls.append((args, input)); return output(args)
+            }
+            defer { model.close(); try? FileManager.default.removeItem(at: root) }
+            let provider = QuotaSourceTests.router
+            model.add(provider); model.setKey(secret, provider: provider)
+            guard model.rowDirty(provider), !model.canTest(provider) else { return false }
+            model.setEnabled(false, provider: .codex)
+            await model.save()
+            _ = await wait(coordinator)
+            let writes = calls.filter { $0.0.first == "config" }.map(\.0)
+            guard writes == [["config", "disable", "--provider", "codex", "--json"],
+                             ["config", "set-api-key", "--provider", "openrouter", "--stdin", "--no-enable", "--json"],
+                             ["config", "enable", "--provider", "openrouter", "--json"]],
+                  calls.first(where: { $0.0.contains("set-api-key") })?.1 == Data((secret + "\n").utf8),
+                  !calls.flatMap(\.0).contains(where: { $0.contains(secret) }), model.key(provider).isEmpty,
+                  state.quotaProviders.contains(provider), model.canTest(provider) else { return false }
+            let rawClient = CodexBarClient(path: "/synthetic/cli", environment: environment, executor: { _, _, _, _ in CLIOutput(stdout: Data(secret.utf8), stderr: Data(secret.utf8)) }, rawOutput: { _, _, _ in leaks += 1 })
+            try rawClient.setAPIKey(secret, provider: provider)
+            let before = calls.count
+            model.remove(provider); await model.save()
+            guard calls.count == before, !state.quotaProviders.contains(provider), leaks == 0 else { return false }
+            return true
+        } catch { print("额度设置命令测试失败：\(error)"); return false }
+    }
+    static func partialFailure() async -> Bool {
+        do {
+            let (_, coordinator, model) = try prepare { _, args, _, _ in
+                if args.contains("openrouter"), args.first == "config" { return CLIOutput(status: 1) }
+                return output(args)
+            }
+            defer { model.close(); try? FileManager.default.removeItem(at: root) }
+            model.add(QuotaSourceTests.router)
+            model.setEnabled(false, provider: .codex)
+            await model.save()
+            guard model.saved.first(where: { $0.provider == .codex })?.enabled == false,
+                  model.saved.allSatisfy({ $0.provider != QuotaSourceTests.router }),
+                  model.draft.contains(where: { $0.provider == QuotaSourceTests.router }),
+                  model.errors[QuotaSourceTests.router] != nil, model.isDirty,
+                  coordinator.sourceEnabled[.codex] == false else { return false }
+            return true
+        } catch { return false }
+    }
+    static func throttles(_ mode: Int) async -> Bool {
+        do {
+            var now = Date(timeIntervalSince1970: 1_000_000), claudeCalls = 0
+            let (state, coordinator, model) = try prepare { _, args, _, _ in
+                if args.first == "usage", args.contains("claude") { claudeCalls += 1 }
+                return output(args)
+            }
+            state.now = { now }
+            defer { model.close(); try? FileManager.default.removeItem(at: root) }
+            if mode == 0 {
+                coordinator.requestRefresh([.claude]); guard await wait(coordinator), claudeCalls == 1 else { return false }
+                now = now.addingTimeInterval(60); model.test(.claude)
+                return claudeCalls == 1 && model.testing[.claude]?.contains("240 秒") == true
+            }
+            if mode == 1 {
+                model.setEnabled(false, provider: .claude); await model.save()
+                guard await wait(coordinator), claudeCalls == 1 else { return false }
+                model.test(.claude)
+                return claudeCalls == 1 && model.testing[.claude]?.contains("300 秒") == true
+            }
+            model.test(.claude); guard await wait(coordinator), claudeCalls == 1 else { return false }
+            now = now.addingTimeInterval(120)
+            model.setEnabled(false, provider: .claude); await model.save()
+            guard claudeCalls == 1, model.statusText.contains("180 秒") else { return false }
+            now = now.addingTimeInterval(180); coordinator.drain()
+            return await wait(coordinator) && claudeCalls == 2
+        } catch { print("Claude 限频测试失败：\(error)"); return false }
+    }
+    static func credentials() async -> Bool {
+        do {
+            let (state, _, model) = try prepare { _, args, _, _ in
+                if args.contains("providers") {
+                    return CLIOutput(stdout: Data(#"[{"provider":"opencodego","displayName":"OpenCode Go","enabled":true},{"provider":"openrouter","displayName":"OpenRouter","enabled":true}]"#.utf8))
+                }
+                return CLIOutput(stdout: Data(#"{"providers":[{"id":"opencodego","apiKey":"[REDACTED]"},{"id":"openrouter"}]}"#.utf8))
+            }
+            defer { model.close(); try? FileManager.default.removeItem(at: root) }
+            await model.load()
+            guard model.credentialText(.opencodego) == "已配置" else { return false }
+            state.quotaAttempts[.opencodego] = QuotaAttempt(at: state.now(), success: true, message: "成功")
+            guard model.collectionText(.opencodego).contains("采集成功") else { return false }
+            state.quotaAttempts[.opencodego] = QuotaAttempt(at: state.now(), success: false, message: "合成失败")
+            guard model.collectionText(.opencodego).contains("采集失败"), model.credentialText(.opencodego) == "已配置",
+                  model.credentialText(QuotaSourceTests.router) == "未配置",
+                  model.collectionText(QuotaSourceTests.router) == "尚未采集",
+                  model.credentialText(.claude) == "登录凭据由 CodexBar 管理", !model.canEditKey(.claude) else { return false }
+            return true
+        } catch { return false }
+    }
+    static func liveConfig() async -> Bool {
+        let directory = URL(fileURLWithPath: "build/acceptance/config-entries/live-config-" + UUID().uuidString)
+        let file = directory.appendingPathComponent("cli.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let client = CodexBarClient(path: "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI", environment: ["CODEXBAR_CONFIG": file.path])
+            let store = QuotaSourceStore(root: directory)
+            let provider = QuotaSourceTests.router
+            // 假 key 在内存中生成，只让 CLI 写入此临时配置；不打印、不提交。
+            try client.setAPIKey(UUID().uuidString, provider: provider)
+            try client.setEnabled(true, provider: provider)
+            try store.save(QuotaSourceList(providers: [provider]))
+            guard try client.providers().first(where: { $0.provider == provider })?.enabled == true,
+                  try client.configStatus()[provider] == true else { return false }
+            try client.setEnabled(false, provider: provider)
+            try store.save(QuotaSourceList(providers: []))
+            guard try client.providers().first(where: { $0.provider == provider })?.enabled == false,
+                  try client.configStatus()[provider] == true, store.load().list.providers.isEmpty else { return false }
+            return true
+        } catch { print("临时 CodexBar 配置集成失败：\(error)"); return false }
+    }
+    static func controlsAndPreviews() async -> Bool {
+        do {
+            let data = try JSONSerialization.data(withJSONObject: all.map { ["provider": $0.id, "displayName": $0.displayName, "enabled": true] as [String: Any] })
+            let (state, coordinator, _) = try prepare { _, args, _, _ in
+                if args.contains("providers") { return CLIOutput(stdout: data) }
+                if args.contains("dump") { return CLIOutput(stdout: Data(#"{"providers":[]}"#.utf8)) }
+                if args.contains("openrouter"), args.first == "config" { return CLIOutput(status: 1) }
+                return output(args)
+            }
+            defer { try? FileManager.default.removeItem(at: root) }
+            let controller = QuotaSourceSettingsController(state: state, coordinator: coordinator)
+            controller.present(load: false)
+            guard let window = controller.window, let model = controller.model else { return false }
+            defer { window.close() }
+            await model.load()
+            controller.present(load: false)
+            guard controller.window === window else { return false }
+            func capture(_ name: String) throws {
+                guard let path = ProcessInfo.processInfo.environment["MEOWMAC_CONFIG_RENDER_DIR"] else { return }
+                let directory = URL(fileURLWithPath: path)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                for dark in [false, true] {
+                    window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                    SettingsControlTestSupport.settle(window)
+                    // 原生普通背景，缓存图走实际 NSWindow 的内容与布局。
+                    guard let view = window.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw CocoaError(.fileWriteUnknown) }
+                    view.cacheDisplay(in: view.bounds, to: rep)
+                    try rep.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent(name + (dark ? "-dark.png" : "-light.png")))
+                }
+            }
+            try capture("quota-settings-default")
+            model.add(QuotaSourceTests.router); model.editingKeys.insert(QuotaSourceTests.router)
+            SettingsControlTestSupport.settle(window)
+            guard let field = SettingsControlTestSupport.element(window, id: "quota-source.key.openrouter") as? NSSecureTextField else { return false }
+            let secret = UUID().uuidString
+            field.stringValue = secret
+            field.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: field))
+            guard model.key(QuotaSourceTests.router) == secret, !model.canTest(QuotaSourceTests.router) else { return false }
+            try capture("quota-settings-key")
+            await model.save(); SettingsControlTestSupport.settle(window)
+            guard model.errors[QuotaSourceTests.router] != nil, model.key(QuotaSourceTests.router).isEmpty, field.stringValue.isEmpty else { return false }
+            try capture("quota-settings-error")
+            model.cancel()
+            return controller.window == nil && state.quotaProviders == [.claude, .codex, .deepseek, .opencodego]
+        } catch { print("额度设置真实控件失败：\(error)"); return false }
+    }
+}

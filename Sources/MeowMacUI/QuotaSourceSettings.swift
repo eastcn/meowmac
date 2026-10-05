@@ -1,0 +1,283 @@
+import AppKit
+import Combine
+import Foundation
+import SwiftUI
+import MeowMacCore
+import MeowMacQuota
+import os
+
+public struct QuotaSourceDraft: Equatable, Identifiable {
+    public let provider: QuotaProvider
+    public var enabled: Bool
+    public var id: String { provider.rawValue }
+    public init(provider: QuotaProvider, enabled: Bool) { self.provider = provider; self.enabled = enabled }
+}
+
+@MainActor
+public final class QuotaSourceSettingsModel: ObservableObject {
+    @Published public private(set) var saved: [QuotaSourceDraft]
+    @Published public private(set) var draft: [QuotaSourceDraft]
+    @Published public private(set) var catalog: [QuotaCatalogEntry]
+    @Published public private(set) var credentials: [QuotaProvider: Bool] = [:]
+    @Published public private(set) var errors: [QuotaProvider: String] = [:]
+    @Published public private(set) var testing: [QuotaProvider: String] = [:]
+    @Published public var editingKeys = Set<QuotaProvider>()
+    @Published private var keys: [QuotaProvider: String] = [:]
+    @Published private var failedKeys = Set<QuotaProvider>()
+    @Published public private(set) var busy = false
+    @Published public private(set) var status = "尚未修改"
+    public var onClose: () -> Void = {}
+    private let state: PanelState
+    private let coordinator: QuotaCoordinator
+    private var refreshSince: Date?
+    private var refreshedProviders: [QuotaProvider] = []
+    private var unsupportedKeys = Set<QuotaProvider>()
+    private let logger = Logger(subsystem: AppIdentity.bundleID, category: "quota-source-settings")
+
+    public init(state: PanelState, coordinator: QuotaCoordinator, catalog: [QuotaCatalogEntry] = []) {
+        self.state = state; self.coordinator = coordinator; self.catalog = catalog
+        let initial = state.quotaProviders.map { QuotaSourceDraft(provider: $0, enabled: coordinator.sourceEnabled[$0] ?? true) }
+        saved = initial; draft = initial
+        if let reason = state.quotaSourceRecoveryReason { status = reason }
+    }
+    public var available: [QuotaCatalogEntry] { catalog.filter { entry in !draft.contains { $0.provider == entry.provider } } }
+    public var isDirty: Bool { draft != saved || !keys.isEmpty || !failedKeys.isEmpty }
+    public func rowDirty(_ provider: QuotaProvider) -> Bool {
+        draft.first { $0.provider == provider } != saved.first { $0.provider == provider } || keys[provider] != nil || failedKeys.contains(provider)
+    }
+    public func canTest(_ provider: QuotaProvider) -> Bool { !busy && !rowDirty(provider) && saved.contains { $0.provider == provider } }
+    public func entry(_ provider: QuotaProvider) -> QuotaCatalogEntry? { catalog.first { $0.provider == provider } ?? QuotaCatalog.entry(provider) }
+    public func canEditKey(_ provider: QuotaProvider) -> Bool { entry(provider)?.supportsAPIKey == true && !unsupportedKeys.contains(provider) }
+    public func key(_ provider: QuotaProvider) -> String { keys[provider] ?? "" }
+    public func setKey(_ value: String, provider: QuotaProvider) {
+        guard canEditKey(provider), !busy else { return }
+        if value.isEmpty { keys.removeValue(forKey: provider) } else { keys[provider] = value }
+        failedKeys.remove(provider)
+    }
+    public func add(_ provider: QuotaProvider) {
+        guard !busy, available.contains(where: { $0.provider == provider }) else { return }
+        draft.append(QuotaSourceDraft(provider: provider, enabled: true))
+    }
+    public func remove(_ provider: QuotaProvider) {
+        guard !busy else { return }
+        draft.removeAll { $0.provider == provider }; keys.removeValue(forKey: provider)
+        failedKeys.remove(provider); editingKeys.remove(provider); errors.removeValue(forKey: provider)
+    }
+    public func setEnabled(_ value: Bool, provider: QuotaProvider) {
+        guard !busy, let index = draft.firstIndex(where: { $0.provider == provider }) else { return }
+        draft[index].enabled = value
+    }
+    public func cancelKey(_ provider: QuotaProvider) { keys.removeValue(forKey: provider); editingKeys.remove(provider); failedKeys.remove(provider) }
+    public func cancel() {
+        guard !busy else { return }
+        keys.removeAll(); failedKeys.removeAll(); draft = saved; onClose()
+    }
+    public func close() { keys.removeAll(); editingKeys.removeAll() }
+
+    public func load() async {
+        guard !busy else { return }
+        busy = true; defer { busy = false }
+        let client = coordinator.client
+        do {
+            let (entries, states) = try await Task.detached { (try client.providers(), try client.configStatus()) }.value
+            catalog = entries; credentials = states
+            if !isDirty {
+                saved = state.quotaProviders.map { provider in QuotaSourceDraft(provider: provider, enabled: entries.first { $0.provider == provider }?.enabled ?? false) }
+                draft = saved
+            }
+            for entry in entries { coordinator.sourceEnabled[entry.provider] = entry.enabled }
+        } catch {
+            status = "渠道目录读取失败：" + error.localizedDescription
+            logger.error("额度渠道目录读取失败，未修改配置")
+        }
+    }
+
+    public func credentialText(_ provider: QuotaProvider) -> String {
+        if canEditKey(provider) { return keys[provider] != nil ? "新 key 待保存" : credentials[provider] == true ? "已配置" : "未配置" }
+        if provider == .deepseek { return credentials[provider] == true ? "已配置 · 由 CodexBar 管理" : "未配置 · 由 CodexBar 管理" }
+        return "登录凭据由 CodexBar 管理"
+    }
+    public func collectionText(_ provider: QuotaProvider) -> String {
+        if let attempt = state.quotaAttempts[provider] {
+            return (attempt.success ? "最近采集成功 " : "最近采集失败 ") + DisplayDate.format(attempt.at, pattern: "HH:mm") + (attempt.success ? "" : "：" + attempt.message)
+        }
+        if let snapshot = state.quotas[provider] { return "最近采集成功 " + DisplayDate.format(snapshot.updatedAt, pattern: "HH:mm") }
+        return "尚未采集"
+    }
+    public func sourceText(_ provider: QuotaProvider) -> String {
+        if canEditKey(provider) { return "API key" }
+        if provider == .deepseek { return "token 账号（由 CodexBar 管理）" }
+        return "使用本机登录（OAuth / 浏览器 cookie / CLI）"
+    }
+    public func test(_ provider: QuotaProvider) {
+        guard canTest(provider) else { testing[provider] = "先保存再测试"; return }
+        testing[provider] = coordinator.test(provider)
+    }
+    public var statusText: String {
+        guard let since = refreshSince, !refreshedProviders.isEmpty else { return isDirty && status == "尚未修改" ? "有未保存的修改" : status }
+        let completed = refreshedProviders.compactMap { state.quotaAttempts[$0] }.filter { $0.at >= since }
+        if completed.count == refreshedProviders.count {
+            return "已保存，刷新完成：\(completed.filter(\.success).count) 个成功，\(completed.filter { !$0.success }.count) 个失败"
+        }
+        let remaining = refreshedProviders.map(coordinator.cooldownRemaining).max() ?? 0
+        return "已保存，正在刷新 \(refreshedProviders.count) 个渠道…" + (remaining > 0 ? "（合并请求，约 \(Int(ceil(remaining))) 秒后继续）" : "")
+    }
+
+    public func save() async {
+        guard !busy, isDirty else { return }
+        busy = true; refreshSince = nil
+        defer { keys.removeAll(); busy = false }
+        let desired = draft
+        let removed = saved.filter { row in !desired.contains { $0.provider == row.provider } }
+        var changed: [QuotaProvider] = []
+        do {
+            if !removed.isEmpty {
+                let retained = saved.filter { row in !removed.contains { $0.provider == row.provider } }
+                try coordinator.replaceSources(QuotaSourceList(providers: retained.map(\.provider)))
+                saved = retained
+            }
+        } catch { status = error.localizedDescription; logger.error("额度渠道清单保存失败"); return }
+        let client = coordinator.client
+        for row in desired where rowDirty(row.provider) {
+            let provider = row.provider
+            do {
+                if failedKeys.contains(provider), keys[provider] == nil {
+                    errors[provider] = "API key 保存失败，请重新填写"; continue
+                }
+                if let key = keys[provider] {
+                    do {
+                        try await Task.detached { try client.setAPIKey(key, provider: provider) }.value
+                        keys.removeValue(forKey: provider); editingKeys.remove(provider); credentials[provider] = true
+                    } catch {
+                        keys.removeValue(forKey: provider); failedKeys.insert(provider)
+                        if case CodexBarError.apiKeyUnsupported = error { unsupportedKeys.insert(provider) }
+                        throw error
+                    }
+                }
+                if saved.first(where: { $0.provider == provider })?.enabled != row.enabled {
+                    try await Task.detached { try client.setEnabled(row.enabled, provider: provider) }.value
+                }
+                var successful = saved.filter { $0.provider != provider }; successful.append(row)
+                let ordered = desired.filter { item in successful.contains { $0.provider == item.provider } }
+                try coordinator.replaceSources(QuotaSourceList(providers: ordered.map(\.provider)))
+                saved = ordered; coordinator.sourceEnabled[provider] = row.enabled
+                failedKeys.remove(provider); errors.removeValue(forKey: provider); changed.append(provider)
+            } catch {
+                errors[provider] = error.localizedDescription
+                logger.error("额度源保存失败：\(provider.rawValue, privacy: .public)，未记录凭据")
+            }
+        }
+        if errors.isEmpty {
+            status = "已保存"
+            refreshedProviders = changed; refreshSince = state.now()
+            coordinator.requestRefresh(changed, includeDisabled: true)
+        } else { status = "部分保存失败：成功项已生效，请修正标红的项" }
+    }
+}
+
+struct QuotaSecureField: NSViewRepresentable {
+    @Binding var value: String
+    let identifier: String
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var binding: Binding<String>
+        init(_ binding: Binding<String>) { self.binding = binding }
+        func controlTextDidChange(_ notification: Notification) {
+            if let field = notification.object as? NSSecureTextField { binding.wrappedValue = field.stringValue }
+        }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator($value) }
+    func makeNSView(context: Context) -> NSSecureTextField {
+        let field = NSSecureTextField()
+        field.placeholderString = "粘贴 API key"; field.delegate = context.coordinator
+        field.setAccessibilityLabel("API key"); field.setAccessibilityIdentifier(identifier)
+        return field
+    }
+    func updateNSView(_ field: NSSecureTextField, context: Context) {
+        context.coordinator.binding = $value
+        if field.stringValue != value { field.stringValue = value }
+    }
+    static func dismantleNSView(_ field: NSSecureTextField, coordinator: Coordinator) { field.stringValue = ""; field.delegate = nil }
+}
+
+@MainActor
+public final class QuotaSourceSettingsController: NSObject, NSWindowDelegate {
+    public private(set) var window: NSWindow?
+    public private(set) var model: QuotaSourceSettingsModel?
+    private let state: PanelState
+    private let coordinator: QuotaCoordinator
+    public init(state: PanelState, coordinator: QuotaCoordinator) { self.state = state; self.coordinator = coordinator }
+    public func present(load: Bool = true) {
+        if let window { window.makeKeyAndOrderFront(nil); NSApplication.shared.activate(ignoringOtherApps: true); return }
+        let model = QuotaSourceSettingsModel(state: state, coordinator: coordinator)
+        self.model = model; model.onClose = { [weak self] in self?.window?.close() }
+        let controller = NSHostingController(rootView: QuotaSourceSettingsView(model: model, state: state))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 650), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = "额度源设置"; window.isReleasedWhenClosed = false; window.delegate = self
+        window.contentViewController = controller
+        window.setContentSize(NSSize(width: 540, height: min(720, (NSScreen.main?.visibleFrame.height ?? 800) - 60)))
+        self.window = window; window.center(); window.makeKeyAndOrderFront(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        if load { Task { await model.load() } }
+    }
+    public func windowWillClose(_ notification: Notification) { model?.close(); window?.delegate = nil; window = nil; model = nil }
+}
+
+struct QuotaSourceSettingsView: View {
+    @ObservedObject var model: QuotaSourceSettingsModel
+    @ObservedObject var state: PanelState
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack { Text("渠道").fontWeight(.semibold); Spacer(); Text("启用状态与 CodexBar 共用").font(.caption).foregroundStyle(.secondary) }.padding(.horizontal, 24).padding(.top, 18)
+            ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(spacing: 0) {
+                        ForEach(model.draft) { row in
+                            if row.id != model.draft.first?.id { Divider() }
+                            channel(row).id(row.id)
+                        }
+                    }.background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor)))
+                    Menu("＋ 添加渠道…") {
+                        ForEach(model.available) { entry in Button(entry.displayName) { model.add(entry.provider) } }
+                    }.menuStyle(.borderlessButton).fixedSize().disabled(model.busy || model.available.isEmpty).accessibilityIdentifier("quota-source.add")
+                    Text("数据来源：CodexBarCLI 0.70.0。API key 只写进 CodexBar 配置，MeowMac 不保存、不显示、不记日志。其他渠道复用本机的 OAuth、浏览器 cookie 或 CLI 登录，由 CodexBarCLI 采集时读取。").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }.padding(24)
+            }.onChange(of: model.editingKeys) { keys in
+                if let provider = keys.sorted(by: { $0.rawValue < $1.rawValue }).first { proxy.scrollTo(provider.rawValue, anchor: .bottom) }
+            }
+            }
+            Divider()
+            HStack { Spacer(); Button("取消") { model.cancel() }.disabled(model.busy).accessibilityIdentifier("quota-source.cancel")
+                Button("保存") { Task { await model.save() } }.buttonStyle(.borderedProminent).disabled(!model.isDirty || model.busy || state.quotaSourceRecoveryReason != nil).accessibilityIdentifier("quota-source.save")
+            }.padding(.horizontal, 20).padding(.vertical, 12)
+            Text(model.statusText).font(.caption).foregroundStyle(model.errors.isEmpty ? Color.secondary : Color.red).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 20).padding(.bottom, 12).accessibilityIdentifier("quota-source.status")
+        }.frame(width: 540).background(Color(nsColor: .windowBackgroundColor))
+    }
+    private func channel(_ row: QuotaSourceDraft) -> some View {
+        let provider = row.provider
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                ProviderLogo(provider: provider)
+                VStack(alignment: .leading, spacing: 3) { Text(provider.displayName).fontWeight(.semibold); Text(model.sourceText(provider)).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+                Spacer(minLength: 8)
+                Toggle("启用 " + provider.displayName, isOn: Binding(get: { row.enabled }, set: { model.setEnabled($0, provider: provider) })).labelsHidden().toggleStyle(.switch).controlSize(.small).disabled(model.busy).accessibilityIdentifier("quota-source.enabled." + row.id)
+            }
+            Text(model.credentialText(provider) + " · " + model.collectionText(provider)).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 14) {
+                if model.canEditKey(provider) { Button(model.credentials[provider] == true ? "更换 API key…" : "填写 API key…") { model.editingKeys.insert(provider) } }
+                Button("测试") { model.test(provider) }.disabled(!model.canTest(provider)).help(model.rowDirty(provider) ? "先保存再测试" : "立即采集已保存的渠道")
+                    .accessibilityIdentifier("quota-source.test." + row.id)
+                Button("移除") { model.remove(provider) }.accessibilityIdentifier("quota-source.remove." + row.id)
+                if model.rowDirty(provider) { Text("先保存再测试").foregroundStyle(.secondary) }
+            }.buttonStyle(.link).font(.caption).disabled(model.busy)
+            if model.editingKeys.contains(provider) {
+                HStack { QuotaSecureField(value: Binding(get: { model.key(provider) }, set: { model.setKey($0, provider: provider) }), identifier: "quota-source.key." + row.id).frame(height: 24)
+                    Button("取消") { model.cancelKey(provider) }
+                }.disabled(model.busy)
+            }
+            if let message = model.testing[provider], state.quotaAttempts[provider] == nil || message.contains("秒后") { Text(message).font(.caption).foregroundStyle(.secondary) }
+            if let error = model.errors[provider] { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
+        }.padding(12)
+    }
+}

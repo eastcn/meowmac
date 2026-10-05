@@ -6,7 +6,7 @@ import os
 
 @MainActor
 public final class QuotaCoordinator {
-    private let client: CodexBarClient
+    public let client: CodexBarClient
     private let history: QuotaHistoryStore
     private let importSource: URL
     private let config: LocalConfig
@@ -107,6 +107,7 @@ public final class QuotaCoordinator {
 
     public var isRefreshing: Bool { refreshing }
     public private(set) var lastActualCalls: [QuotaProvider: Date] = [:]
+    private var explicitRequests = Set<QuotaProvider>()
     private var pending: [QuotaProvider: Date] = [:]
     private var generations: [QuotaProvider: Int] = [:]
     public var sourceEnabled: [QuotaProvider: Bool] = [:]
@@ -123,7 +124,7 @@ public final class QuotaCoordinator {
         guard state.quotaProviders.contains(provider) else { return "渠道已移除" }
         let remaining = cooldownRemaining(provider)
         guard remaining == 0 else { return "距上次调用不足 \(provider == .claude ? 5 : 1) 分钟，约 \(Int(ceil(remaining))) 秒后再试" }
-        requestRefresh([provider]); return "正在测试…"
+        requestRefresh([provider], includeDisabled: true); return "正在测试…"
     }
 
     public func replaceSources(_ list: QuotaSourceList) throws {
@@ -133,8 +134,9 @@ public final class QuotaCoordinator {
         state.applyQuotaSources(list)
     }
 
-    public func requestRefresh(_ providers: [QuotaProvider]) {
-        for provider in providers where state.quotaProviders.contains(provider) && sourceEnabled[provider] != false {
+    public func requestRefresh(_ providers: [QuotaProvider], includeDisabled: Bool = false) {
+        for provider in providers where state.quotaProviders.contains(provider) && (sourceEnabled[provider] != false || includeDisabled) {
+            if includeDisabled { explicitRequests.insert(provider) }
             pending[provider] = state.now().addingTimeInterval(cooldownRemaining(provider))
         }
         drain()
@@ -151,10 +153,11 @@ public final class QuotaCoordinator {
     /// 按真实调用串行刷新，防止多个入口绕过 Claude 的限频或覆盖移除后的缓存。
     public func drain() {
         guard !sleeping, !refreshing else { return }
-        guard let provider = state.quotaProviders.first(where: { (pending[$0].map { $0 <= state.now() } ?? false) && sourceEnabled[$0] != false }) else { return }
+        guard let provider = state.quotaProviders.first(where: { (pending[$0].map { $0 <= state.now() } ?? false) && (sourceEnabled[$0] != false || explicitRequests.contains($0)) }) else { return }
         let remaining = cooldownRemaining(provider)
         if remaining > 0 { pending[provider] = state.now().addingTimeInterval(remaining); return }
         pending.removeValue(forKey: provider)
+        explicitRequests.remove(provider)
         refreshing = true
         lastActualCalls[provider] = state.now()
         let generation = generations[provider, default: 0]
