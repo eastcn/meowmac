@@ -85,14 +85,18 @@ struct PanelSurface: View {
     @Environment(\.colorScheme) private var colorScheme
     var body: some View {
         Group {
-            if previewMaterial {
-                if colorScheme == .light {
-                    // 仅为离线预览模拟网络设计稿的玻璃透色。
-                    LinearGradient(colors: [Color(red: 227 / 255, green: 232 / 255, blue: 238 / 255),
-                                            Color(red: 239 / 255, green: 234 / 255, blue: 228 / 255)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                } else { Design.background }
-            } else if #available(macOS 26, *) { Color.clear }
+            if previewMaterial { Design.background }
+            else if #available(macOS 26, *) { Color.clear }
             else { Rectangle().fill(.regularMaterial) }
+        }.overlay {
+            if colorScheme == .light {
+                // 保留底层玻璃透色，顶部淡蓝灰，底部暖杏色。
+                LinearGradient(stops: [
+                    .init(color: Color(red: 199 / 255, green: 217 / 255, blue: 237 / 255).opacity(0.26), location: 0),
+                    .init(color: Color.white.opacity(0.04), location: 0.45),
+                    .init(color: Color(red: 255 / 255, green: 216 / 255, blue: 184 / 255).opacity(0.32), location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+            }
         }.allowsHitTesting(false)
     }
 }
