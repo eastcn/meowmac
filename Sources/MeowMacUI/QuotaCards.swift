@@ -116,7 +116,10 @@ struct QuotaPage: View {
         VStack(alignment: .leading, spacing: Design.sectionGap) {
             if let reason = state.quotaSourceRecoveryReason { Text(reason).font(Design.caption).foregroundStyle(Design.stateText(.warn)) }
             if state.quotaProviders.isEmpty {
-                Text(state.quotaEmptyMessage).font(Design.body).foregroundStyle(Design.secondary).fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: Design.smallGap) {
+                    Text(state.quotaEmptyMessage).font(Design.body).foregroundStyle(Design.secondary).fixedSize(horizontal: false, vertical: true)
+                    Button("打开额度源设置", action: state.openQuotaSourceSettings).buttonStyle(.link).accessibilityIdentifier("quota.open-settings")
+                }
             } else {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Design.gap), count: 4), spacing: Design.gap) {
                 ForEach(state.quotaProviders, id: \.self) { item in

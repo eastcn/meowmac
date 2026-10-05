@@ -220,10 +220,10 @@ enum CodexBarImportTests {
             let state = PanelPreviewRenderer.syntheticState()
             state.quotaHistory = [:]
             let coordinator = QuotaCoordinator(state: state, config: LocalConfig(), history: importer.store, importSource: src)
-            let before = coordinator.codexBarImportDone, shownBefore = SettingsMenu.make(state: state).items.contains { $0.title == "导入 CodexBar 历史…" }
+            let before = coordinator.codexBarImportDone, shownBefore = state.showsCodexBarImport
             let first = try coordinator.importCodexBarHistory(now: now)
             let hidden = coordinator.codexBarImportDone && !state.showsCodexBarImport
-                && !SettingsMenu.make(state: state).items.contains { $0.title == "导入 CodexBar 历史…" }
+                && !state.showsCodexBarImport
             let refreshed = state.quotaHistory[.claude]?.count == 2 && state.quotaHistory[.codex]?.count == 1
             let second = try coordinator.importCodexBarHistory(now: now)
             let missing = CodexBarImportReport(outcome: .sourceMissing).message

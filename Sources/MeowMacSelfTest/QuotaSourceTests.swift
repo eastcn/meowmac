@@ -68,7 +68,7 @@ enum QuotaSourceTests {
         return state.quotaProviders.isEmpty && state.quotas.isEmpty && state.quotaHistory.isEmpty
             && state.overviewMetrics.first(where: { $0.item == .quota })?.value == "未添加"
             && !state.allReminders.contains(where: { $0.provider != nil })
-            && state.quotaEmptyMessage == "还没有额度渠道，在 设置 → 额度源设置… 中添加"
+            && state.quotaEmptyMessage == "还没有额度渠道，在设置的“额度源”栏中添加"
     }
     static func selectionRemoval() -> Bool {
         let state = PanelPreviewRenderer.syntheticState()
