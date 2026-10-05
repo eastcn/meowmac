@@ -110,6 +110,36 @@ enum QuotaSourceTests {
                 && state.allReminders.allSatisfy { $0.provider != router }
         } catch { release.signal(); return false }
     }
+    static func overviewRestart() -> Bool {
+        let directory = root.appendingPathComponent("overview-restart")
+        defer { try? FileManager.default.removeItem(at: root) }
+        do {
+            let store = QuotaSourceStore(root: directory)
+            // 两个旧窗口同为 5 小时，布局必须按 ID 选择；新渠道的同名 ID 却是 7 天。
+            func window(_ id: String, _ minutes: Int, _ used: Double) -> QuotaWindow {
+                QuotaWindow(usedPercent: used, windowMinutes: minutes, resetsAt: nil, resetDescription: nil, identifier: id)
+            }
+            let state = PanelPreviewRenderer.syntheticState()
+            state.quotas[.claude] = QuotaSnapshot(provider: .claude, source: "合成", updatedAt: state.now(), windows: [window("primary", 300, 10), window("secondary", 300, 20)], paceSummary: nil, credits: nil)
+            let replacement = QuotaSnapshot(provider: router, source: "合成", updatedAt: state.now(), windows: [window("primary", 10080, 90), window("secondary", 300, 25)], paceSummary: nil, credits: nil)
+            state.quotas[router] = replacement
+            let coordinator = QuotaCoordinator(state: state, config: LocalConfig(), sourceStore: store)
+            // 初始清单不含新渠道，先加入后再移除原渠道。
+            try coordinator.replaceSources(QuotaSourceList(providers: [.claude, router]))
+            state.quotas[router] = replacement
+            try coordinator.replaceSources(QuotaSourceList(providers: [router]))
+            let overview = PanelOverview(quota: OverviewQuota(provider: .claude, window: "id:primary"))
+            guard state.overviewMetrics(for: overview).first(where: { $0.item == .quota })?.numericValue == 75 else { return false }
+            let restarted = PanelState()
+            let loaded = QuotaCoordinator(state: restarted, config: LocalConfig(), sourceStore: store)
+            restarted.quotas[router] = replacement
+            guard restarted.quotas[.claude] == nil, loaded.sourceStore.load().recoveryReason == nil else { return false }
+            let legacy = Data(#"{"providers":["codex"]}"#.utf8)
+            let legacyList = try JSONDecoder().decode(QuotaSourceList.self, from: legacy)
+            return restarted.overviewMetrics(for: overview).first(where: { $0.item == .quota })?.numericValue == 75
+                && legacyList.providers == [.codex]
+        } catch { return false }
+    }
     static func previews() async -> Bool {
         guard let path = ProcessInfo.processInfo.environment["MEOWMAC_CONFIG_RENDER_DIR"] else { return true }
         do {

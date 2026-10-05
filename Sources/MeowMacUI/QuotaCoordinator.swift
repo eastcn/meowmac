@@ -149,7 +149,8 @@ public final class QuotaCoordinator {
         requestRefresh([provider], includeDisabled: true); return "正在测试…"
     }
 
-    public func replaceSources(_ list: QuotaSourceList) throws {
+    public func replaceSources(_ requested: QuotaSourceList) throws {
+        let list = state.sourcesWithWindowFallbacks(requested)
         try sourceStore.save(list)
         let removed = state.quotaProviders.filter { !list.providers.contains($0) }
         for provider in removed { generations[provider, default: 0] += 1; pending.removeValue(forKey: provider); explicitRequests.remove(provider) }

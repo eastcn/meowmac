@@ -74,13 +74,21 @@ public final class PanelState: ObservableObject {
     public var onQuotaSourcesRemoved: ([QuotaProvider]) -> Void = { _ in }
     public var quotaProviders: [QuotaProvider] { quotaSources.providers }
     public var quotaEmptyMessage: String { "还没有额度渠道，在 设置 → 额度源设置… 中添加" }
-    private var removedWindowKinds: [QuotaProvider: [String: (minutes: Int?, name: String)]] = [:]
-    public func applyQuotaSources(_ list: QuotaSourceList) {
+    public func sourcesWithWindowFallbacks(_ list: QuotaSourceList) -> QuotaSourceList {
+        var result = list
+        result.overviewWindowKinds = quotaSources.overviewWindowKinds.merging(list.overviewWindowKinds) { _, new in new }
         let removed = quotaProviders.filter { !list.providers.contains($0) }
         for provider in removed {
-            removedWindowKinds[provider] = Dictionary((quotas[provider]?.windows ?? []).map { ($0.identifier, ($0.effectiveWindowMinutes, $0.displayName)) }, uniquingKeysWith: { first, _ in first })
+            if let windows = quotas[provider]?.windows {
+                result.overviewWindowKinds[provider.rawValue] = Dictionary(windows.map { ($0.identifier, QuotaWindowKind(minutes: $0.effectiveWindowMinutes, name: $0.displayName)) }, uniquingKeysWith: { first, _ in first })
+            }
         }
-        for provider in list.providers { removedWindowKinds.removeValue(forKey: provider) }
+        for provider in list.providers { result.overviewWindowKinds.removeValue(forKey: provider.rawValue) }
+        return result
+    }
+    public func applyQuotaSources(_ requested: QuotaSourceList) {
+        let list = sourcesWithWindowFallbacks(requested)
+        let removed = quotaProviders.filter { !list.providers.contains($0) }
         quotaSources = list
         for provider in removed {
             quotaAttempts.removeValue(forKey: provider); quotas.removeValue(forKey: provider); quotaErrors.removeValue(forKey: provider)
@@ -308,14 +316,14 @@ public extension PanelState {
         let memoryLevel: HealthLevel = snapshot?.memoryPressure == .critical ? .severe : snapshot?.memoryPressure == .warn ? .warn : .normal
         var quotaConfig = overview.quota
         if !quotaProviders.contains(quotaConfig.provider), let first = quotaProviders.first {
-            if quotaConfig.window.hasPrefix("id:"), let kind = removedWindowKinds[quotaConfig.provider]?[String(quotaConfig.window.dropFirst(3))] {
+            if quotaConfig.window.hasPrefix("id:"), let kind = quotaSources.overviewWindowKinds[quotaConfig.provider.rawValue]?[String(quotaConfig.window.dropFirst(3))] {
                 let candidates = (quotas[first]?.windows ?? []).filter { window in
                     if let minutes = kind.minutes { return window.effectiveWindowMinutes == minutes }
                     return window.displayName == kind.name
                 }
                 if let match = candidates.first(where: { $0.displayName == kind.name }) ?? candidates.first {
                     quotaConfig.window = "id:" + match.identifier
-                }
+                } else { quotaConfig.window = kind.minutes.map { "minutes:\($0)" } ?? "id:unavailable" }
             }
             quotaConfig.provider = first
         }

@@ -223,12 +223,33 @@ public enum QuotaCatalog {
     }
 }
 
+public struct QuotaWindowKind: Codable, Equatable, Sendable {
+    public let minutes: Int?
+    public let name: String
+    public init(minutes: Int?, name: String) { self.minutes = minutes; self.name = name }
+}
+
 public struct QuotaSourceList: Codable, Equatable, Sendable {
     public var providers: [QuotaProvider]
+    /// 只保存被移除渠道的窗口类型，供各猫的总览选择器回退；不保存额度值。
+    public var overviewWindowKinds: [String: [String: QuotaWindowKind]] = [:]
     public init(providers: [QuotaProvider] = [.claude, .codex, .deepseek, .opencodego]) { self.providers = providers }
+    private enum CodingKeys: String, CodingKey { case providers, overviewWindowKinds }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        providers = try container.decode([QuotaProvider].self, forKey: .providers)
+        overviewWindowKinds = try container.decodeIfPresent([String: [String: QuotaWindowKind]].self, forKey: .overviewWindowKinds) ?? [:]
+    }
     public func validated() throws -> Self {
         guard providers.count <= QuotaCatalog.usageNames.count, Set(providers).count == providers.count,
-              providers.allSatisfy({ QuotaCatalog.usageNames[$0.rawValue] != nil }) else { throw QuotaSourceError.invalid }
+              providers.allSatisfy({ QuotaCatalog.usageNames[$0.rawValue] != nil }),
+              overviewWindowKinds.count <= QuotaCatalog.usageNames.count,
+              overviewWindowKinds.allSatisfy({ id, windows in
+                  QuotaCatalog.usageNames[id] != nil && windows.count <= 3 && windows.allSatisfy { key, kind in
+                      !key.isEmpty && key.count <= 128 && kind.name.count <= 160
+                          && key.unicodeScalars.allSatisfy { $0.value >= 32 && $0.value != 127 }
+                  }
+              }) else { throw QuotaSourceError.invalid }
         return self
     }
 }
@@ -261,7 +282,7 @@ public struct QuotaSourceStore {
             try checkPath()
             guard FileManager.default.fileExists(atPath: file.path) else { return (QuotaSourceList(), nil) }
             let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max
-            guard size <= 16384 else { throw QuotaSourceError.invalid }
+            guard size <= 65536 else { throw QuotaSourceError.invalid }
             let list = try JSONDecoder().decode(QuotaSourceList.self, from: Data(contentsOf: file)).validated()
             return (list, nil)
         } catch { return (QuotaSourceList(), QuotaSourceError.invalid.localizedDescription) }

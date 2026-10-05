@@ -105,6 +105,7 @@ enum SelfTestMain {
             ("UI.QuotaSources/空清单", { QuotaSourceTests.empty() }),
             ("UI.QuotaSources/移除选中渠道", { QuotaSourceTests.selectionRemoval() }),
             ("UI.QuotaSources/移除总览引用", { QuotaSourceTests.overviewRemoval() }),
+            ("UI.QuotaSources/异 ID 总览回退与重启", { QuotaSourceTests.overviewRestart() }),
             ("UI.QuotaSources/移除在途结果", { await QuotaSourceTests.inFlightRemoval() }),
             ("UI.QuotaSources/真实面板预览", { await QuotaSourceTests.previews() }),
             ("Core.Quota/渠道标识旧格式往返", { QuotaProviderTests.legacyRoundTrip() }),
