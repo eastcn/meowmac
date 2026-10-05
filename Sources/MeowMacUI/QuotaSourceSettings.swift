@@ -9,8 +9,19 @@ import os
 public struct QuotaSourceDraft: Equatable, Identifiable {
     public let provider: QuotaProvider
     public var enabled: Bool
+    /// 余额提醒阈值的输入文本；留空表示不提醒。
+    public var balanceWarn: String
     public var id: String { provider.rawValue }
-    public init(provider: QuotaProvider, enabled: Bool) { self.provider = provider; self.enabled = enabled }
+    public init(provider: QuotaProvider, enabled: Bool, balanceWarn: String = MetricFormat.money(QuotaSourceList.defaultBalanceWarn)) {
+        self.provider = provider; self.enabled = enabled; self.balanceWarn = balanceWarn
+    }
+    /// 解析阈值：空 = 0（不提醒），非法返回 nil。
+    public var balanceWarnValue: Double? {
+        let text = balanceWarn.trimmingCharacters(in: .whitespaces)
+        if text.isEmpty { return 0 }
+        guard let value = Double(text), value.isFinite, value >= 0, value <= 1_000_000 else { return nil }
+        return value
+    }
 }
 
 @MainActor
@@ -35,7 +46,7 @@ public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSess
 
     public init(state: PanelState, coordinator: QuotaCoordinator, catalog: [QuotaCatalogEntry] = []) {
         self.state = state; self.coordinator = coordinator; self.catalog = catalog
-        let initial = state.quotaProviders.map { QuotaSourceDraft(provider: $0, enabled: coordinator.sourceEnabled[$0] ?? true) }
+        let initial = state.quotaProviders.map { QuotaSourceDraft(provider: $0, enabled: coordinator.sourceEnabled[$0] ?? true, balanceWarn: Self.warnText(state, $0)) }
         saved = initial; draft = initial
         if let reason = state.quotaSourceRecoveryReason { status = reason }
     }
@@ -48,7 +59,26 @@ public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSess
         return list.filter { $0.displayName.localizedCaseInsensitiveContains(keyword) || $0.provider.rawValue.localizedCaseInsensitiveContains(keyword) }
     }
     public var isDirty: Bool { draft != saved || !keys.isEmpty || !failedKeys.isEmpty }
-    public var canSave: Bool { isDirty && !busy && state.quotaSourceRecoveryReason == nil }
+    public var canSave: Bool { isDirty && !busy && state.quotaSourceRecoveryReason == nil && !hasInvalidBalanceWarn }
+    public var hasInvalidBalanceWarn: Bool { draft.contains { showsBalanceWarn($0.provider) && $0.balanceWarnValue == nil } }
+    /// 余额型渠道：已采到余额，或 DeepSeek（还没采集过也显示）。
+    public func showsBalanceWarn(_ provider: QuotaProvider) -> Bool { provider == .deepseek || state.quotas[provider]?.balance != nil }
+    public func balanceCurrency(_ provider: QuotaProvider) -> String { state.quotas[provider]?.balance?.currency ?? (provider == .deepseek ? "¥" : "") }
+    public func balanceWarnText(_ provider: QuotaProvider) -> String { draft.first { $0.provider == provider }?.balanceWarn ?? "" }
+    public func setBalanceWarn(_ value: String, provider: QuotaProvider) {
+        guard !busy, let index = draft.firstIndex(where: { $0.provider == provider }) else { return }
+        draft[index].balanceWarn = value
+    }
+    static func warnText(_ state: PanelState, _ provider: QuotaProvider) -> String {
+        let value = state.quotaSources.balanceThreshold(provider)
+        return value > 0 ? MetricFormat.money(value) : ""
+    }
+    /// 保存清单时带上这些渠道的余额阈值，避免覆盖成默认值。
+    private func sourceList(_ rows: [QuotaSourceDraft]) -> QuotaSourceList {
+        var list = QuotaSourceList(providers: rows.map(\.provider))
+        for row in rows where showsBalanceWarn(row.provider) { if let value = row.balanceWarnValue { list.balanceWarn[row.provider.rawValue] = value } }
+        return list
+    }
     public var isBusy: Bool { busy }
     public func rowDirty(_ provider: QuotaProvider) -> Bool {
         draft.first { $0.provider == provider } != saved.first { $0.provider == provider } || keys[provider] != nil || failedKeys.contains(provider)
@@ -64,7 +94,7 @@ public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSess
     }
     public func add(_ provider: QuotaProvider) {
         guard !busy, available.contains(where: { $0.provider == provider }) else { return }
-        draft.append(QuotaSourceDraft(provider: provider, enabled: true))
+        draft.append(QuotaSourceDraft(provider: provider, enabled: true, balanceWarn: Self.warnText(state, provider)))
     }
     public func remove(_ provider: QuotaProvider) {
         guard !busy else { return }
@@ -92,7 +122,7 @@ public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSess
             let (entries, states) = try await Task.detached { (try client.providers(), try client.configStatus()) }.value
             catalog = entries; credentials = states
             if !isDirty {
-                saved = state.quotaProviders.map { provider in QuotaSourceDraft(provider: provider, enabled: entries.first { $0.provider == provider }?.enabled ?? false) }
+                saved = state.quotaProviders.map { provider in QuotaSourceDraft(provider: provider, enabled: entries.first { $0.provider == provider }?.enabled ?? false, balanceWarn: Self.warnText(state, provider)) }
                 draft = saved
             }
             for entry in entries { coordinator.sourceEnabled[entry.provider] = entry.enabled }
@@ -143,13 +173,16 @@ public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSess
         do {
             if !removed.isEmpty {
                 let retained = saved.filter { row in !removed.contains { $0.provider == row.provider } }
-                try coordinator.replaceSources(QuotaSourceList(providers: retained.map(\.provider)))
+                try coordinator.replaceSources(sourceList(retained))
                 saved = retained
             }
         } catch { status = error.localizedDescription; logger.error("额度渠道清单保存失败"); return false }
         let client = coordinator.client
         for row in desired where rowDirty(row.provider) {
             let provider = row.provider
+            // 只改了余额阈值：写本机清单即可，不调用 CLI、不刷新。
+            let previous = saved.first { $0.provider == provider }
+            let warnOnly = previous.map { var other = $0; other.balanceWarn = row.balanceWarn; return other == row } == true && keys[provider] == nil && !failedKeys.contains(provider)
             do {
                 if failedKeys.contains(provider), keys[provider] == nil {
                     errors[provider] = "API key 保存失败，请重新填写"; continue
@@ -169,9 +202,10 @@ public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSess
                 }
                 var successful = saved.filter { $0.provider != provider }; successful.append(row)
                 let ordered = desired.filter { item in successful.contains { $0.provider == item.provider } }
-                try coordinator.replaceSources(QuotaSourceList(providers: ordered.map(\.provider)))
+                try coordinator.replaceSources(sourceList(ordered))
                 saved = ordered; coordinator.sourceEnabled[provider] = row.enabled
-                failedKeys.remove(provider); errors.removeValue(forKey: provider); changed.append(provider)
+                failedKeys.remove(provider); errors.removeValue(forKey: provider)
+                if !warnOnly { changed.append(provider) }
             } catch {
                 errors[provider] = error.localizedDescription
                 logger.error("额度源保存失败：\(provider.rawValue, privacy: .public)，未记录凭据")
@@ -274,6 +308,18 @@ struct QuotaSourceSettingsView: View {
                 Toggle("启用 " + provider.displayName, isOn: Binding(get: { row.enabled }, set: { model.setEnabled($0, provider: provider) })).labelsHidden().toggleStyle(.switch).controlSize(.small).disabled(model.busy).accessibilityIdentifier("quota-source.enabled." + row.id)
             }
             Text(model.credentialText(provider) + " · " + model.collectionText(provider)).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if model.showsBalanceWarn(provider) {
+                let invalid = row.balanceWarnValue == nil
+                HStack(spacing: 6) {
+                    Text("余额低于").font(.caption)
+                    Text(model.balanceCurrency(provider)).font(.caption).foregroundStyle(.secondary)
+                    TextField("不提醒", text: Binding(get: { model.balanceWarnText(provider) }, set: { model.setBalanceWarn($0, provider: provider) }))
+                        .textFieldStyle(.roundedBorder).frame(width: 72).font(.caption).disabled(model.busy)
+                        .accessibilityIdentifier("quota-source.balance-warn." + row.id)
+                    Text("时提醒，留空不提醒").font(.caption).foregroundStyle(.secondary)
+                }
+                if invalid { Text("请输入 0～1000000 的数字，或留空").font(.caption).foregroundStyle(.red) }
+            }
             HStack(spacing: 14) {
                 if model.canEditKey(provider) { Button(model.credentials[provider] == true ? "更换 API key…" : "填写 API key…") { model.editingKeys.insert(provider) } }
                 Button("测试") { model.test(provider) }.disabled(!model.canTest(provider)).help(model.rowDirty(provider) ? "先保存再测试" : "立即采集已保存的渠道")

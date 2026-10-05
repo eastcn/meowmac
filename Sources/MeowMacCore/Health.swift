@@ -47,17 +47,20 @@ public struct HealthInputs {
     public let networkConfirmed: Bool
     public let networkCheckedAt: Date?
     public let energyUpdatedAt: Date?
+    /// 余额型渠道的提醒阈值；没有的渠道用默认值，0 表示不提醒。
+    public let balanceWarn: [String: Double]
 
     public init(system: SystemSnapshot?, energy: EnergyDiagnosis?, quotaUsedPercent: [Double], network: NetworkTone,
                 failedSources: [String: Int], fairSince: Date?, now: Date, quotaSnapshots: [QuotaSnapshot] = [],
                 networkSignals: [NetworkReminderSignal]? = nil, networkConfirmed: Bool = true,
-                networkCheckedAt: Date? = nil, energyUpdatedAt: Date? = nil, fanHighSince: Date? = nil) {
+                networkCheckedAt: Date? = nil, energyUpdatedAt: Date? = nil, fanHighSince: Date? = nil,
+                balanceWarn: [String: Double] = [:]) {
         self.system = system; self.energy = energy; self.quotaUsedPercent = quotaUsedPercent
         self.network = network; self.failedSources = failedSources; self.fairSince = fairSince; self.now = now
         self.quotaSnapshots = quotaSnapshots
         self.networkSignals = networkSignals; self.networkConfirmed = networkConfirmed
         self.networkCheckedAt = networkCheckedAt; self.energyUpdatedAt = energyUpdatedAt
-        self.fanHighSince = fanHighSince
+        self.fanHighSince = fanHighSince; self.balanceWarn = balanceWarn
     }
 }
 

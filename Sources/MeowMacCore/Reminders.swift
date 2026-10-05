@@ -20,14 +20,18 @@ public struct ReminderFacts: Codable, Equatable {
     public var failures: Int?
     public var cachedAt: Date?
     public var hint: String?
+    /// 余额提醒：当前余额和阈值，均带币种，例如 “¥8.20”“¥10”。
+    public var balance: String?
+    public var balanceThreshold: String?
     public init(subject: String? = nil, remainingPercent: Double? = nil, secondsUntilExhaustion: TimeInterval? = nil,
                 cpuPercent: Double? = nil, duration: TimeInterval? = nil, pressurePercent: Double? = nil,
                 diskRemainingFraction: Double? = nil, diskAvailableBytes: Int64? = nil, thermalState: String? = nil,
-                failures: Int? = nil, cachedAt: Date? = nil, hint: String? = nil) {
+                failures: Int? = nil, cachedAt: Date? = nil, hint: String? = nil, balance: String? = nil, balanceThreshold: String? = nil) {
         self.subject = subject; self.remainingPercent = remainingPercent; self.secondsUntilExhaustion = secondsUntilExhaustion
         self.cpuPercent = cpuPercent; self.duration = duration; self.pressurePercent = pressurePercent
         self.diskRemainingFraction = diskRemainingFraction; self.diskAvailableBytes = diskAvailableBytes
         self.thermalState = thermalState; self.failures = failures; self.cachedAt = cachedAt; self.hint = hint
+        self.balance = balance; self.balanceThreshold = balanceThreshold
     }
 }
 
@@ -99,6 +103,19 @@ public enum ReminderCollector {
             let sourceValid = input.failedSources["quota", default: 0] == 0
                 && input.failedSources["quota.\(snapshot.provider.rawValue)", default: 0] == 0
                 && snapshot.updatedAt <= input.now
+            // 余额型渠道（D13 2026-10-05 补充）：低于阈值按额度不足提醒，没有重置周期。
+            if let balance = snapshot.balance, let value = balance.value, value.isFinite {
+                let threshold = input.balanceWarn[snapshot.provider.rawValue] ?? QuotaSourceList.defaultBalanceWarn
+                let object = snapshot.provider.rawValue + ".balance"
+                if sourceValid { batch.confirmedKeys.insert(ReminderKind.quotaLow.rawValue + "." + object) }
+                if threshold > 0 && value < threshold {
+                    let limit = balance.currency + MetricFormat.money(threshold)
+                    add(Reminder(kind: .quotaLow, object: object, tab: .quota, title: snapshot.provider.displayName + " 余额不足",
+                                 detail: "余额 \(balance.amount)，低于 \(limit)", sampledAt: snapshot.updatedAt,
+                                 resetAt: nil, confirmed: sourceValid, provider: snapshot.provider,
+                                 facts: ReminderFacts(subject: snapshot.provider.displayName + " 余额", balance: balance.amount, balanceThreshold: limit)))
+                }
+            }
             for window in snapshot.windows where window.usedPercent.isFinite {
                 let object = snapshot.provider.rawValue + "." + window.identifier
                 // 到期缓存不建立新周期，也不作为恢复证据。

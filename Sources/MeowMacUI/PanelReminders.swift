@@ -15,7 +15,7 @@ public extension PanelState {
             quotaUsedPercent: quotas.values.filter { quotaProviders.contains($0.provider) }.flatMap { $0.windows.map(\.usedPercent) }, network: networkTone,
             failedSources: failures.filter { key, _ in !key.hasPrefix("quota.") || (key == "quota.codex-resets" && quotaProviders.contains(.codex)) || quotaProviders.contains(where: { "quota." + $0.rawValue == key }) }, fairSince: fairSince, now: now(), quotaSnapshots: quotas.values.filter { quotaProviders.contains($0.provider) },
             networkSignals: signals, networkConfirmed: completed, networkCheckedAt: networkModel?.lastCheckedAt,
-            energyUpdatedAt: energyUpdatedAt, fanHighSince: fanHighSince), config: configResult.config)
+            energyUpdatedAt: energyUpdatedAt, fanHighSince: fanHighSince, balanceWarn: quotaSources.balanceWarn), config: configResult.config)
     }
     var projectedReminders: ReminderTracker {
         var value = reminderTracker; value.reconcile(reminderBatch, now: now()); return value

@@ -105,6 +105,7 @@ enum SelfTestMain {
             ("UI.QuotaSettings/测试后保存限频", { await QuotaSourceSettingsTests.throttles(2) }),
             ("UI.QuotaSettings/凭据与采集组合", { await QuotaSourceSettingsTests.credentials() }),
             ("UI.Quota/余额渠道普通材质预览", { QuotaSourceTests.balancePreview() }),
+            ("UI.QuotaSettings/余额提醒阈值", { await QuotaSourceSettingsTests.balanceWarn() }),
             ("UI.QuotaSettings/移除保存后可再添加与搜索", { await QuotaSourceSettingsTests.addAfterRemoveAndSearch() }),
             ("UI.QuotaSettings/真实控件与合成预览", { await QuotaSourceSettingsTests.controlsAndPreviews() }),
             ("QuotaSettings.Live/临时 CLI 添加停用移除", { await QuotaSourceSettingsTests.liveConfig() }),
@@ -148,6 +149,7 @@ enum SelfTestMain {
         tests.append(("UI.SystemTrend/真实弹出面板鼠标与首屏", { await SystemTrendNativeTests.popover() }))
         tests.append(("UI.SystemTrend/全状态及三页浅深色预览", { SystemTrendNativeTests.previews() }))
         tests.append(contentsOf: NotificationTests.tests)
+        tests.append(contentsOf: BalanceAlertTests.tests)
         tests.append(contentsOf: NotificationUITests.tests)
         tests.append(contentsOf: CodexResetTests.tests)
         tests.append(contentsOf: CodexResetUITests.tests)

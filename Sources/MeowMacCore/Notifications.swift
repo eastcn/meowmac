@@ -208,6 +208,9 @@ public enum NotificationContent {
         func percent(_ value: Double) -> String { "\(Int(value.rounded()))%" }
         switch reminder.kind {
         case .quotaLow:
+            if let balance = facts.balance {
+                return (facts.subject ?? reminder.title) + " " + balance + (facts.balanceThreshold.map { "，低于 " + $0 } ?? "")
+            }
             var text = (facts.subject ?? reminder.title) + (facts.remainingPercent.map { "剩余 " + percent($0) } ?? "剩余不足")
             if let reset = reminder.resetAt { text += "，" + time(reset, now: now, timeZone: timeZone) + " 重置" }
             return text

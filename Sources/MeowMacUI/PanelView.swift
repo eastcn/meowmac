@@ -78,6 +78,7 @@ public final class PanelState: ObservableObject {
     public func sourcesWithWindowFallbacks(_ list: QuotaSourceList) -> QuotaSourceList {
         var result = list
         result.overviewWindowKinds = quotaSources.overviewWindowKinds.merging(list.overviewWindowKinds) { _, new in new }
+        result.balanceWarn = quotaSources.balanceWarn.merging(list.balanceWarn) { _, new in new }
         let removed = quotaProviders.filter { !list.providers.contains($0) }
         for provider in removed {
             if let windows = quotas[provider]?.windows {

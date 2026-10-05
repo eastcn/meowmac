@@ -55,6 +55,10 @@ public enum QuotaHistorySeries {
 }
 
 public enum MetricFormat {
+    /// 金额：整数不带小数，否则保留两位，例如 10、8.20。
+    public static func money(_ value: Double) -> String {
+        value.rounded() == value ? String(format: "%.0f", value) : String(format: "%.2f", value)
+    }
     public static func rate(_ value: Double) -> String {
         let bounded = value.isFinite ? max(0, value) : 0
         let units = ["B", "K", "M", "G"]

@@ -87,6 +87,13 @@ public struct QuotaBalance: Codable, Equatable {
     public let amount: String
     public let detail: String?
     public init(amount: String, detail: String?) { self.amount = amount; self.detail = detail }
+    /// 金额里的数字，例如 “¥1,234.50” → 1234.5；解析不出时为 nil，不参与提醒。
+    public var value: Double? {
+        let digits = amount.filter { $0.isNumber || $0 == "." || $0 == "-" }
+        return digits.isEmpty ? nil : Double(digits)
+    }
+    /// 金额前的币种符号，例如 “¥”；没有时为空串。
+    public var currency: String { String(amount.prefix { !$0.isNumber && $0 != "-" }).trimmingCharacters(in: .whitespaces) }
     public static func isBalanceLabel(_ label: String?) -> Bool { label?.trimmingCharacters(in: .whitespaces).lowercased() == "balance" }
     public static func parse(_ description: String?) -> QuotaBalance? {
         guard let text = description?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }

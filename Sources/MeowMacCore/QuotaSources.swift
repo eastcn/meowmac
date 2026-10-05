@@ -233,12 +233,17 @@ public struct QuotaSourceList: Codable, Equatable, Sendable {
     public var providers: [QuotaProvider]
     /// 只保存被移除渠道的窗口类型，供各猫的总览选择器回退；不保存额度值。
     public var overviewWindowKinds: [String: [String: QuotaWindowKind]] = [:]
+    /// 余额型渠道的提醒阈值，按渠道 id 存，单位是该渠道自己的币种。没有记录时用默认值，0 表示不提醒。
+    public var balanceWarn: [String: Double] = [:]
+    public static let defaultBalanceWarn = 10.0
     public init(providers: [QuotaProvider] = [.claude, .codex, .deepseek, .opencodego]) { self.providers = providers }
-    private enum CodingKeys: String, CodingKey { case providers, overviewWindowKinds }
+    public func balanceThreshold(_ provider: QuotaProvider) -> Double { balanceWarn[provider.rawValue] ?? Self.defaultBalanceWarn }
+    private enum CodingKeys: String, CodingKey { case providers, overviewWindowKinds, balanceWarn }
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         providers = try container.decode([QuotaProvider].self, forKey: .providers)
         overviewWindowKinds = try container.decodeIfPresent([String: [String: QuotaWindowKind]].self, forKey: .overviewWindowKinds) ?? [:]
+        balanceWarn = try container.decodeIfPresent([String: Double].self, forKey: .balanceWarn) ?? [:]
     }
     public func validated() throws -> Self {
         guard providers.count <= QuotaCatalog.usageNames.count, Set(providers).count == providers.count,
@@ -249,7 +254,10 @@ public struct QuotaSourceList: Codable, Equatable, Sendable {
                       !key.isEmpty && key.count <= 128 && kind.name.count <= 160
                           && key.unicodeScalars.allSatisfy { $0.value >= 32 && $0.value != 127 }
                   }
-              }) else { throw QuotaSourceError.invalid }
+              }),
+              balanceWarn.count <= QuotaCatalog.usageNames.count,
+              balanceWarn.allSatisfy({ QuotaCatalog.usageNames[$0.key] != nil && $0.value.isFinite && $0.value >= 0 && $0.value <= 1_000_000 })
+        else { throw QuotaSourceError.invalid }
         return self
     }
 }

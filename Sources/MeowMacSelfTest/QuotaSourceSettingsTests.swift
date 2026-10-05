@@ -201,6 +201,30 @@ enum QuotaSourceSettingsTests {
             return true
         } catch { print("临时 CodexBar 配置集成失败：\(error)"); return false }
     }
+    /// 余额提醒阈值：只写本机清单，不调用 CLI 写命令，不触发刷新；非法值不能保存。
+    static func balanceWarn() async -> Bool {
+        do {
+            var calls: [[String]] = []
+            let (state, coordinator, model, controller) = try prepare { _, args, _, _ in calls.append(args); return output(args) }
+            defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
+            guard model.showsBalanceWarn(.deepseek), !model.showsBalanceWarn(.claude), model.balanceWarnText(.deepseek) == "10",
+                  model.balanceCurrency(.deepseek) == "¥" else { print("阈值初始显示不符"); return false }
+            model.setBalanceWarn("abc", provider: .deepseek)
+            guard model.isDirty, model.hasInvalidBalanceWarn, !model.canSave else { print("非法阈值仍可保存"); return false }
+            model.setBalanceWarn("25", provider: .deepseek)
+            guard model.canSave else { return false }
+            _ = await model.save(); _ = await wait(coordinator)
+            guard state.quotaSources.balanceThreshold(.deepseek) == 25, !model.isDirty,
+                  !calls.contains(where: { $0.first == "config" || $0.first == "usage" }) else { print("阈值保存调用了 CLI 或未写入：\(calls)"); return false }
+            let stored = QuotaSourceStore(root: root).load().list
+            guard stored.balanceThreshold(.deepseek) == 25 else { print("阈值未落盘"); return false }
+            model.setBalanceWarn("", provider: .deepseek); _ = await model.save()
+            guard state.quotaSources.balanceThreshold(.deepseek) == 0, model.balanceWarnText(.deepseek).isEmpty else { print("清空后未关闭提醒"); return false }
+            // 其他保存（停用渠道）不得把阈值冲回默认值。
+            model.setEnabled(false, provider: .codex); _ = await model.save(); _ = await wait(coordinator)
+            return state.quotaSources.balanceThreshold(.deepseek) == 0
+        } catch { print("余额阈值测试失败：\(error)"); return false }
+    }
     /// 用户反馈：移除 DeepSeek 并保存后，“添加渠道…”点不动；列表里还有已添加的渠道；不能搜索。
     static func addAfterRemoveAndSearch() async -> Bool {
         do {
