@@ -28,6 +28,8 @@
 
 **D6　额度。** 调用 CodexBarCLI，只用 DeepSeek、Codex、Claude 和 OpenCodeGo 这 4 个渠道。CodexBar.app 不再常驻。计费数据来自 `cost --breakdown --json`，只有 Claude 和 Codex 有。
 
+2026-10-05 修改：默认仍是这 4 个渠道。用户可以在“额度源设置”里，从 CodexBarCLI 支持的渠道中添加或移除渠道。新增渠道用通用卡片：有 CodexBar 图标就用，没有就用首字母圆形占位；显示窗口、节奏、趋势和历史，参与额度提醒和通知（D13、D41）。花费仍只有 Claude 和 Codex，按会话补刷（D8）仍只管 Claude 和 Codex，其他渠道按 30 分钟周期和手动刷新。渠道清单是本机配置，不进猫包。写 CodexBar 配置的范围见 `AGENTS.md`。
+
 **D7　额度历史。** MeowMac 自己定时采样，写成 JSONL，放在 `~/Library/Application Support/MeowMac/`，保留 90 天。v0.2 时一次性导入 CodexBar 已有的历史文件。
 
 **D8　刷新策略。**
