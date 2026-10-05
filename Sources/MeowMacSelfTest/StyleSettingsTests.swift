@@ -18,7 +18,41 @@ enum StyleSettingsTests {
         state.onCatChanged = { controller.catDidChange() }
         return (state, cats, controller)
     }
-    private static func restoreStyle(_ model: StyleSettingsModel) -> Bool { model.restoreDefault(); return true }
+    private static func resetFromMenu(_ window: NSWindow, title: String) -> Bool {
+        SettingsControlTestSupport.settle(window)
+        guard let button = SettingsControlTestSupport.element(window, id: "appearance.reset") as? NSButton,
+              button.action != nil, let item = button.menu?.item(withTitle: title), item.isEnabled,
+              let action = item.action, let target = item.target else { return false }
+        let sent = NSApplication.shared.sendAction(action, to: target, from: item)
+        SettingsControlTestSupport.settle(window)
+        return sent
+    }
+    static func resetMenu() -> Bool {
+        do {
+            let (state, _, controller) = try prepare()
+            controller.open(section: .appearance, load: false)
+            defer { controller.closeWithoutConfirmation() }
+            guard let window = controller.window, let layout = controller.appearance.layout else { return false }
+            let style = controller.appearance.style
+            style.setBasis(.used); layout.moveTab(.network, to: .system)
+            let layoutDraft = layout.draft
+            guard resetFromMenu(window, title: "恢复默认样式"), style.draft == .default,
+                  layout.draft == layoutDraft, layout.isDirty else { print("默认样式菜单动作或独立草稿断言失败"); return false }
+            style.setEmail(.hidden)
+            let styleDraft = style.draft
+            guard resetFromMenu(window, title: "恢复默认布局"), layout.draft == layout.packageDefault,
+                  style.draft == styleDraft, style.isDirty, state.style == .default, state.panelLayout == .default else { print("默认布局菜单动作或独立草稿断言失败"); return false }
+            controller.appearance.discard()
+            state.selectedCat = nil; controller.catDidChange()
+            SettingsControlTestSupport.settle(window)
+            guard let button = SettingsControlTestSupport.element(window, id: "appearance.reset") as? NSButton,
+                  let menu = button.menu, menu.items.map(\.title) == ["恢复默认样式", "恢复默认布局"],
+                  menu.autoenablesItems == false, menu.items[0].isEnabled, !menu.items[1].isEnabled,
+                  controller.appearance.layout == nil else { print("无猫菜单未禁用布局：\(controller.appearance.layout == nil)，\((SettingsControlTestSupport.element(window, id: "appearance.reset") as? NSButton)?.menu?.items.map { $0.isEnabled } ?? [])"); return false }
+            style.setBasis(.used)
+            return resetFromMenu(window, title: "恢复默认样式") && style.draft == .default
+        } catch { print("恢复默认生产菜单测试失败：\(error)"); return false }
+    }
     private static func clickControl(_ window: NSWindow, id: String) -> Bool {
         SettingsControlTestSupport.settle(window)
         guard let button = SettingsControlTestSupport.element(window, id: id) as? NSButton,
@@ -141,7 +175,7 @@ enum StyleSettingsTests {
                   state.style == .default,
                   clickControl(window, id: "style.color.claude.pink"), model.draft.color(for: .claude) == .pink,
                   let pick = support.element(window, id: "style.color.claude.pink") as? NSButton, pick.state == .on,
-                  restoreStyle(model), !model.isDirty,
+                  resetFromMenu(window, title: "恢复默认样式"), !model.isDirty,
                   clickControl(window, id: "style.color.codex.blue"),
                   clickControl(window, id: "settings.save") else { return false }
             for _ in 0..<50 where controller.appearance.isDirty {
@@ -192,7 +226,7 @@ enum StyleSettingsTests {
                       state.style == .default else { return false }
             }
             try support.capture(window, name: "style-selected-colors")
-            guard restoreStyle(model), !model.isDirty,
+            guard resetFromMenu(window, title: "恢复默认样式"), !model.isDirty,
                   providers.allSatisfy({ matches($0, style: .default) }) else { return false }
             guard clickControl(window, id: "style.color.claude.pink"), model.isDirty,
                   clickControl(window, id: "settings.cancel"), controller.window != nil else { return false }

@@ -269,6 +269,7 @@ enum SelfTestMain {
         tests.append(("UI.PanelLayout/隐藏网络检查后点击总览告警", { await PanelLayoutUITests.hiddenNetworkIssueClick() }))
         tests.append(("UI.StyleIntegration/启动切猫包默认与坏文件", { StyleIntegrationTests.lifecycle() }))
         tests.append(("UI.AppearanceSettings/联合保存与部分失败及无猫", { await StyleSettingsTests.combinedSave() }))
+        tests.append(("UI.AppearanceSettings/恢复默认生产菜单与无猫禁用", { StyleSettingsTests.resetMenu() }))
         tests.append(("UI.SettingsWindow/切栏与关闭三选确认", { await SettingsWindowTests.navigation() }))
         tests.append(("UI.SettingsWindow/单例定位与记忆", { SettingsWindowTests.window() }))
         tests.append(("UI.SettingsWindow/快捷键窗口与修饰键", { SettingsWindowTests.shortcut() }))

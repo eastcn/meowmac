@@ -95,26 +95,30 @@ public struct AppearanceSettingsView: View {
 
 @MainActor
 private struct AppearanceResetButton: NSViewRepresentable {
-    let model: AppearanceSettingsModel
+    @ObservedObject var model: AppearanceSettingsModel
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
     func makeNSView(context: Context) -> NSButton {
         let button = NSButton(title: "恢复默认…", target: context.coordinator, action: #selector(Coordinator.showMenu(_:)))
         button.bezelStyle = .rounded
         button.setAccessibilityIdentifier("appearance.reset")
+        button.menu = context.coordinator.makeMenu()
         return button
     }
-    func updateNSView(_ nsView: NSButton, context: Context) {}
+    func updateNSView(_ nsView: NSButton, context: Context) { nsView.menu = context.coordinator.makeMenu() }
     @MainActor final class Coordinator: NSObject {
         let model: AppearanceSettingsModel
         init(model: AppearanceSettingsModel) { self.model = model }
         @objc func showMenu(_ sender: NSButton) {
+            sender.menu?.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY), in: sender)
+        }
+        func makeMenu() -> NSMenu {
             let menu = NSMenu()
             let style = menu.addItem(withTitle: "恢复默认样式", action: #selector(resetStyle), keyEquivalent: "")
             style.target = self
             let layout = menu.addItem(withTitle: "恢复默认布局", action: #selector(resetLayout), keyEquivalent: "")
             layout.target = self; layout.isEnabled = model.layout != nil
             menu.autoenablesItems = false
-            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY), in: sender)
+            return menu
         }
         @objc func resetStyle() { model.style.restoreDefault() }
         @objc func resetLayout() { model.layout?.restoreDefault() }
