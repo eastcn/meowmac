@@ -92,6 +92,8 @@ enum SelfTestMain {
             ("UI.NetworkSettings/真实控件与合成预览", { NetworkSettingsTests.controlsAndPreviews() }),
             ("UI.QuotaSettings/命令顺序与 stdin 凭据", { await QuotaSourceSettingsTests.commands() }),
             ("UI.QuotaSettings/部分失败保留草稿", { await QuotaSourceSettingsTests.partialFailure() }),
+            ("UI.QuotaSettings/停用后重启先读取启停", { await QuotaSourceSettingsTests.disabledRestart() }),
+            ("UI.QuotaSettings/启停读取失败不采集", { await QuotaSourceSettingsTests.startupStatusFailure() }),
             ("UI.QuotaSettings/定时后测试限频", { await QuotaSourceSettingsTests.throttles(0) }),
             ("UI.QuotaSettings/保存后测试限频", { await QuotaSourceSettingsTests.throttles(1) }),
             ("UI.QuotaSettings/测试后保存限频", { await QuotaSourceSettingsTests.throttles(2) }),

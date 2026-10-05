@@ -19,6 +19,8 @@ public final class QuotaCoordinator {
     private var sessionTimer: Timer?
     private var lastPrunedAt: Date?
     private var refreshing = false
+    private var starting = false
+    private var startupTask: Task<Void, Never>?
     private var sleeping = false
     private var observers: [NSObjectProtocol] = []
 
@@ -34,6 +36,8 @@ public final class QuotaCoordinator {
     }
 
     public func start() {
+        guard startupTask == nil else { return }
+        starting = true
         state.showsCodexBarImport = !codexBarImportDone
         do { try history.prune(before: Date().addingTimeInterval(Double(-config.quotaHistoryDays) * 86400)); lastPrunedAt = Date() }
         catch { logger.error("额度历史清理失败：\(error.localizedDescription, privacy: .private)") }
@@ -59,11 +63,29 @@ public final class QuotaCoordinator {
                 if self.schedule.wake(at: Date(), config: self.config) { self.refreshAll() }
             }
         })
-        refreshAll()
-        pollSessions()
+        let client = self.client
+        startupTask = Task { [weak self] in
+            let result = await Task.detached { Result { try client.providers() } }.value
+            guard let self, !Task.isCancelled else { return }
+            switch result {
+            case .success(let entries):
+                self.sourceEnabled = Dictionary(entries.map { ($0.provider, $0.enabled) }, uniquingKeysWith: { _, new in new })
+                for provider in self.state.quotaProviders where self.sourceEnabled[provider] == nil { self.sourceEnabled[provider] = false }
+            case .failure:
+                self.sourceEnabled = Dictionary(uniqueKeysWithValues: self.state.quotaProviders.map { ($0, false) })
+                for provider in self.state.quotaProviders {
+                    self.state.quotaErrors[provider] = "无法读取渠道启停状态。请打开额度源设置重试，再手动刷新。"
+                }
+                self.logger.error("启动时读取渠道启停状态失败，未自动采集额度")
+            }
+            self.starting = false
+            self.refreshAll()
+            self.pollSessions()
+        }
     }
 
     public func stop() {
+        startupTask?.cancel(); startupTask = nil; starting = false
         refreshTimer?.invalidate(); sessionTimer?.invalidate()
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers.removeAll()
@@ -105,7 +127,7 @@ public final class QuotaCoordinator {
         drain()
     }
 
-    public var isRefreshing: Bool { refreshing }
+    public var isRefreshing: Bool { refreshing || starting }
     public private(set) var lastActualCalls: [QuotaProvider: Date] = [:]
     private var explicitRequests = Set<QuotaProvider>()
     private var pending: [QuotaProvider: Date] = [:]
@@ -152,7 +174,7 @@ public final class QuotaCoordinator {
 
     /// 按真实调用串行刷新，防止多个入口绕过 Claude 的限频或覆盖移除后的缓存。
     public func drain() {
-        guard !sleeping, !refreshing else { return }
+        guard !sleeping, !refreshing, !starting else { return }
         guard let provider = state.quotaProviders.first(where: { (pending[$0].map { $0 <= state.now() } ?? false) && (sourceEnabled[$0] != false || explicitRequests.contains($0)) }) else { return }
         let remaining = cooldownRemaining(provider)
         if remaining > 0 { pending[provider] = state.now().addingTimeInterval(remaining); return }

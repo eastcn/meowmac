@@ -74,6 +74,47 @@ enum QuotaSourceSettingsTests {
             return true
         } catch { return false }
     }
+    static func disabledRestart() async -> Bool {
+        do {
+            var enabled = true, usages: [String] = [], events: [String] = []
+            let (state, first, _) = try prepare { _, args, _, _ in
+                if args.contains("disable") { enabled = false }
+                if args.contains("providers") {
+                    events.append("providers")
+                    return CLIOutput(stdout: Data("[{\"provider\":\"claude\",\"displayName\":\"Claude\",\"enabled\":\(enabled)},{\"provider\":\"openrouter\",\"displayName\":\"OpenRouter\",\"enabled\":true}]".utf8))
+                }
+                if args.first == "usage" { usages.append(args[2]); events.append("usage") }
+                return output(args)
+            }
+            defer { try? FileManager.default.removeItem(at: root) }
+            try first.replaceSources(QuotaSourceList(providers: [.claude, QuotaSourceTests.router]))
+            let model = QuotaSourceSettingsModel(state: state, coordinator: first, catalog: all)
+            model.setEnabled(false, provider: .claude); await model.save()
+            guard await wait(first), !enabled else { return false }
+            usages = []; events = []
+            let restarted = QuotaCoordinator(state: PanelState(), config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: first.client, sourceStore: first.sourceStore)
+            restarted.start(); defer { restarted.stop() }
+            guard await wait(restarted) else { return false }
+            return restarted.sourceEnabled[.claude] == false && usages == ["openrouter"] && events.first == "providers"
+        } catch { return false }
+    }
+    static func startupStatusFailure() async -> Bool {
+        do {
+            var calls = 0
+            let (_, first, _) = try prepare { _, args, _, _ in
+                if args.contains("providers") { return CLIOutput(status: 1) }
+                if args.first == "usage" { calls += 1 }
+                return output(args)
+            }
+            defer { try? FileManager.default.removeItem(at: root) }
+            try first.replaceSources(QuotaSourceList(providers: [QuotaSourceTests.router]))
+            let state = PanelState()
+            let restarted = QuotaCoordinator(state: state, config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: first.client, sourceStore: first.sourceStore)
+            restarted.start(); defer { restarted.stop() }
+            return await wait(restarted) && calls == 0 && restarted.lastActualCalls.isEmpty
+                && state.quotaErrors[QuotaSourceTests.router]?.contains("启停状态") == true
+        } catch { return false }
+    }
     static func throttles(_ mode: Int) async -> Bool {
         do {
             var now = Date(timeIntervalSince1970: 1_000_000), claudeCalls = 0
