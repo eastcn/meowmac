@@ -40,6 +40,8 @@ public enum SettingsMenu {
         menu.addItem(catItem)
         add("布局与显示…", enabled: state.selectedCat != nil, action: state.onShowLayoutSettings)
         add("样式…", action: state.onShowStyleSettings)
+        add("网络设置…", action: state.onShowNetworkSettings)
+        add("额度源设置…", action: state.onShowQuotaSourceSettings)
         let terminalItem = NSMenuItem(title: "清理终端", action: nil, keyEquivalent: "")
         terminalItem.submenu = cleanTerminalMenu(state: state)
         menu.addItem(terminalItem)

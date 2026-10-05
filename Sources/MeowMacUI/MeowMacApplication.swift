@@ -26,6 +26,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             SettingsMenu.presentCleanTerminals(state: self.panelState, anchor: button)
         })
     private lazy var layoutSettings = LayoutSettingsController(state: panelState)
+    private var networkSettings: NetworkSettingsController?
+    private var quotaSourceSettings: QuotaSourceSettingsController?
     private lazy var styleSettings = StyleSettingsController(state: panelState)
     private let logger = Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "app")
     private let collector = SystemCollector()
@@ -82,6 +84,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         bridge.start()
         let quota = QuotaCoordinator(state: panelState, config: configResult.config)
         quotaCoordinator = quota
+        networkSettings = NetworkSettingsController(network: bridge.model)
+        quotaSourceSettings = QuotaSourceSettingsController(state: panelState, coordinator: quota)
         panelState.onQuotaSourcesRemoved = { [weak self] providers in self?.notificationCoordinator?.removeProviders(providers) }
         let absent = QuotaCatalog.usageNames.keys.compactMap(QuotaProvider.init(rawValue:)).filter { !panelState.quotaProviders.contains($0) }
         notificationCoordinator?.removeProviders(absent)
@@ -108,6 +112,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         panelState.onShowCats = { [weak self] in self?.showCats() }
         panelState.onShowLayoutSettings = { [weak self] in self?.layoutSettings.present() }
         panelState.onShowStyleSettings = { [weak self] in self?.styleSettings.present() }
+        panelState.onShowNetworkSettings = { [weak self] in self?.networkSettings?.present() }
+        panelState.onShowQuotaSourceSettings = { [weak self] in self?.quotaSourceSettings?.present() }
         panelState.onImportCodexBarHistory = { [weak self] in self?.importCodexBarHistory() }
         panelState.onCatChanged = { [weak self] in
             self?.layoutSettings.catDidChange(); self?.styleSettings.catDidChange()

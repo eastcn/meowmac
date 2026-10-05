@@ -233,7 +233,9 @@ enum SelfTestMain {
         tests.append(("UI.Quota/近七天花费快照", { CostTests.snapshot() }))
         tests.append(("UI.Settings/原生菜单", { @MainActor in
             let state = PanelPreviewRenderer.syntheticState(); state.loginEnabled = true
-            var selected: String?, imported = false, shown = false, importedHistory = false
+            var selected: String?, imported = false, shown = false, importedHistory = false, networkOpened = false, quotaOpened = false
+            state.onShowNetworkSettings = { networkOpened = true }
+            state.onShowQuotaSourceSettings = { quotaOpened = true }
             state.onImportCodexBarHistory = { importedHistory = true }
             state.onSelectCat = { selected = $0 }
             state.onImportCat = { imported = true }
@@ -246,14 +248,18 @@ enum SelfTestMain {
                 let item = cats.items[index]
                 guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
             }
-            let historyItem = menu.items[8]
+            for index in [6, 7] {
+                let item = menu.items[index]
+                guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
+            }
+            let historyItem = menu.items[10]
             guard historyItem.title == "导入 CodexBar 历史…", let historyAction = historyItem.action,
                   NSApplication.shared.sendAction(historyAction, to: historyItem.target, from: historyItem) else { return false }
-            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "样式…", "清理终端", "系统通知", "导入 CodexBar 历史…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
-                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].isEnabled && menu.items[9].state == .on
-                && menu.items[7].submenu != nil
-                && menu.items[2].isSeparatorItem && menu.items[10].isSeparatorItem && menu.items[12].keyEquivalent == "q"
-                && selected == "builtin.round" && imported && shown && importedHistory
+            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "样式…", "网络设置…", "额度源设置…", "清理终端", "系统通知", "导入 CodexBar 历史…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
+                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].isEnabled && menu.items[11].state == .on
+                && menu.items[9].submenu != nil
+                && menu.items[2].isSeparatorItem && menu.items[12].isSeparatorItem && menu.items[14].keyEquivalent == "q"
+                && selected == "builtin.round" && imported && shown && importedHistory && networkOpened && quotaOpened
                 && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
         tests.append(("UI.Cat/真实初始化与诊断快照", { CatIntegrationTests.snapshotAndSwitch() }))

@@ -167,6 +167,8 @@ public final class PanelState: ObservableObject {
     public var onShowCats: () -> Void = {}
     public var onShowLayoutSettings: () -> Void = {}
     public var onShowStyleSettings: () -> Void = {}
+    public var onShowNetworkSettings: () -> Void = {}
+    public var onShowQuotaSourceSettings: () -> Void = {}
     public var onImportCodexBarHistory: () -> Void = {}
     /// 系统通知（D41）：开关、授权状态（nil 表示未知）和菜单回调。
     @Published public var notificationSettings = NotificationSettings()
