@@ -128,6 +128,9 @@ enum NetworkSettingsTests {
         do {
             for tab in NetworkSettingsTab.allCases {
                 guard click(window, id: "network.tab.\(tab)"), controller.model.tab == tab else { return false }
+                guard let selected = SettingsControlTestSupport.element(window, id: "network.tab.\(tab)") as? NSButton,
+                      let titleColor = selected.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor,
+                      selected.bezelColor == nil, titleColor == .controlAccentColor else { print("选中分页文字与底色同色"); return false }
                 if tab == .sites {
                     guard SettingsControlTestSupport.element(window, id: "ID") == nil,
                           SettingsControlTestSupport.element(window, id: "network.proxyDiagnostics") == nil else { print("站点页仍有额外字段"); return false }

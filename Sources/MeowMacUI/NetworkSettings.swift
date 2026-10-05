@@ -301,7 +301,8 @@ private struct NetworkSettingsButton: NSViewRepresentable {
     func updateNSView(_ button: NSButton, context: Context) {
         context.coordinator.action = action; button.isEnabled = enabled
         if let checked { button.state = checked ? .on : .off }
-        button.bezelColor = selected ? .controlAccentColor : nil
+        // 选中分页只用强调色粗体文字标出，底色保持普通按钮；底色也用强调色会让标题看不见。
+        button.bezelColor = nil
         let color = !enabled ? NSColor.disabledControlTextColor : (selected ? NSColor.controlAccentColor : NSColor.labelColor)
         let text = NSMutableAttributedString(string: title, attributes: [.foregroundColor: color, .font: selected ? NSFont.boldSystemFont(ofSize: 13) : NSFont.systemFont(ofSize: 13)])
         if error { text.append(NSAttributedString(string: " ●", attributes: [.foregroundColor: NSColor.systemRed])) }
