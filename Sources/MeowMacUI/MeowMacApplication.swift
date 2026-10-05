@@ -25,10 +25,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             self.popover?.performClose(nil)
             SettingsMenu.presentCleanTerminals(state: self.panelState, anchor: button)
         })
-    private lazy var layoutSettings = LayoutSettingsController(state: panelState)
-    private var networkSettings: NetworkSettingsController?
-    private var quotaSourceSettings: QuotaSourceSettingsController?
-    private lazy var styleSettings = StyleSettingsController(state: panelState)
+    private var settingsWindow: SettingsWindowController?
     private let logger = Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "app")
     private let collector = SystemCollector()
     private var energyTracker = EnergyTracker()
@@ -84,8 +81,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         bridge.start()
         let quota = QuotaCoordinator(state: panelState, config: configResult.config)
         quotaCoordinator = quota
-        networkSettings = NetworkSettingsController(network: bridge.model)
-        quotaSourceSettings = QuotaSourceSettingsController(state: panelState, coordinator: quota)
+        let settings = SettingsWindowController(state: panelState, network: bridge.model, quotaCoordinator: quota)
+        settingsWindow = settings
+        settings.ownsWindow = { [weak self] window in self?.popover?.contentViewController?.view.window === window }
+        settings.installShortcutMonitor()
         panelState.onQuotaSourcesRemoved = { [weak self] providers in self?.notificationCoordinator?.removeProviders(providers) }
         let absent = QuotaCatalog.usageNames.keys.compactMap(QuotaProvider.init(rawValue:)).filter { !panelState.quotaProviders.contains($0) }
         notificationCoordinator?.removeProviders(absent)
@@ -110,14 +109,12 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         panelState.onSelectCat = { [weak self] id in self?.selectCat(id) }
         panelState.onImportCat = { [weak self] in self?.importCat() }
         panelState.onShowCats = { [weak self] in self?.showCats() }
-        panelState.onShowLayoutSettings = { [weak self] in self?.layoutSettings.present() }
-        panelState.onShowStyleSettings = { [weak self] in self?.styleSettings.present() }
-        panelState.onShowNetworkSettings = { [weak self] in self?.networkSettings?.present() }
-        panelState.onShowQuotaSourceSettings = { [weak self] in self?.quotaSourceSettings?.present() }
-        panelState.onImportCodexBarHistory = { [weak self] in self?.importCodexBarHistory() }
-        panelState.onCatChanged = { [weak self] in
-            self?.layoutSettings.catDidChange(); self?.styleSettings.catDidChange()
+        panelState.onOpenSettings = { [weak self] section in
+            self?.settingsWindow?.open(section: section)
+            self?.popover?.performClose(nil)
         }
+        panelState.onImportCodexBarHistory = { [weak self] in self?.importCodexBarHistory() }
+        panelState.onCatChanged = { [weak self] in self?.settingsWindow?.catDidChange() }
         panelState.onQuit = { NSApplication.shared.terminate(nil) }
         panelState.loginEnabled = loginItem.status == .enabled
         panelState.onToggleLogin = { [weak self] enabled in
@@ -284,6 +281,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         if !popover.isShown {
             panelState.open()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            NSApp.activate(ignoringOtherApps: true)
         }
         panelState.showingReminders = false
         panelState.select(tab)
@@ -295,6 +293,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         else {
             panelState.open()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
@@ -410,6 +409,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
+        settingsWindow?.removeShortcutMonitor()
         sampleTimer?.invalidate()
         energyLoop?.cancel()
         networkBridge?.stop()

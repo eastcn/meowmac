@@ -8,7 +8,13 @@ import AppKit
 
 @main
 enum SelfTestMain {
-    @MainActor static func main() async {
+    @MainActor static func main() {
+        // 原生控件会泵送 RunLoop；由 AppKit 托管主循环，避免 async-main 提前结束。
+        NSApplication.shared.setActivationPolicy(.accessory)
+        Task { @MainActor in await runTests() }
+        NSApplication.shared.run()
+    }
+    @MainActor static func runTests() async {
         var tests: [(String, @MainActor () async -> Bool)] = [
             ("Core.Smoke/版本号", { AppIdentity.version == "0.1.0" }),
             ("Core.Config/文件不存在", { SelfTestMain.missingConfig() }),
@@ -238,36 +244,23 @@ enum SelfTestMain {
         tests.append(("UI.Quota/花费点击与渠道切换", { CostTests.selection() }))
         tests.append(("UI.Quota/近七天花费快照", { CostTests.snapshot() }))
         tests.append(("UI.Settings/原生菜单", { @MainActor in
-            let state = PanelPreviewRenderer.syntheticState(); state.loginEnabled = true
-            var selected: String?, imported = false, shown = false, importedHistory = false, networkOpened = false, quotaOpened = false
-            state.onShowNetworkSettings = { networkOpened = true }
-            state.onShowQuotaSourceSettings = { quotaOpened = true }
-            state.onImportCodexBarHistory = { importedHistory = true }
-            state.onSelectCat = { selected = $0 }
-            state.onImportCat = { imported = true }
-            state.onShowCats = { shown = true }
+            let state = PanelPreviewRenderer.syntheticState()
+            var opened = false, config = false, folder = false, quit = false
+            state.onOpenSettings = { opened = $0 == nil }
+            state.onOpenConfig = { config = true }; state.onShowConfigFolder = { folder = true }; state.onQuit = { quit = true }
             let menu = SettingsMenu.make(state: state)
-            guard let cats = menu.items[3].submenu,
-                  cats.items.map(\.title) == ["标准瘦身", "圆润", "圆润美短", "瘦身橘白", "", "导入猫配置…", "在访达中显示猫配置"],
-                  cats.items[0].state == .on, cats.items[1].state == .off else { return false }
-            for index in [1, 5, 6] {
-                let item = cats.items[index]
-                guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
-            }
-            for index in [6, 7] {
+            guard menu.items.map(\.title) == ["设置…", "", "打开配置文件…", "在访达中显示配置目录", "", "关于 MeowMac", "退出 MeowMac"],
+                  menu.items[0].keyEquivalent == ",", menu.items[6].keyEquivalent == "q", menu.items.allSatisfy({ $0.submenu == nil }),
+                  menu.items[1].isSeparatorItem, menu.items[4].isSeparatorItem else { return false }
+            for index in [0, 2, 3, 6] {
                 let item = menu.items[index]
                 guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
             }
-            let historyItem = menu.items[10]
-            guard historyItem.title == "导入 CodexBar 历史…", let historyAction = historyItem.action,
-                  NSApplication.shared.sendAction(historyAction, to: historyItem.target, from: historyItem) else { return false }
-            return menu.items.map(\.title) == ["打开配置文件…", "在访达中显示配置目录", "", "猫配置", "布局与显示…", "样式…", "网络设置…", "额度源设置…", "清理终端", "系统通知", "导入 CodexBar 历史…", "开机启动", "", "关于 MeowMac", "退出 MeowMac"]
-                && menu.items[3].isEnabled && menu.items[4].isEnabled && menu.items[5].isEnabled && menu.items[11].state == .on
-                && menu.items[9].submenu != nil
-                && menu.items[2].isSeparatorItem && menu.items[12].isSeparatorItem && menu.items[14].keyEquivalent == "q"
-                && selected == "builtin.round" && imported && shown && importedHistory && networkOpened && quotaOpened
-                && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
+            return opened && config && folder && quit && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
+        tests.append(("UI.Settings/即时设置回调与条件", { ImmediateSettingsTests.callbacks() }))
+        tests.append(("UI.Settings/六栏合成窗口预览", { await ImmediateSettingsTests.previews() }))
+        tests.append(("UI.Settings/空渠道入口", { ImmediateSettingsTests.quotaLink() }))
         tests.append(("UI.Cat/真实初始化与诊断快照", { CatIntegrationTests.snapshotAndSwitch() }))
         tests.append(("UI.Cat/同名导入菜单", { CatIntegrationTests.menuDuplicates() }))
         tests.append(("UI.Panel/真实容器的自然高度与切换", { await PanelLayoutTests.heights() }))
@@ -275,14 +268,18 @@ enum SelfTestMain {
         tests.append(("UI.PanelLayout/默认与极端容器尺寸", { await PanelLayoutUITests.sizes() }))
         tests.append(("UI.PanelLayout/隐藏网络检查后点击总览告警", { await PanelLayoutUITests.hiddenNetworkIssueClick() }))
         tests.append(("UI.StyleIntegration/启动切猫包默认与坏文件", { StyleIntegrationTests.lifecycle() }))
+        tests.append(("UI.AppearanceSettings/联合保存与部分失败及无猫", { await StyleSettingsTests.combinedSave() }))
+        tests.append(("UI.SettingsWindow/切栏与关闭三选确认", { await SettingsWindowTests.navigation() }))
+        tests.append(("UI.SettingsWindow/单例定位与记忆", { SettingsWindowTests.window() }))
+        tests.append(("UI.SettingsWindow/快捷键窗口与修饰键", { SettingsWindowTests.shortcut() }))
         tests.append(("UI.StyleSettings/原生菜单与保存生命周期", { StyleSettingsTests.lifecycle() }))
-        tests.append(("UI.StyleSettings/真实控件与色板", { StyleSettingsTests.controls() }))
-        tests.append(("UI.StyleSettings/渠道预览条与草稿颜色", { StyleSettingsTests.colorPreviews() }))
+        tests.append(("UI.StyleSettings/真实控件与色板", { await StyleSettingsTests.controls() }))
+        tests.append(("UI.StyleSettings/渠道预览条与草稿颜色", { await StyleSettingsTests.colorPreviews() }))
         tests.append(("UI.LayoutSettings/原生菜单与草稿", { LayoutSettingsTests.menuAndDraft() }))
         tests.append(("UI.LayoutSettings/保存失败与切猫", { LayoutSettingsTests.saveAndFailure() }))
         tests.append(("UI.LayoutSettings/拖动回调与坏文件提示", { await LayoutSettingsTests.dropAndRecovery() }))
         tests.append(("UI.LayoutSettings/总览拖动与缺失窗口", { await LayoutSettingsTests.overview() }))
-        tests.append(("UI.LayoutSettings/真实控件操作", { LayoutSettingsTests.actualControls() }))
+        tests.append(("UI.LayoutSettings/真实控件操作", { await LayoutSettingsTests.actualControls() }))
         tests.append(("UI.LayoutSettings/快照到达刷新与选择保留", { LayoutSettingsTests.snapshotArrival() }))
         tests.append(("UI.LayoutSettings/总览指标共用颜色", { LayoutSettingsTests.overviewColors() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
@@ -294,14 +291,17 @@ enum SelfTestMain {
         let filters = CommandLine.arguments.dropFirst().map { $0.lowercased() }
         if filters.contains("--list") {
             tests.forEach { print($0.0) }
-            return
+            exit(0)
         }
-        var failed = 0
+        var failed = 0, executed = 0
         for (name, run) in tests where (filters.isEmpty || filters.contains(where: { name.lowercased().contains($0) })) && (!name.contains(".Live") || ProcessInfo.processInfo.environment["MEOWMAC_LIVE"] == "1") {
+            if ProcessInfo.processInfo.environment["MEOWMAC_TEST_TRACE"] == "1" { print("START \(name)"); fflush(stdout) }
+            executed += 1
             if await run() { print("PASS \(name)") }
             else { print("FAIL \(name)"); failed += 1 }
         }
-        if failed > 0 { exit(1) }
+        print("自测完成：\(executed) 项，\(failed) 项失败")
+        exit(failed > 0 ? 1 : 0)
     }
 
     private static func temporaryConfig(_ contents: String?, check: (URL) -> Bool) -> Bool {

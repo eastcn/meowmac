@@ -73,7 +73,8 @@ public final class PanelState: ObservableObject {
     @Published public var quotaSourceRecoveryReason: String?
     public var onQuotaSourcesRemoved: ([QuotaProvider]) -> Void = { _ in }
     public var quotaProviders: [QuotaProvider] { quotaSources.providers }
-    public var quotaEmptyMessage: String { "还没有额度渠道，在 设置 → 额度源设置… 中添加" }
+    public func openQuotaSourceSettings() { onOpenSettings(.quotaSources) }
+    public var quotaEmptyMessage: String { "还没有额度渠道，在设置的“额度源”栏中添加" }
     public func sourcesWithWindowFallbacks(_ list: QuotaSourceList) -> QuotaSourceList {
         var result = list
         result.overviewWindowKinds = quotaSources.overviewWindowKinds.merging(list.overviewWindowKinds) { _, new in new }
@@ -173,10 +174,7 @@ public final class PanelState: ObservableObject {
     public var onSelectCat: (String) -> Void = { _ in }
     public var onImportCat: () -> Void = {}
     public var onShowCats: () -> Void = {}
-    public var onShowLayoutSettings: () -> Void = {}
-    public var onShowStyleSettings: () -> Void = {}
-    public var onShowNetworkSettings: () -> Void = {}
-    public var onShowQuotaSourceSettings: () -> Void = {}
+    public var onOpenSettings: (SettingsSection?) -> Void = { _ in }
     public var onImportCodexBarHistory: () -> Void = {}
     /// 系统通知（D41）：开关、授权状态（nil 表示未知）和菜单回调。
     @Published public var notificationSettings = NotificationSettings()
