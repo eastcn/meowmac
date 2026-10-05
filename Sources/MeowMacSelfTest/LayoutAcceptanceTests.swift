@@ -119,10 +119,10 @@ enum LayoutAcceptanceTests {
             let settingsRoot = directory.appendingPathComponent("test-root-settings", isDirectory: true)
             if FileManager.default.fileExists(atPath: settingsRoot.path) { try FileManager.default.removeItem(at: settingsRoot) }
             let settingsState = state(root: settingsRoot)
-            let settings = LayoutSettingsController(state: settingsState)
-            settings.present()
-            guard let settingsWindow = settings.window, let model = settings.model,
-                  settingsWindow.contentRect(forFrameRect: settingsWindow.frame).width == 520 else { return false }
+            let settings = SettingsWindowController(state: settingsState)
+            settings.open(section: .appearance)
+            guard let settingsWindow = settings.window, let model = settings.appearance.layout,
+                  settingsWindow.contentRect(forFrameRect: settingsWindow.frame).width == 760 else { return false }
             for tab in PanelTab.allCases {
                 model.selectedTab = tab
                 try capture(settingsWindow.contentView!, to: directory.appendingPathComponent("settings-" + tab.rawValue + ".png"))
@@ -144,15 +144,16 @@ enum LayoutAcceptanceTests {
                 return false
             }
             try capture(settingsWindow.contentView!, to: directory.appendingPathComponent("settings-save-failure.png"))
-            settingsWindow.close()
+            settings.appearance.discard()
+            settings.closeWithoutConfirmation()
             let folder = settingsRoot.appendingPathComponent("PanelLayouts", isDirectory: true)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try Data("{broken".utf8).write(to: folder.appendingPathComponent("builtin.slim.json"))
             settingsState.loadLayoutForSelectedCat()
-            settings.present()
-            guard settings.model?.error != nil, let recoveryWindow = settings.window else { return false }
+            settings.open(section: .appearance)
+            guard settings.appearance.layout?.error != nil, let recoveryWindow = settings.window else { return false }
             try capture(recoveryWindow.contentView!, to: directory.appendingPathComponent("settings-recovery.png"))
-            recoveryWindow.close()
+            settings.closeWithoutConfirmation()
             try JSONEncoder().encode(records).write(to: directory.appendingPathComponent("layout-report.json"), options: .atomic)
             print("布局合成验收：\(records.count) 个真实面板容器截图，6 个原生窗口状态；输出 \(directory.path)")
             return records.count == 26

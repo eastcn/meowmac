@@ -5,7 +5,7 @@ import MeowMacUI
 @MainActor
 enum StyleSettingsTests {
     private static let root = URL(fileURLWithPath: "build/acceptance/style-tests/window-app", isDirectory: true)
-    private static func prepare() throws -> (PanelState, CatStore, StyleSettingsController) {
+    private static func prepare() throws -> (PanelState, CatStore, SettingsWindowController) {
         let manager = FileManager.default
         try manager.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
         if manager.fileExists(atPath: root.path) { try manager.removeItem(at: root) }
@@ -13,23 +13,84 @@ enum StyleSettingsTests {
         let cats = CatStore(rootURL: root)
         CatRuntime.initialize(state: state, store: cats)
         state.styleStore = StyleStore(rootURL: root)
-        let controller = StyleSettingsController(state: state)
-        state.onShowStyleSettings = { controller.present() }
+        let controller = SettingsWindowController(state: state)
+        state.onOpenSettings = { controller.open(section: $0) }
         state.onCatChanged = { controller.catDidChange() }
         return (state, cats, controller)
+    }
+    private static func restoreStyle(_ model: StyleSettingsModel) -> Bool { model.restoreDefault(); return true }
+    private static func clickControl(_ window: NSWindow, id: String) -> Bool {
+        SettingsControlTestSupport.settle(window)
+        guard let button = SettingsControlTestSupport.element(window, id: id) as? NSButton,
+              button.isEnabled else { return false }
+        button.performClick(nil)
+        SettingsControlTestSupport.settle(window)
+        return true
+    }
+    static func combinedSave() async -> Bool {
+        do {
+            let (state, _, controller) = try prepare()
+            defer { controller.closeWithoutConfirmation() }
+            controller.open(section: .appearance)
+            let model = controller.appearance
+            guard let layout = model.layout else { return false }
+            model.style.setBasis(.used)
+            guard await model.save(), state.style.quotaBasis == .used, !model.isDirty,
+                  state.panelLayout == .default else { return false }
+            layout.setVisible(false, id: "quota.cost", in: .quota)
+            guard await model.save(), !model.isDirty, state.style.quotaBasis == .used,
+                  !state.panelLayout.placements(for: .quota).first(where: { $0.id == "quota.cost" })!.visible else { return false }
+            model.style.setEmail(.masked)
+            layout.moveTab(.network, to: .system)
+            guard await model.save(), !model.isDirty, state.style.email == .masked,
+                  state.panelLayout.tabs.first == .network else { return false }
+            let savedStyle = model.style.saved
+            let savedLayout = layout.saved
+            model.style.setChartMinutes(15)
+            layout.moveTab(.quota, to: .network)
+            model.discard()
+            guard model.style.draft == savedStyle, layout.draft == savedLayout, !model.isDirty else { return false }
+            state.layoutStore = PanelLayoutStore(rootURL: root, beforePublish: { throw PanelLayoutError.invalid("合成布局失败") })
+            model.style.setEmail(.hidden)
+            layout.moveTab(.quota, to: .network)
+            let styleDraft = model.style.draft
+            let layoutDraft = layout.draft
+            guard !(await model.save()), model.statusText.contains("样式已保存"),
+                  model.statusText.contains("布局保存失败"), model.statusText.contains("合成布局失败"),
+                  model.style.draft == styleDraft, layout.draft == layoutDraft,
+                  !model.style.isDirty, layout.isDirty, state.style == styleDraft,
+                  state.panelLayout == savedLayout else { return false }
+            layout.selectedTab = .network
+            guard model.statusText.contains("样式已保存"), model.statusText.contains("布局保存失败") else { return false }
+            model.discard()
+            guard model.style.draft == styleDraft, layout.draft == savedLayout, !model.isDirty else { return false }
+            // 反向失败同样保留草稿，已成功的布局不回滚。
+            state.layoutStore = PanelLayoutStore(rootURL: root)
+            state.styleStore = StyleStore(rootURL: root, beforePublish: { throw StyleError.invalid("合成样式失败") })
+            model.style.setChartMinutes(15)
+            layout.moveTab(.quota, to: .network)
+            let nextLayout = layout.draft
+            guard !(await model.save()), model.statusText.contains("样式保存失败"),
+                  model.statusText.contains("布局已保存"), model.style.isDirty, !layout.isDirty,
+                  state.panelLayout == nextLayout else { return false }
+            let noCat = PanelState()
+            noCat.selectedCat = nil
+            noCat.styleStore = StyleStore(rootURL: root.appendingPathComponent("no-cat"))
+            let noCatModel = AppearanceSettingsModel(state: noCat)
+            noCatModel.style.setEmail(.hidden)
+            let noCatSaved = await noCatModel.save()
+            return noCatModel.layout == nil && noCatSaved && noCat.style.email == .hidden
+        } catch { print("外观联合保存测试失败：\(error)"); return false }
     }
     static func lifecycle() -> Bool {
         do {
             let (state, cats, controller) = try prepare()
-            defer { controller.window?.close() }
-            let menu = SettingsMenu.make(state: state)
-            guard let index = menu.items.firstIndex(where: { $0.title == "布局与显示…" }),
-                  menu.items[index + 1].title == "样式…", let action = menu.items[index + 1].action,
-                  NSApplication.shared.sendAction(action, to: menu.items[index + 1].target, from: menu.items[index + 1]),
-                  let window = controller.window, let model = controller.model, window.title == "样式",
-                  window.contentRect(forFrameRect: window.frame).width == 520 else { return false }
-            controller.present()
-            guard controller.window === window, controller.model === model else { return false }
+            defer { controller.closeWithoutConfirmation() }
+            controller.open(section: .appearance)
+            guard let window = controller.window, let model = Optional(controller.appearance.style), window.title == "设置",
+                  window.contentRect(forFrameRect: window.frame).width == 760 else { return false }
+            controller.open(section: .appearance)
+            guard controller.window === window, controller.appearance.style === model else { return false }
             model.setBasis(.used); model.setEmail(.masked); model.setChartMinutes(15); model.setColor(.teal, for: .claude)
             guard state.style == .default, model.isDirty, model.emailExample == "账号邮箱示例：n***@e***" else { return false }
             model.setEmail(.hidden)
@@ -37,35 +98,35 @@ enum StyleSettingsTests {
             model.restoreDefault()
             guard !model.isDirty, state.style == .default else { return false }
             model.setBasis(.used); let changed = model.draft; model.save()
-            guard controller.window == nil, state.style == changed,
+            guard controller.window != nil, state.style == changed,
                   StyleStore(rootURL: root).load().settings == changed else { return false }
             let file = root.appendingPathComponent("style.json")
             let bytes = try Data(contentsOf: file)
             state.styleStore = StyleStore(rootURL: root, beforePublish: { throw StyleError.invalid("合成保存失败") })
-            controller.present()
-            guard let failed = controller.model else { return false }
+            controller.open(section: .appearance)
+            guard let failed = Optional(controller.appearance.style) else { return false }
             failed.setEmail(.hidden); failed.save()
             guard controller.window != nil, failed.isDirty, failed.error != nil, state.style == changed,
                   (try Data(contentsOf: file)) == bytes else { return false }
             failed.cancel()
-            guard controller.window == nil else { return false }
-            controller.present(); controller.model?.setChartMinutes(15); controller.window?.close()
+            guard controller.window != nil, !failed.isDirty, failed.draft == changed else { return false }
+            controller.open(section: .appearance); controller.appearance.style.setChartMinutes(15); controller.appearance.discard(); controller.closeWithoutConfirmation()
             guard state.style == changed, (try Data(contentsOf: file)) == bytes else { return false }
-            controller.present(); controller.model?.setEmail(.masked)
-            let draft = controller.model?.draft
+            controller.open(section: .appearance); controller.appearance.style.setEmail(.masked)
+            let draft = controller.appearance.style.draft
             let failingCats = CatStore(rootURL: root, beforeSelectionSave: { throw StyleError.invalid("合成切猫失败") })
             guard (try? failingCats.select("builtin.round", state: state)) == nil,
-                  controller.model?.draft == draft, controller.window != nil else { return false }
+                  controller.appearance.style.draft == draft, controller.window != nil else { return false }
             try cats.select("builtin.round", state: state)
-            return controller.window == nil && state.style == changed && (try? Data(contentsOf: file)) == bytes
+            return controller.window != nil && state.style == changed && (try? Data(contentsOf: file)) == bytes
         } catch { print("样式窗口生命周期失败：\(error)"); return false }
     }
-    static func controls() -> Bool {
+    static func controls() async -> Bool {
         do {
             let (state, _, controller) = try prepare()
-            controller.present()
-            defer { controller.window?.close() }
-            guard let window = controller.window, let model = controller.model else { return false }
+            controller.open(section: .appearance)
+            defer { controller.closeWithoutConfirmation() }
+            guard let window = controller.window, let model = Optional(controller.appearance.style) else { return false }
             let support = SettingsControlTestSupport.self
             support.settle(window)
             try support.capture(window, name: "style-default")
@@ -78,25 +139,31 @@ enum StyleSettingsTests {
             }
             guard model.draft.quotaBasis == .used, model.draft.email == .masked, model.draft.chartMinutes == 15,
                   state.style == .default,
-                  support.click(window, id: "style.color.claude.pink"), model.draft.color(for: .claude) == .pink,
+                  clickControl(window, id: "style.color.claude.pink"), model.draft.color(for: .claude) == .pink,
                   let pick = support.element(window, id: "style.color.claude.pink") as? NSButton, pick.state == .on,
-                  support.click(window, id: "style.reset"), !model.isDirty,
-                  support.click(window, id: "style.color.codex.blue"),
-                  support.click(window, id: "style.save"), controller.window == nil,
+                  restoreStyle(model), !model.isDirty,
+                  clickControl(window, id: "style.color.codex.blue"),
+                  clickControl(window, id: "settings.save") else { return false }
+            for _ in 0..<50 where controller.appearance.isDirty {
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            guard controller.window != nil, !controller.appearance.isDirty,
                   state.style.color(for: .codex) == .blue else { return false }
-            controller.present()
+            controller.open(section: .appearance)
             guard let cancelWindow = controller.window else { return false }
-            controller.model?.setEmail(.hidden)
-            return support.click(cancelWindow, id: "style.cancel") && controller.window == nil && state.style.email == .full
+            controller.appearance.style.setEmail(.hidden)
+            guard clickControl(cancelWindow, id: "settings.cancel") else { return false }
+            support.settle(cancelWindow)
+            return controller.window != nil && !model.isDirty && state.style.email == .full
         } catch { print("样式真实控件失败：\(error)"); return false }
     }
 
-    static func colorPreviews() -> Bool {
+    static func colorPreviews() async -> Bool {
         do {
             let (state, _, controller) = try prepare()
-            controller.present()
-            defer { controller.window?.close() }
-            guard let window = controller.window, let model = controller.model else { return false }
+            controller.open(section: .appearance)
+            defer { controller.closeWithoutConfirmation() }
+            guard let window = controller.window, let model = Optional(controller.appearance.style) else { return false }
             let support = SettingsControlTestSupport.self
             support.settle(window)
             func matches(_ provider: QuotaProvider, style: StyleSettings) -> Bool {
@@ -120,16 +187,16 @@ enum StyleSettingsTests {
             let providers: [QuotaProvider] = [.claude, .codex, .deepseek, .opencodego]
             guard providers.allSatisfy({ matches($0, style: .default) }) else { return false }
             for (provider, color) in zip(providers, [ThemeColor.pink, .blue, .teal, .purple]) {
-                guard support.click(window, id: "style.color." + provider.rawValue + "." + color.rawValue) else { return false }
+                guard clickControl(window, id: "style.color." + provider.rawValue + "." + color.rawValue) else { return false }
                 guard model.draft.color(for: provider) == color, matches(provider, style: model.draft),
                       state.style == .default else { return false }
             }
             try support.capture(window, name: "style-selected-colors")
-            guard support.click(window, id: "style.reset"), !model.isDirty,
+            guard restoreStyle(model), !model.isDirty,
                   providers.allSatisfy({ matches($0, style: .default) }) else { return false }
-            guard support.click(window, id: "style.color.claude.pink"), model.isDirty,
-                  support.click(window, id: "style.cancel"), controller.window == nil else { return false }
-            controller.present()
+            guard clickControl(window, id: "style.color.claude.pink"), model.isDirty,
+                  clickControl(window, id: "settings.cancel"), controller.window != nil else { return false }
+            controller.open(section: .appearance)
             guard let reopened = controller.window else { return false }
             support.settle(reopened)
             return state.style == .default && providers.allSatisfy { provider in

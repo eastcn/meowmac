@@ -8,11 +8,10 @@ public final class LayoutSettingsModel: ObservableObject {
     public let catID: String
     public let catName: String
     public let packageDefault: PanelLayout
-    public let saved: PanelLayout
+    @Published public private(set) var saved: PanelLayout
     @Published public private(set) var draft: PanelLayout
     @Published public var selectedTab: PanelTab = .system
     @Published public private(set) var error: String? { didSet { onContentChange() } }
-    public var onClose: () -> Void = {}
     public var onContentChange: () -> Void = {}
     private let state: PanelState
 
@@ -22,7 +21,7 @@ public final class LayoutSettingsModel: ObservableObject {
         catID = cat.id; catName = cat.name
         packageDefault = cat.package.panel
         saved = state.panelLayout
-        draft = saved
+        draft = state.panelLayout
         error = state.layoutRecoveryReason
     }
 
@@ -85,13 +84,15 @@ public final class LayoutSettingsModel: ObservableObject {
         draft.cards[tab.rawValue]?[index].visible = visible
     }
     public func restoreDefault() { draft = packageDefault; error = state.layoutRecoveryReason }
-    public func cancel() { onClose() }
-    public func save() {
-        guard isDirty else { return }
+    public func cancel() { discard() }
+    public func discard() { draft = saved; error = state.layoutRecoveryReason }
+    @discardableResult public func save() -> Bool {
+        guard isDirty else { return true }
         do {
             try state.saveLayout(draft, for: catID)
-            onClose()
-        } catch { self.error = error.localizedDescription }
+            saved = draft; error = nil
+            return true
+        } catch { self.error = error.localizedDescription; return false }
     }
     public func acceptDrop(_ providers: [NSItemProvider], kind: String, target: String) -> Bool {
         guard let provider = providers.first(where: { $0.canLoadObject(ofClass: NSString.self) }) else { return false }
@@ -115,55 +116,6 @@ public final class LayoutSettingsModel: ObservableObject {
     }
 }
 
-@MainActor
-public final class LayoutSettingsController: NSObject, NSWindowDelegate {
-    public private(set) var window: NSWindow?
-    public private(set) var model: LayoutSettingsModel?
-    private var hostingController: NSHostingController<LayoutSettingsView>?
-    private let state: PanelState
-    public init(state: PanelState) { self.state = state }
-
-    public func present() {
-        if let window { window.makeKeyAndOrderFront(nil); NSApplication.shared.activate(ignoringOtherApps: true); return }
-        guard let model = LayoutSettingsModel(state: state) else { return }
-        model.onClose = { [weak self] in self?.window?.close() }
-        model.onContentChange = { [weak self] in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.resizeToFit() }
-        }
-        let controller = NSHostingController(rootView: LayoutSettingsView(model: model, state: state))
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 500),
-                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.title = "布局与显示"
-        window.contentViewController = controller
-        controller.view.layoutSubtreeIfNeeded()
-        window.setContentSize(NSSize(width: 520, height: min(760, (NSScreen.main?.visibleFrame.height ?? 800) - 40)))
-        window.contentMinSize = NSSize(width: 520, height: 460)
-        window.contentMaxSize = NSSize(width: 520, height: min(900, NSScreen.main?.visibleFrame.height ?? 900))
-        window.center()
-        window.delegate = self
-        self.model = model; self.window = window; hostingController = controller
-        window.makeKeyAndOrderFront(nil)
-        NSApplication.shared.activate(ignoringOtherApps: true)
-    }
-
-    public func catDidChange() {
-        guard let model, model.catID != state.selectedCat?.id else { return }
-        window?.close()
-    }
-
-    private func resizeToFit() {
-        guard let window, let controller = hostingController else { return }
-        controller.view.layoutSubtreeIfNeeded()
-        window.setContentSize(NSSize(width: 520, height: min(760, (NSScreen.main?.visibleFrame.height ?? 800) - 40)))
-    }
-
-    public func windowWillClose(_ notification: Notification) {
-        window?.delegate = nil
-        window = nil; model = nil; hostingController = nil
-    }
-}
-
 struct LayoutSettingsView: View {
     @ObservedObject var model: LayoutSettingsModel
     @ObservedObject var state: PanelState
@@ -176,9 +128,7 @@ struct LayoutSettingsView: View {
         }
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 20) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("当前猫").font(.caption).foregroundStyle(.secondary)
                     Text(model.catName).font(.system(size: 15, weight: .semibold))
@@ -306,20 +256,6 @@ struct LayoutSettingsView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor)))
                     Text(note).font(.caption).foregroundStyle(.secondary)
                 }
-            }.padding(24)
-            }
-            Divider()
-            HStack {
-                Button("恢复默认布局") { model.restoreDefault() }.accessibilityIdentifier("layout.reset")
-                Spacer()
-                Button("取消") { model.cancel() }.accessibilityIdentifier("layout.cancel")
-                Button("保存") { model.save() }.accessibilityIdentifier("layout.save").buttonStyle(.borderedProminent).disabled(!model.isDirty)
-            }.padding(.horizontal, 20).padding(.vertical, 14)
-            Text(model.error ?? (model.isDirty ? "有未保存的更改" : "尚未修改"))
-                .font(.caption).foregroundStyle(model.error == nil ? Color.secondary : Color.orange)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20).padding(.bottom, 12)
-        }.frame(width: 520).background(Color(nsColor: .windowBackgroundColor))
+        }
     }
 }

@@ -1,19 +1,20 @@
 import AppKit
+import SwiftUI
+import Combine
 import MeowMacCore
 import os
 
 @MainActor
-public final class StyleSettingsModel {
-    public let saved: StyleSettings
-    public private(set) var draft: StyleSettings { didSet { onContentChange() } }
-    public private(set) var error: String? { didSet { onContentChange() } }
-    public var onClose: () -> Void = {}
+public final class StyleSettingsModel: ObservableObject {
+    @Published public private(set) var saved: StyleSettings
+    @Published public private(set) var draft: StyleSettings { didSet { onContentChange() } }
+    @Published public private(set) var error: String? { didSet { onContentChange() } }
     public var onContentChange: () -> Void = {}
     private let state: PanelState
     private let logger = Logger(subsystem: AppIdentity.bundleID, category: "style-settings")
     public init(state: PanelState) {
         self.state = state
-        saved = state.style; draft = saved; error = state.styleRecoveryReason
+        saved = state.style; draft = state.style; error = state.styleRecoveryReason
     }
     public var isDirty: Bool { draft != saved }
     public var emailExample: String { "账号邮箱示例：" + (draft.email.display("name@example.com") ?? "（不显示）") }
@@ -22,13 +23,15 @@ public final class StyleSettingsModel {
     public func setChartMinutes(_ value: Int) { draft.chartMinutes = value }
     public func setColor(_ value: ThemeColor, for provider: QuotaProvider) { draft.colors[provider.rawValue] = value }
     public func restoreDefault() { draft = .default; error = state.styleRecoveryReason }
-    public func cancel() { onClose() }
-    public func save() {
-        guard isDirty else { return }
-        do { try state.saveStyle(draft); onClose() }
+    public func cancel() { discard() }
+    public func discard() { draft = saved; error = state.styleRecoveryReason }
+    @discardableResult public func save() -> Bool {
+        guard isDirty else { return true }
+        do { try state.saveStyle(draft); saved = draft; error = nil; return true }
         catch {
             logger.error("样式保存失败：\(error.localizedDescription, privacy: .private)")
             self.error = error.localizedDescription
+            return false
         }
     }
 }
@@ -62,38 +65,39 @@ private final class StyleSwatch: NSButton {
     }
 }
 
+/// 统一外观栏里的原生样式表单。草稿由外层会话管理。
 @MainActor
-public final class StyleSettingsController: NSObject, NSWindowDelegate {
-    public private(set) var window: NSWindow?
-    public private(set) var model: StyleSettingsModel?
+struct StyleSettingsForm: NSViewRepresentable {
+    let model: StyleSettingsModel
+    let state: PanelState
+    func makeCoordinator() -> StyleSettingsFormController { StyleSettingsFormController(model: model, state: state) }
+    func makeNSView(context: Context) -> NSView { context.coordinator.view }
+    func updateNSView(_ nsView: NSView, context: Context) { context.coordinator.refresh() }
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSView, context: Context) -> CGSize? {
+        return CGSize(width: proposal.width ?? 480, height: nsView.fittingSize.height)
+    }
+}
+
+@MainActor
+final class StyleSettingsFormController: NSViewController {
+    private let model: StyleSettingsModel
     private let state: PanelState
-    private var openedCatID: String?
     private var basis: NSSegmentedControl!
     private var email: NSSegmentedControl!
     private var range: NSSegmentedControl!
     private var example: NSTextField!
-    private var status: NSTextField!
-    private var saveButton: NSButton!
     private var swatches: [StyleSwatch] = []
     private var colorPreviews: [QuotaProvider: NSBox] = [:]
-    public init(state: PanelState) { self.state = state }
-    public func present() {
-        if let window { window.makeKeyAndOrderFront(nil); NSApplication.shared.activate(ignoringOtherApps: true); return }
-        let model = StyleSettingsModel(state: state)
-        self.model = model; openedCatID = state.selectedCat?.id
-        model.onClose = { [weak self] in self?.window?.close() }
-        model.onContentChange = { [weak self] in self?.refresh() }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 700),
-            styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "样式"; window.isReleasedWhenClosed = false; window.delegate = self
-        self.window = window
-        buildContent(window)
-        window.setContentSize(NSSize(width: 520, height: min(700, (NSScreen.main?.visibleFrame.height ?? 800) - 40)))
-        refresh(); window.center(); window.makeKeyAndOrderFront(nil)
-        NSApplication.shared.activate(ignoringOtherApps: true)
+    init(model: StyleSettingsModel, state: PanelState) {
+        self.model = model; self.state = state
+        super.init(nibName: nil, bundle: nil)
     }
-    public func catDidChange() {
-        if window != nil && openedCatID != state.selectedCat?.id { window?.close() }
+    required init?(coder: NSCoder) { nil }
+    override func loadView() {
+        view = NSView()
+        buildContent()
+        model.onContentChange = { [weak self] in self?.refresh() }
+        refresh()
     }
     private func text(_ title: String, small: Bool = false) -> NSTextField {
         let label = NSTextField(wrappingLabelWithString: title)
@@ -135,8 +139,8 @@ public final class StyleSettingsController: NSObject, NSWindowDelegate {
         control.setAccessibilityIdentifier(id)
         return control
     }
-    private func buildContent(_ window: NSWindow) {
-        let content = NSView(); window.contentView = content
+    private func buildContent() {
+        let content = view
         basis = segment(["剩余", "已用"], id: "style.basis", action: #selector(changeBasis))
         email = segment(["完整", "部分遮罩", "隐藏"], id: "style.email", action: #selector(changeEmail))
         range = segment(["15 分钟", "1 小时"], id: "style.range", action: #selector(changeRange))
@@ -170,52 +174,25 @@ public final class StyleSettingsController: NSObject, NSWindowDelegate {
             header.widthAnchor.constraint(equalTo: row.widthAnchor).isActive = true
             colorRows.append(row)
         }
-        let form = stack([heading, text("所有猫共用 · 总览条在“布局与显示…”里调", small: true),
+        let form = stack([heading, text("所有猫共用", small: true),
             group(settingsRows), example, colors, text("用于进度条、趋势线和渠道标记", small: true), group(colorRows)],
             vertical: true, spacing: 10)
         form.translatesAutoresizingMaskIntoConstraints = false
-        let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true
-        scroll.documentView = form; scroll.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(scroll)
-        let reset = NSButton(title: "恢复默认样式", target: self, action: #selector(resetDraft))
-        reset.setAccessibilityIdentifier("style.reset")
-        let cancel = NSButton(title: "取消", target: self, action: #selector(cancelDraft))
-        cancel.setAccessibilityIdentifier("style.cancel")
-        saveButton = NSButton(title: "保存", target: self, action: #selector(saveDraft))
-        saveButton.keyEquivalent = "\r"; saveButton.setAccessibilityIdentifier("style.save")
-        for button in [reset, cancel, saveButton!] { button.bezelStyle = .rounded }
-        status = text("", small: true); status.setAccessibilityIdentifier("style.status")
-        let footer = stack([stack([reset, NSView(), cancel, saveButton]), status], vertical: true, spacing: 8)
-        footer.translatesAutoresizingMaskIntoConstraints = false; content.addSubview(footer)
-        let divider = NSBox(); divider.boxType = .separator; divider.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(divider)
+        content.addSubview(form)
         NSLayoutConstraint.activate([
-            scroll.topAnchor.constraint(equalTo: content.topAnchor, constant: 18),
-            scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
-            scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24),
-            scroll.bottomAnchor.constraint(equalTo: divider.topAnchor, constant: -14),
-            form.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
-            form.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
-            form.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            divider.leadingAnchor.constraint(equalTo: content.leadingAnchor), divider.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            divider.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -14),
-            footer.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
-            footer.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
-            footer.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
-            status.widthAnchor.constraint(equalTo: footer.widthAnchor)
+            form.topAnchor.constraint(equalTo: content.topAnchor),
+            form.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            form.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            form.bottomAnchor.constraint(equalTo: content.bottomAnchor)
         ])
         for box in form.arrangedSubviews.compactMap({ $0 as? NSBox }) { box.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true }
-        if let buttons = footer.arrangedSubviews.first { buttons.widthAnchor.constraint(equalTo: footer.widthAnchor).isActive = true }
     }
-    private func refresh() {
-        guard let model, window != nil else { return }
+    func refresh() {
+        guard isViewLoaded else { return }
         basis.selectedSegment = model.draft.quotaBasis == .remaining ? 0 : 1
         email.selectedSegment = EmailDisplay.allCases.firstIndex(of: model.draft.email) ?? 0
         range.selectedSegment = model.draft.chartMinutes == 15 ? 0 : 1
         example.stringValue = model.emailExample
-        status.stringValue = model.error ?? (model.isDirty ? "有未保存的更改" : "尚未修改")
-        status.textColor = model.error == nil ? .secondaryLabelColor : .systemOrange
-        saveButton.isEnabled = model.isDirty
         for button in swatches {
             button.state = model.draft.color(for: button.provider) == button.color ? .on : .off
             button.needsDisplay = true
@@ -224,15 +201,8 @@ public final class StyleSettingsController: NSObject, NSWindowDelegate {
             preview.fillColor = QuotaPalette.color(provider, style: model.draft)
         }
     }
-    @objc private func changeBasis() { model?.setBasis(basis.selectedSegment == 0 ? .remaining : .used) }
-    @objc private func changeEmail() { model?.setEmail(EmailDisplay.allCases[email.selectedSegment]) }
-    @objc private func changeRange() { model?.setChartMinutes(range.selectedSegment == 0 ? 15 : 60) }
-    @objc private func changeColor(_ sender: StyleSwatch) { model?.setColor(sender.color, for: sender.provider) }
-    @objc private func resetDraft() { model?.restoreDefault() }
-    @objc private func cancelDraft() { model?.cancel() }
-    @objc private func saveDraft() { model?.save() }
-    public func windowWillClose(_ notification: Notification) {
-        window?.delegate = nil; window = nil; model = nil; openedCatID = nil
-        swatches.removeAll(); colorPreviews.removeAll()
-    }
+    @objc private func changeBasis() { model.setBasis(basis.selectedSegment == 0 ? .remaining : .used) }
+    @objc private func changeEmail() { model.setEmail(EmailDisplay.allCases[email.selectedSegment]) }
+    @objc private func changeRange() { model.setChartMinutes(range.selectedSegment == 0 ? 15 : 60) }
+    @objc private func changeColor(_ sender: StyleSwatch) { model.setColor(sender.color, for: sender.provider) }
 }
