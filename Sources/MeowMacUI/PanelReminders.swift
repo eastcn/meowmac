@@ -42,7 +42,10 @@ public extension PanelState {
         let placeholders = loaded.records.map { record -> Reminder in
             let object = String(record.key.dropFirst(record.kind.rawValue.count + 1))
             let providerObject = object.hasPrefix("quota.") ? String(object.dropFirst(6)) : object
-            let provider = object == "quota.codex-resets" ? .codex : providerObject.split(separator: ".").first.flatMap { QuotaProvider(rawValue: String($0)) }
+            let isProviderReminder = [.quotaLow, .quotaPace].contains(record.kind)
+                || (record.kind == .source && object.hasPrefix("quota."))
+            let provider = !isProviderReminder ? nil : object == "quota.codex-resets" ? .codex
+                : providerObject.split(separator: ".").first.flatMap { QuotaProvider(rawValue: String($0)) }
             let tab: PanelTab = record.kind == .quotaLow || record.kind == .quotaPace || object.hasPrefix("quota") ? .quota : object == "network" ? .network : .system
             return Reminder(kind: record.kind, object: object, tab: tab,
                             title: (provider.map { $0.displayName + " · " } ?? "") + (titles[record.kind] ?? "待确认问题"),

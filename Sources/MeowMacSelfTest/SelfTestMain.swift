@@ -122,6 +122,7 @@ enum SelfTestMain {
         for test in ReminderTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         tests.append(("UI.ReminderStore/重载坏文件与安全写入", { (try? ReminderTests.storage()) ?? false }))
         tests.append(("UI.Reminders/动作重载到期与详情定位", { ReminderUITests.lifecycle() }))
+        tests.append(("UI.Reminders/恢复渠道身份与系统负例", { ReminderUITests.providerRecovery() }))
         tests.append(("UI.Reminders/原生入口暂缓恢复与容器", { await ReminderUITests.nativeControls() }))
         tests.append(("UI.Reminders/启动到期切猫与快照", { ReminderIntegrationTests.runtime() }))
         tests.append(("UI.Reminders/真实弹出面板与超高筛选", { await ReminderIntegrationTests.popover() }))

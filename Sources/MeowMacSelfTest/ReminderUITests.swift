@@ -4,6 +4,31 @@ import MeowMacUI
 
 @MainActor
 enum ReminderUITests {
+    static func providerRecovery() -> Bool {
+        let root = URL(fileURLWithPath: "build/acceptance/config-entries/reminder-recovery")
+        defer { try? FileManager.default.removeItem(at: root) }
+        do {
+            let state = PanelState(), store = ReminderStore(rootURL: root), now = Date()
+            let reminders = [
+                Reminder(kind: .disk, object: "system", tab: .system, title: "磁盘剩余不足"),
+                Reminder(kind: .source, object: "cpu", tab: .system, title: "CPU 数据源失效"),
+                Reminder(kind: .source, object: "quota", tab: .quota, title: "额度数据源失效"),
+                Reminder(kind: .quotaLow, object: "openrouter.primary", tab: .quota, title: "额度不足"),
+                Reminder(kind: .source, object: "quota.codex-resets", tab: .quota, title: "重置监控失效")
+            ]
+            try store.save(reminders.map { try SnoozeRecord(reminder: $0, acknowledgedAt: now, until: now.addingTimeInterval(3600)) })
+            state.initializeReminders(store: store)
+            for original in reminders.prefix(3) {
+                guard let restored = state.allReminders.first(where: { $0.id == original.id }), restored.provider == nil else { return false }
+                let selected = state.selectedProvider
+                state.showReminderDetail(restored)
+                guard state.selectedProvider == selected else { return false }
+            }
+            return state.allReminders.first(where: { $0.id == "quotaLow.openrouter.primary" })?.provider == QuotaSourceTests.router
+                && state.allReminders.first(where: { $0.id == "source.quota.codex-resets" })?.provider == .codex
+        } catch { return false }
+    }
+
     static func prepare() throws -> (PanelState, URL) {
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("build/acceptance/reminder-ui/" + UUID().uuidString)
