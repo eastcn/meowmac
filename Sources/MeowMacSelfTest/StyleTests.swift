@@ -6,7 +6,7 @@ enum StyleTests {
     static func core() -> Bool {
         let standard = StyleSettings.default
         guard standard.quotaBasis == .remaining, standard.email == .full, standard.chartMinutes == 60,
-              QuotaProvider.allCases.allSatisfy({ standard.color(for: $0) == .default }),
+              QuotaProvider.defaults.allSatisfy({ standard.color(for: $0) == .default }),
               EmailDisplay.mask("name@example.com") == "n***@e***",
               EmailDisplay.mask("a@b") == "a***@b***",
               EmailDisplay.mask("plain") == "plain", EmailDisplay.mask("") == "",

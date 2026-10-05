@@ -154,7 +154,7 @@ public struct PanelLayout: Codable, Equatable {
             guard let object = root["overview"] as? [String: Any], Set(object.keys) == ["order", "hidden", "quota"],
                   let orderNames = object["order"] as? [String], let hiddenNames = object["hidden"] as? [String],
                   let quota = object["quota"] as? [String: Any], Set(quota.keys) == ["provider", "window"],
-                  let providerName = quota["provider"] as? String, let provider = QuotaProvider(rawValue: providerName),
+                  let providerName = quota["provider"] as? String, let provider = QuotaProvider(rawValue: providerName), QuotaProvider.defaults.contains(provider),
                   let selector = quota["window"] as? String,
                   orderNames.allSatisfy({ OverviewItem(rawValue: $0) != nil }),
                   hiddenNames.allSatisfy({ OverviewItem(rawValue: $0) != nil }) else { throw fail("总览字段或类型错误") }

@@ -398,6 +398,7 @@ public enum QuotaPalette {
         case .claude: return NSColor(srgbRed: 217 / 255, green: 119 / 255, blue: 87 / 255, alpha: 1)
         case .deepseek: return NSColor(srgbRed: 77 / 255, green: 107 / 255, blue: 254 / 255, alpha: 1)
         case .opencodego: return .systemGray
+        default: return .systemGray
         }
     }
     public static func peakOpacity(usedPercent: Double, isCurrent: Bool) -> Double {

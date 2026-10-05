@@ -32,7 +32,7 @@ public enum PanelPreviewRenderer {
             runaway: alert ? [runaway] : [], longAssertions: [], prolongedMemoryPressure: false,
             runawayDurations: alert ? [50: 2100] : [:])
         if alert { state.fairSince = now.addingTimeInterval(-2100) }
-        for provider in QuotaProvider.allCases {
+        for provider in QuotaProvider.defaults {
             let short = QuotaWindow(usedPercent: provider == .claude ? 28 : 40, windowMinutes: 300,
                 resetsAt: now.addingTimeInterval(9900), resetDescription: nil)
             let long = QuotaWindow(usedPercent: provider == .codex && quotaAlert ? 70 : 38, windowMinutes: 10080,

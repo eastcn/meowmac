@@ -86,6 +86,7 @@ enum SelfTestMain {
             ("UI.CatStore/发布与写入失败", { CatStoreTests.transactions() }),
             ("UI.RenderCat/三档帧图", { SelfTestMain.renderCat() }),
             ("UI.Cat/帧图透明区域", { SelfTestMain.catPixels() }),
+            ("Core.Quota/渠道标识旧格式往返", { QuotaProviderTests.legacyRoundTrip() }),
             ("Core.Quota/四渠道解析", { SelfTestMain.quotaParsing() }),
             ("Core.Quota/dashboard 解析", { SelfTestMain.dashboardParsing() }),
             ("Core.Quota/花费与会话", { SelfTestMain.costAndSessions() }),
@@ -397,7 +398,7 @@ enum SelfTestMain {
         do {
             let client = CodexBarClient(path: LocalConfig().codexBarCLIPath)
             let result = try client.dashboard()
-            guard Set(result.snapshots.keys) == Set(QuotaProvider.allCases) else {
+            guard Set(result.snapshots.keys) == Set(QuotaProvider.defaults) else {
                 print("额度采集：成功 \(result.snapshots.count) 个，错误 \(result.errors.count) 个")
                 return false
             }
@@ -405,7 +406,7 @@ enum SelfTestMain {
                 .appendingPathComponent("build/acceptance/quota-live-history/\(UUID().uuidString)", isDirectory: true)
             let history = QuotaHistoryStore(directory: directory)
             for snapshot in result.snapshots.values { try history.append(snapshot) }
-            let counts = try QuotaProvider.allCases.map { try history.read($0).count }
+            let counts = try QuotaProvider.defaults.map { try history.read($0).count }
             print("额度采集：4 个渠道，历史新增；各渠道行数 \(counts)")
             return counts.allSatisfy { $0 > 0 }
         } catch { print("额度实测失败：\(error)"); return false }
@@ -531,7 +532,7 @@ enum SelfTestMain {
     }
 
     private static func quotaParsing() -> Bool {
-        for provider in QuotaProvider.allCases {
+        for provider in QuotaProvider.defaults {
             let text = "[{\"provider\":\"\(provider.rawValue)\",\"source\":\"fixture\",\"usage\":{\"primary\":{\"usedPercent\":42,\"windowMinutes\":300,\"resetDescription\":\"稍后重置\"},\"pace\":{\"summary\":\"正常\"}}}]"
             guard let snapshot = try? CodexBarParser.usage(Data(text.utf8), at: Date(timeIntervalSince1970: 1_000_000)),
                   snapshot.provider == provider, snapshot.windows.count == 1, snapshot.windows[0].usedPercent == 42 else { return false }

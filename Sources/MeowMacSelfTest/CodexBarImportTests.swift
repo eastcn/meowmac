@@ -240,7 +240,7 @@ enum CodexBarImportTests {
         do {
             let store = QuotaHistoryStore()
             var summary: [String: Any] = [:]
-            for provider in QuotaProvider.allCases {
+            for provider in QuotaProvider.defaults {
                 let file = CodexBarHistoryImport.defaultSource.appendingPathComponent("\(provider.rawValue).json")
                 guard let data = try? Data(contentsOf: file) else { summary[provider.rawValue] = "no source"; continue }
                 let existing = try store.read(provider)

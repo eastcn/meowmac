@@ -73,7 +73,7 @@ public struct PanelSnapshot: Codable {
         system = SystemPanelSnapshot(latest: state.snapshot, diagnosis: state.diagnosisRows, energy: state.energy, trends: state.systemTrends,
             chartMinutes: state.chartMinutes, domain: state.trendDomain, warmPeriods: state.warmPeriods, lastCleaning: state.lastCleaning,
             coolingLegend: state.coolingLegend, fanHighSince: state.fanHighSince, diskTrend: state.diskTrend, diskChange: state.diskChangeSummary)
-        quota = QuotaProvider.allCases.map { state.channelDisplay($0) }
+        quota = QuotaProvider.defaults.map { state.channelDisplay($0) }
         var networkDisplay = state.networkModel?.meowMacDisplay
         networkDisplay?.capture = state.networkCapture
         networkDisplay?.trends = state.networkTrends

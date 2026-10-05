@@ -45,7 +45,7 @@ public enum SnapshotCollector {
         }.value
         state.energyUpdatedAt = Date()
         state.energy = energy
-        for provider in QuotaProvider.allCases {
+        for provider in QuotaProvider.defaults {
             do {
                 state.quotas[provider] = try await Task.detached { try client.usage(provider) }.value
                 state.quotaHistory[provider] = try QuotaHistoryStore().read(provider)

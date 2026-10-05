@@ -1,7 +1,33 @@
 import Foundation
 
-public enum QuotaProvider: String, CaseIterable, Codable {
-    case deepseek, codex, claude, opencodego
+public struct QuotaProvider: RawRepresentable, Hashable, Codable, Sendable {
+    public let rawValue: String
+
+    public init?(rawValue: String) {
+        guard !rawValue.isEmpty, rawValue.count <= 80,
+              rawValue.utf8.allSatisfy({ (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }) else { return nil }
+        self.rawValue = rawValue
+    }
+
+    public static let deepseek = QuotaProvider(rawValue: "deepseek")!
+    public static let codex = QuotaProvider(rawValue: "codex")!
+    public static let claude = QuotaProvider(rawValue: "claude")!
+    public static let opencodego = QuotaProvider(rawValue: "opencodego")!
+    public static let defaults: [QuotaProvider] = [.deepseek, .codex, .claude, .opencodego]
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let id = try container.decode(String.self)
+        guard let provider = Self(rawValue: id) else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "渠道标识无效")
+        }
+        self = provider
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 public struct QuotaWindow: Codable {
@@ -21,7 +47,7 @@ public struct QuotaWindow: Codable {
 
 public extension QuotaProvider {
     var displayName: String {
-        switch self { case .claude: return "Claude"; case .codex: return "Codex"; case .deepseek: return "DeepSeek"; case .opencodego: return "OpenCode Go" }
+        switch self { case .claude: return "Claude"; case .codex: return "Codex"; case .deepseek: return "DeepSeek"; case .opencodego: return "OpenCode Go"; default: return rawValue }
     }
 }
 
@@ -104,7 +130,7 @@ public enum CodexBarParser {
         var snapshots: [QuotaProvider: QuotaSnapshot] = [:]
         var errors: [QuotaProvider: String] = [:]
         for row in rows {
-            guard let id = row["id"] as? String, let provider = QuotaProvider(rawValue: id.lowercased()) else { continue }
+            guard let id = row["id"] as? String, let provider = QuotaProvider(rawValue: id.lowercased()), QuotaProvider.defaults.contains(provider) else { continue }
             if let error = row["error"] as? String { errors[provider] = error; continue }
             if let error = row["error"] as? [String: Any] { errors[provider] = error["message"] as? String ?? "采集失败"; continue }
             guard let windowRows = row["windows"] as? [[String: Any]] else {
@@ -134,7 +160,7 @@ public enum CodexBarParser {
         guard let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]], let row = rows.first else {
             throw QuotaParseError.invalidRoot
         }
-        guard let name = row["provider"] as? String, let provider = QuotaProvider(rawValue: name.lowercased()) else {
+        guard let name = row["provider"] as? String, let provider = QuotaProvider(rawValue: name.lowercased()), QuotaProvider.defaults.contains(provider) else {
             throw QuotaParseError.missingProvider
         }
         guard let usage = row["usage"] as? [String: Any] else { throw QuotaParseError.missingUsage }
@@ -182,7 +208,7 @@ public enum CodexBarParser {
             throw QuotaParseError.invalidRoot
         }
         return rows.compactMap { row in
-            guard let name = row["provider"] as? String, let provider = QuotaProvider(rawValue: name.lowercased()),
+            guard let name = row["provider"] as? String, let provider = QuotaProvider(rawValue: name.lowercased()), QuotaProvider.defaults.contains(provider),
                   let state = row["state"] as? String else { return nil }
             return SessionActivity(provider: provider, active: state == "active")
         }

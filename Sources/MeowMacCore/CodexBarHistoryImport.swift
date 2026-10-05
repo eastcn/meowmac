@@ -107,7 +107,7 @@ public struct CodexBarImportReport: Equatable {
         case .sourceMissing: return "没有找到 CodexBar 的额度历史文件，未导入。"
         case .imported:
             var lines: [String] = []
-            for provider in QuotaProvider.allCases {
+            for provider in QuotaProvider.defaults {
                 guard let count = imported[provider] else { continue }
                 lines.append("\(provider.displayName)：\(count) 条")
             }

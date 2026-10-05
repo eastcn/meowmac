@@ -33,7 +33,7 @@ public final class QuotaCoordinator {
         state.showsCodexBarImport = !codexBarImportDone
         do { try history.prune(before: Date().addingTimeInterval(Double(-config.quotaHistoryDays) * 86400)); lastPrunedAt = Date() }
         catch { logger.error("额度历史清理失败：\(error.localizedDescription, privacy: .private)") }
-        for provider in QuotaProvider.allCases {
+        for provider in QuotaProvider.defaults {
             do { state.quotaHistory[provider] = try history.read(provider) }
             catch { logger.error("额度历史读取失败：\(error.localizedDescription, privacy: .private)") }
         }
@@ -75,7 +75,7 @@ public final class QuotaCoordinator {
             .run(now: now, retentionDays: config.quotaHistoryDays)
         state.showsCodexBarImport = !codexBarImportDone
         if report.totalImported > 0 {
-            for provider in QuotaProvider.allCases {
+            for provider in QuotaProvider.defaults {
                 do { state.quotaHistory[provider] = try history.read(provider) }
                 catch { logger.error("额度历史读取失败：\(error.localizedDescription, privacy: .private)") }
             }
@@ -110,7 +110,7 @@ public final class QuotaCoordinator {
             do {
                 var snapshots: [QuotaProvider: QuotaSnapshot] = [:]
                 var errors: [QuotaProvider: String] = [:]
-                for provider in QuotaProvider.allCases {
+                for provider in QuotaProvider.defaults {
                     do { snapshots[provider] = try client.usage(provider) }
                     catch {
                         errors[provider] = error.localizedDescription

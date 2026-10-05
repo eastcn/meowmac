@@ -61,7 +61,7 @@ enum ReminderIntegrationTests {
             guard popover.isShown, empty.width == 360, empty.height <= 820, state.allReminders.isEmpty else { return false }
             ReminderUITests.setDisk(state, available: 50)
             state.failures = ["CPU": 2, "内存压力": 2, "磁盘": 2, "电池": 2, "energy": 2]
-            for provider in QuotaProvider.allCases {
+            for provider in QuotaProvider.defaults {
                 state.quotas[provider] = QuotaSnapshot(provider: provider, source: "合成", updatedAt: state.now(),
                     windows: [QuotaWindow(usedPercent: 95, windowMinutes: 300, resetsAt: state.now().addingTimeInterval(3600), resetDescription: nil)], paceSummary: nil, credits: nil)
             }

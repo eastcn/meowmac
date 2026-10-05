@@ -209,7 +209,7 @@ public enum ReminderCollector {
     private static func sourceObject(_ source: String) -> String {
         let known = ["CPU": "cpu", "内存压力": "memory", "磁盘": "disk", "电池": "battery"]
         if let value = known[source] { return value }
-        let permitted = ["energy", "system", "quota", "network", "quota.codex-resets"] + QuotaProvider.allCases.map { "quota." + $0.rawValue }
+        let permitted = ["energy", "system", "quota", "network", "quota.codex-resets"] + QuotaProvider.defaults.map { "quota." + $0.rawValue }
         return permitted.contains(source) ? source : "other"
     }
 }

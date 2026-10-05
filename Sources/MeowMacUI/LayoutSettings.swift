@@ -214,7 +214,7 @@ struct LayoutSettingsView: View {
                             if item == .quota {
                                 HStack(spacing: 8) {
                                     Picker("额度渠道", selection: Binding(get: { model.draft.overview.quota.provider }, set: { model.setOverviewProvider($0) })) {
-                                        ForEach(QuotaProvider.allCases, id: \.self) { provider in
+                                        ForEach(QuotaProvider.defaults, id: \.self) { provider in
                                             Text(provider.displayName).tag(provider)
                                         }
                                     }

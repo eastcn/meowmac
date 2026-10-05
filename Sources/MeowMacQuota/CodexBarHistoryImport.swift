@@ -32,7 +32,7 @@ public struct CodexBarHistoryImport {
         let notBefore = now.addingTimeInterval(Double(-retentionDays) * 86400)
         var report = CodexBarImportReport(outcome: .sourceMissing)
         var plans: [(provider: QuotaProvider, rows: [QuotaHistoryLine])] = []
-        for provider in QuotaProvider.allCases {
+        for provider in QuotaProvider.defaults {
             let file = source.appendingPathComponent("\(provider.rawValue).json")
             guard let data = try? Data(contentsOf: file) else { continue }
             report.outcome = .imported

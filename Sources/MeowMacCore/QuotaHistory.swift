@@ -78,7 +78,7 @@ public struct QuotaHistoryStore {
     public func prune(before cutoff: Date) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        for provider in QuotaProvider.allCases {
+        for provider in QuotaProvider.defaults {
             let file = directory.appendingPathComponent("\(provider.rawValue).jsonl")
             guard FileManager.default.fileExists(atPath: file.path) else { continue }
             let kept = try read(provider).filter { $0.sampledAt >= cutoff }
