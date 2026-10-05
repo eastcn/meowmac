@@ -272,6 +272,7 @@ enum SelfTestMain {
         tests.append(("UI.AppearanceSettings/恢复默认生产菜单与无猫禁用", { StyleSettingsTests.resetMenu() }))
         tests.append(("UI.SettingsWindow/切栏与关闭三选确认", { await SettingsWindowTests.navigation() }))
         tests.append(("UI.SettingsWindow/单例定位与记忆", { SettingsWindowTests.window() }))
+        tests.append(("UI.SettingsWindow/固定侧栏与移除切换按钮", { SettingsWindowTests.fixedSidebar() }))
         tests.append(("UI.SettingsWindow/快捷键窗口与修饰键", { SettingsWindowTests.shortcut() }))
         tests.append(("UI.StyleSettings/原生菜单与保存生命周期", { StyleSettingsTests.lifecycle() }))
         tests.append(("UI.StyleSettings/真实控件与色板", { await StyleSettingsTests.controls() }))

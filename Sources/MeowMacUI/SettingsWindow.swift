@@ -246,7 +246,7 @@ struct SettingsWindowView: View {
     @ObservedObject var navigation: SettingsNavigation
     init(controller: SettingsWindowController) { self.controller = controller; navigation = controller.navigation }
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             List {
                 ForEach(SettingsSection.allCases) { section in
                     Button { controller.request(.section(section)) } label: {
@@ -260,7 +260,9 @@ struct SettingsWindowView: View {
                         .accessibilityIdentifier("settings.section." + section.rawValue)
                         .accessibilityAddTraits(navigation.section == section ? .isSelected : [])
                 }
-            }.listStyle(.sidebar).navigationSplitViewColumnWidth(min: 190, ideal: 190, max: 190)
+            }.listStyle(.sidebar).frame(width: 190)
+                .toolbar(removing: .sidebarToggle)
+                .navigationSplitViewColumnWidth(min: 190, ideal: 190, max: 190)
         } detail: {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 3) {

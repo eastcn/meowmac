@@ -60,4 +60,34 @@ enum SettingsWindowTests {
             && !SettingsShortcut.matches(characters: ",", modifiers: .command, appActive: true, ownsWindow: false)
             && !SettingsShortcut.matches(characters: "q", modifiers: .command, appActive: true, ownsWindow: true)
     }
+    static func fixedSidebar() -> Bool {
+        let controller = SettingsWindowController(state: PanelPreviewRenderer.syntheticState())
+        controller.open(load: false)
+        defer { controller.closeWithoutConfirmation() }
+        guard let window = controller.window, let content = window.contentView else { return false }
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        func check() -> Bool {
+            SettingsControlTestSupport.settle(window)
+            let items = window.toolbar?.items ?? []
+            guard !items.contains(where: { $0.itemIdentifier.rawValue.lowercased().contains("togglesidebar") }) else {
+                print("设置窗口仍有侧栏切换工具栏项"); return false
+            }
+            guard let list = descendants(content).compactMap({ $0 as? NSOutlineView }).first,
+                  abs(list.frame.width - 190) < 1, !list.isHiddenOrHasHiddenAncestor else {
+                print("设置窗口侧栏列表未显示或宽度不是 190 pt"); return false
+            }
+            var sidebar: NSView = list
+            while let parent = sidebar.superview, !(parent is NSSplitView) { sidebar = parent }
+            guard let split = sidebar.superview as? NSSplitView,
+                  split.arrangedSubviews.contains(where: { $0 === sidebar }), !split.isSubviewCollapsed(sidebar) else {
+                print("设置窗口原生侧栏已收起"); return false
+            }
+            return true
+        }
+        guard check() else { return false }
+        window.setContentSize(NSSize(width: 760, height: 460))
+        guard check() else { return false }
+        _ = NSApplication.shared.sendAction(Selector("toggleSidebar:"), to: nil, from: nil)
+        return check()
+    }
 }
