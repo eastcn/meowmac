@@ -157,7 +157,11 @@ private struct NativeSettingsSwitch: NSViewRepresentable {
     @MainActor final class Coordinator: NSObject {
         var binding: Binding<Bool>
         init(_ binding: Binding<Bool>) { self.binding = binding }
-        @objc func invoke(_ sender: NSSwitch) { binding.wrappedValue = sender.state == .on }
+        @objc func invoke(_ sender: NSSwitch) {
+            binding.wrappedValue = sender.state == .on
+            // 回调可能拒绝修改，立即恢复到实际回传值。
+            sender.state = binding.wrappedValue ? .on : .off
+        }
     }
     func makeCoordinator() -> Coordinator { Coordinator($value) }
     func makeNSView(context: Context) -> NSSwitch {

@@ -47,13 +47,23 @@ enum ImmediateSettingsTests {
         SettingsControlTestSupport.settle(window)
         guard let toggle = SettingsControlTestSupport.element(window, id: "settings.login") as? NSSwitch else { return false }
         login = nil; toggle.state = .on; _ = toggle.sendAction(toggle.action, to: toggle.target)
-        guard login == true, !state.loginEnabled,
+        guard login == true, !state.loginEnabled, toggle.state == .off,
               SettingsControlTestSupport.element(window, id: "settings.history") == nil else { return false }
         controller.open(section: .notifications, load: false)
         SettingsControlTestSupport.settle(window)
         guard let global = SettingsControlTestSupport.element(window, id: "settings.notifications") as? NSSwitch else { return false }
+        state.onSetNotificationSettings = { values.append($0) }
+        global.state = .on; _ = global.sendAction(global.action, to: global.target)
+        guard !state.notificationSettings.enabled, global.state == .off, values.last?.enabled == true else { return false }
+        state.onSetNotificationSettings = { values.append($0); state.notificationSettings = $0 }
         global.state = .on; _ = global.sendAction(global.action, to: global.target); SettingsControlTestSupport.settle(window)
         guard state.notificationSettings.enabled else { return false }
+        guard let category = SettingsControlTestSupport.element(window, id: "settings.notification.source") as? NSSwitch else { return false }
+        state.onSetNotificationSettings = { values.append($0) }
+        category.state = .off; _ = category.sendAction(category.action, to: category.target)
+        guard state.notificationSettings.categories.contains(.source), category.state == .on,
+              values.last?.categories.contains(.source) == false else { return false }
+        state.onSetNotificationSettings = { values.append($0); state.notificationSettings = $0 }
         global.state = .off; _ = global.sendAction(global.action, to: global.target); SettingsControlTestSupport.settle(window)
         return NotificationCategory.allCases.allSatisfy { category in
             (SettingsControlTestSupport.element(window, id: "settings.notification." + category.rawValue) as? NSSwitch)?.isEnabled == false
