@@ -81,6 +81,25 @@ public struct QuotaResetCredits: Codable {
     public init(availableCount: Int, expiresAt: [Date]) { self.availableCount = availableCount; self.expiresAt = expiresAt }
 }
 
+/// 余额型渠道（如 DeepSeek）的账户余额。CodexBarCLI 把它包装成标签为 Balance 的窗口，
+/// usedPercent 恒为 0，金额只在 resetDescription 里，例如 “¥12.34 (Paid: ¥10.00 / Granted: ¥2.34)”。
+public struct QuotaBalance: Codable, Equatable {
+    public let amount: String
+    public let detail: String?
+    public init(amount: String, detail: String?) { self.amount = amount; self.detail = detail }
+    public static func isBalanceLabel(_ label: String?) -> Bool { label?.trimmingCharacters(in: .whitespaces).lowercased() == "balance" }
+    public static func parse(_ description: String?) -> QuotaBalance? {
+        guard let text = description?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        let pattern = #"^(\S+)\s*\(\s*Paid:\s*([^/]+?)\s*/\s*Granted:\s*(.+?)\s*\)$"#
+        if let regex = try? NSRegularExpression(pattern: pattern),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)), match.numberOfRanges == 4,
+           let amount = Range(match.range(at: 1), in: text), let paid = Range(match.range(at: 2), in: text), let granted = Range(match.range(at: 3), in: text) {
+            return QuotaBalance(amount: String(text[amount]), detail: "充值 \(text[paid]) · 赠送 \(text[granted])")
+        }
+        return QuotaBalance(amount: text, detail: nil)
+    }
+}
+
 public struct QuotaSnapshot: Codable {
     public let provider: QuotaProvider
     public let source: String
@@ -91,11 +110,13 @@ public struct QuotaSnapshot: Codable {
     public let accountEmail: String?
     public let planName: String?
     public let codexResetCredits: QuotaResetCredits?
+    public let balance: QuotaBalance?
 
-    public init(provider: QuotaProvider, source: String, updatedAt: Date, windows: [QuotaWindow], paceSummary: String?, credits: Double?, accountEmail: String? = nil, planName: String? = nil, codexResetCredits: QuotaResetCredits? = nil) {
+    public init(provider: QuotaProvider, source: String, updatedAt: Date, windows: [QuotaWindow], paceSummary: String?, credits: Double?, accountEmail: String? = nil, planName: String? = nil, codexResetCredits: QuotaResetCredits? = nil, balance: QuotaBalance? = nil) {
         self.provider = provider; self.source = source; self.updatedAt = updatedAt
         self.windows = windows; self.paceSummary = paceSummary; self.credits = credits
         self.accountEmail = accountEmail; self.planName = planName; self.codexResetCredits = codexResetCredits
+        self.balance = balance
     }
 }
 
@@ -137,8 +158,10 @@ public enum CodexBarParser {
                 errors[provider] = "窗口数据缺失"
                 continue
             }
+            let balanceOnly = windowRows.contains { QuotaBalance.isBalanceLabel($0["label"] as? String) }
             let windows = windowRows.prefix(3).compactMap { window -> QuotaWindow? in
-                guard let used = number(window["usedPercent"]) else { return nil }
+                // dashboard 不带余额金额；余额窗口不当额度处理，金额由 usage 解析。
+                guard !QuotaBalance.isBalanceLabel(window["label"] as? String), let used = number(window["usedPercent"]) else { return nil }
                 let kind = window["kind"] as? String ?? "primary"
                 let minutes = window["windowMinutes"] as? Int
                     ?? (kind == "session" ? 300 : kind == "weekly" ? 10080 : QuotaWindow.inferredWindowMinutes(name: window["label"] as? String))
@@ -146,7 +169,7 @@ public enum CodexBarParser {
                     resetsAt: (window["resetAt"] as? String).flatMap(parseDate),
                     resetDescription: nil, identifier: kind, name: window["label"] as? String)
             }
-            guard !windows.isEmpty else { errors[provider] = "窗口数据无效"; continue }
+            guard !windows.isEmpty || balanceOnly else { errors[provider] = "窗口数据无效"; continue }
             let pace = (row["display"] as? [String: Any])?["paceSummary"] as? String
             let credits = number((row["credits"] as? [String: Any])?["remaining"])
             let updated = (row["updatedAt"] as? String).flatMap(parseDate) ?? now
@@ -164,14 +187,20 @@ public enum CodexBarParser {
             throw QuotaParseError.missingProvider
         }
         guard let usage = row["usage"] as? [String: Any] else { throw QuotaParseError.missingUsage }
+        let labels = row["rateWindowLabels"] as? [String: Any] ?? [:]
+        var balance: QuotaBalance?
         let windows = ["primary", "secondary", "tertiary"].compactMap { key -> QuotaWindow? in
-            guard let item = usage[key] as? [String: Any], let percent = number(item["usedPercent"]) else { return nil }
+            guard let item = usage[key] as? [String: Any] else { return nil }
+            if QuotaBalance.isBalanceLabel(labels[key] as? String) {
+                balance = balance ?? QuotaBalance.parse(item["resetDescription"] as? String); return nil
+            }
+            guard let percent = number(item["usedPercent"]) else { return nil }
             let date = (item["resetsAt"] as? String).flatMap(parseDate)
             return QuotaWindow(usedPercent: percent, windowMinutes: item["windowMinutes"] as? Int,
                                resetsAt: date, resetDescription: item["resetDescription"] as? String, identifier: key,
                                name: provider == .codex && key == "secondary" ? "每周" : nil)
         }
-        guard !windows.isEmpty else { throw QuotaParseError.missingWindow }
+        guard !windows.isEmpty || balance != nil else { throw QuotaParseError.missingWindow }
         let pace = ((row["pace"] as? [String: Any])?["secondary"] as? [String: Any])?["summary"] as? String
             ?? (usage["pace"] as? [String: Any])?["summary"] as? String
         let creditsObject = row["credits"] as? [String: Any] ?? usage["credits"] as? [String: Any]
@@ -186,7 +215,7 @@ public enum CodexBarParser {
                              windows: windows, paceSummary: pace, credits: credits,
                              accountEmail: usage["accountEmail"] as? String ?? identity["accountEmail"] as? String,
                              planName: usage["planName"] as? String ?? usage["plan"] as? String,
-                             codexResetCredits: resetCredits)
+                             codexResetCredits: resetCredits, balance: balance)
     }
 
     public static func cost(_ data: Data) throws -> [DailyCost] {

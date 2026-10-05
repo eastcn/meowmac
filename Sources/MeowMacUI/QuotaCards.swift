@@ -125,8 +125,11 @@ struct QuotaPage: View {
                             ProviderLogo(provider: item)
                             Text(item.displayName).font(Design.caption).fontWeight(provider == item ? .semibold : .regular).lineLimit(1).minimumScaleFactor(0.75)
                             let window = state.providerWindow(item)
+                            let balance = window == nil ? state.quotas[item]?.balance : nil
                             LineBar(fraction: window.map { state.quotaPercent($0) / 100 } ?? 0, color: Design.provider(item, style: state.style), height: Design.miniBar)
-                            Text(window.map { "\(Int(state.quotaPercent($0).rounded()))% · \(state.quotaBasisLabel)" } ?? (state.quotaErrors[item] == nil ? "—" : "出错"))
+                                .opacity(balance == nil ? 1 : 0)
+                            Text(window.map { "\(Int(state.quotaPercent($0).rounded()))% · \(state.quotaBasisLabel)" } ?? balance.map { "余额 " + $0.amount } ?? (state.quotaErrors[item] == nil ? "—" : "出错"))
+                                .lineLimit(1).minimumScaleFactor(0.7)
                                 .font(Design.caption).fontWeight(.semibold).foregroundStyle(window.map { Design.stateText(Design.quotaLevel($0.remainingPercent)) } ?? Design.secondary)
                         }.padding(Design.gap).frame(maxWidth: .infinity).frame(height: Design.providerHeight)
                             .modifier(GlassSurface()).overlay(RoundedRectangle(cornerRadius: Design.cardRadius).stroke(provider == item ? Design.blue.opacity(Design.peakFill) : .clear, lineWidth: Design.rule))
@@ -148,6 +151,13 @@ struct QuotaPage: View {
                         HStack { Text(email); Spacer(); Text("来源 " + quota.source) }
                             .font(Design.caption).foregroundStyle(Design.secondary)
                     }
+                }
+                if let balance = quota.balance {
+                    GlassCard { VStack(alignment: .leading, spacing: Design.gap) {
+                        HStack(alignment: .firstTextBaseline) { Text("余额").font(Design.title); Spacer(); Text(balance.amount).font(Design.amount).monospacedDigit() }
+                        if let detail = balance.detail { Text(detail).font(Design.caption).foregroundStyle(Design.secondary).monospacedDigit() }
+                        Text("余额型渠道，没有额度窗口和重置周期").font(Design.tiny).foregroundStyle(Design.secondary)
+                    } }
                 }
                 ForEach(state.displayedWindows(provider).indices, id: \.self) { index in
                     QuotaWindowView(state: state, value: state.displayedWindows(provider)[index], provider: provider)

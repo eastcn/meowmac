@@ -38,7 +38,7 @@ public enum PanelCardRegistry {
         PanelLayoutCatalog.definitions.values.flatMap { $0 }.map { definition in
             (definition.id, AnyPanelCard(id: definition.id, title: definition.title, available: { state in
                 switch definition.id {
-                case "quota.trend": return state.quotas[state.selectedProvider] != nil
+                case "quota.trend": return state.quotas[state.selectedProvider]?.windows.isEmpty == false
                 case "quota.cost": return state.costDisplay(state.selectedProvider) != nil
                 case "quota.storage": return [.claude, .codex].contains(state.selectedProvider) && state.localStorage[state.selectedProvider] != nil
                 case "network.checks", "network.sites", "network.traffic", "network.egress": return state.networkModel != nil

@@ -37,6 +37,22 @@ enum DataTests {
                 && snapshot.codexResetCredits?.availableCount == 2 && snapshot.codexResetCredits?.expiresAt.count == 2
                 && snapshot.windows[0].identifier == "secondary" && snapshot.credits == 12 && inferred.effectiveWindowMinutes == 300
         }),
+        ("Core.Quota/余额型渠道不当额度窗口", {
+            // 虚构数据，形态同 CodexBarCLI 0.70.0 的 DeepSeek 输出：余额窗口 usedPercent 恒为 0，金额在 resetDescription。
+            let json = #"[{"provider":"deepseek","source":"api","rateWindowLabels":{"primary":"Balance"},"usage":{"updatedAt":"2026-10-05T06:00:00Z","primary":{"usedPercent":0,"resetDescription":"¥12.34 (Paid: ¥10.00 / Granted: ¥2.34)"},"secondary":null}}]"#
+            let plain = #"[{"provider":"deepseek","source":"api","rateWindowLabels":{"primary":"Balance"},"usage":{"primary":{"usedPercent":0,"resetDescription":"$5.00"}}}]"#
+            let empty = #"[{"provider":"deepseek","source":"api","rateWindowLabels":{"primary":"Balance"},"usage":{"primary":{"usedPercent":0}}}]"#
+            let dashboard = #"{"providers":[{"id":"deepseek","source":"api","windows":[{"kind":"session","label":"Balance","usedPercent":0,"remainingPercent":100}]}]}"#
+            guard let snapshot = try? CodexBarParser.usage(Data(json.utf8), at: Date()),
+                  let other = try? CodexBarParser.usage(Data(plain.utf8), at: Date()),
+                  let board = try? CodexBarParser.dashboard(Data(dashboard.utf8), at: Date()) else { return false }
+            let reminders = HealthEvaluator.evaluate(HealthInputs(system: nil, energy: nil, quotaUsedPercent: snapshot.windows.map(\.usedPercent), network: .green, failedSources: [:], fairSince: nil, now: Date(), quotaSnapshots: [snapshot]), config: LocalConfig())
+            return snapshot.windows.isEmpty && snapshot.balance == QuotaBalance(amount: "¥12.34", detail: "充值 ¥10.00 · 赠送 ¥2.34")
+                && other.balance == QuotaBalance(amount: "$5.00", detail: nil)
+                && (try? CodexBarParser.usage(Data(empty.utf8), at: Date())) == nil
+                && board.snapshots[.deepseek]?.windows.isEmpty == true && board.errors.isEmpty
+                && reminders.worst == nil
+        }),
         ("Core.History/峰值分组与本轮截取", history),
         ("System.Storage/分段和文件数量", storage),
     ]

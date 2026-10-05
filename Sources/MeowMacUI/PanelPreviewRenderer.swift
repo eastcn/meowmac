@@ -32,7 +32,7 @@ public enum PanelPreviewRenderer {
             runaway: alert ? [runaway] : [], longAssertions: [], prolongedMemoryPressure: false,
             runawayDurations: alert ? [50: 2100] : [:])
         if alert { state.fairSince = now.addingTimeInterval(-2100) }
-        for provider in QuotaProvider.defaults {
+        for provider in QuotaProvider.defaults where provider != .deepseek {
             let short = QuotaWindow(usedPercent: provider == .claude ? 28 : 40, windowMinutes: 300,
                 resetsAt: now.addingTimeInterval(9900), resetDescription: nil)
             let long = QuotaWindow(usedPercent: provider == .codex && quotaAlert ? 70 : 38, windowMinutes: 10080,
@@ -54,6 +54,9 @@ public enum PanelPreviewRenderer {
             }
             state.quotaHistory[provider] = rows
         }
+        // DeepSeek 是余额型渠道：没有额度窗口和历史，只有余额。
+        state.quotas[.deepseek] = QuotaSnapshot(provider: .deepseek, source: "api", updatedAt: now.addingTimeInterval(-180), windows: [], paceSummary: nil,
+            credits: nil, balance: QuotaBalance(amount: "¥88.00", detail: "充值 ¥80.00 · 赠送 ¥8.00"))
         for provider in [QuotaProvider.claude, .codex] {
             state.costs[provider] = (0..<30).map { index in
                 let date = Calendar.current.date(byAdding: .day, value: index - 29, to: now)!
@@ -128,6 +131,10 @@ public enum PanelPreviewRenderer {
     }
 
     /// 展开的系统页整页，用于逐张对照 system-tab-redesign.html；材质沿用预览退路。
+    public static func quotaPagePNG(state: PanelState, dark: Bool) -> Data? {
+        state.selectedTab = .quota
+        return png(state: state, dark: dark)
+    }
     public static func systemPagePNG(state: PanelState, dark: Bool) -> Data? {
         state.selectedTab = .system
         return png(state: state, dark: dark)

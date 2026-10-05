@@ -174,4 +174,19 @@ enum QuotaSourceTests {
             return true
         } catch { print("渠道真实面板预览失败：\(error)"); return false }
     }
+    /// 余额型渠道（DeepSeek）不显示额度条和趋势，只显示余额；普通材质离屏渲染，不需要截屏权限。
+    static func balancePreview() -> Bool {
+        let state = PanelPreviewRenderer.syntheticState(); state.selectedTab = .quota; state.selectedProvider = .deepseek
+        guard state.providerWindow(.deepseek) == nil, state.quotas[.deepseek]?.balance != nil, state.displayedWindows(.deepseek).isEmpty,
+              !state.renderedCardIDs(for: .quota).contains("quota.trend") else { return false }
+        for dark in [false, true] {
+            guard let png = PanelPreviewRenderer.quotaPagePNG(state: state, dark: dark) else { return false }
+            if let path = ProcessInfo.processInfo.environment["MEOWMAC_CONFIG_RENDER_DIR"] {
+                let directory = URL(fileURLWithPath: path)
+                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try? png.write(to: directory.appendingPathComponent("quota-balance-" + (dark ? "dark" : "light") + ".png"))
+            }
+        }
+        return true
+    }
 }

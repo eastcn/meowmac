@@ -98,6 +98,7 @@ enum SelfTestMain {
             ("UI.QuotaSettings/保存后测试限频", { await QuotaSourceSettingsTests.throttles(1) }),
             ("UI.QuotaSettings/测试后保存限频", { await QuotaSourceSettingsTests.throttles(2) }),
             ("UI.QuotaSettings/凭据与采集组合", { await QuotaSourceSettingsTests.credentials() }),
+            ("UI.Quota/余额渠道普通材质预览", { QuotaSourceTests.balancePreview() }),
             ("UI.QuotaSettings/移除保存后可再添加与搜索", { await QuotaSourceSettingsTests.addAfterRemoveAndSearch() }),
             ("UI.QuotaSettings/真实控件与合成预览", { await QuotaSourceSettingsTests.controlsAndPreviews() }),
             ("QuotaSettings.Live/临时 CLI 添加停用移除", { await QuotaSourceSettingsTests.liveConfig() }),
