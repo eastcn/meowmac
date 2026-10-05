@@ -9,12 +9,15 @@ enum QuotaSourceSettingsTests {
     static let root = URL(fileURLWithPath: "build/acceptance/config-entries/settings-tests")
     static let environment = ["CODEXBAR_CONFIG": root.appendingPathComponent("cli.json").path]
     static let all = QuotaCatalog.usageNames.keys.sorted().compactMap { QuotaCatalog.entry(QuotaProvider(rawValue: $0)!) }
-    static func prepare(executor: @escaping CodexBarClient.Executor) throws -> (PanelState, QuotaCoordinator, QuotaSourceSettingsModel) {
+    static func prepare(executor: @escaping CodexBarClient.Executor) throws -> (PanelState, QuotaCoordinator, QuotaSourceSettingsModel, SettingsWindowController) {
         if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
         let state = PanelPreviewRenderer.syntheticState()
         let client = CodexBarClient(path: "/synthetic/cli", environment: environment, executor: executor)
         let coordinator = QuotaCoordinator(state: state, config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: client, sourceStore: QuotaSourceStore(root: root))
-        return (state, coordinator, QuotaSourceSettingsModel(state: state, coordinator: coordinator, catalog: all))
+        let controller = SettingsWindowController(state: state, quotaCoordinator: coordinator, quotaCatalog: all)
+        controller.open(section: .quotaSources, load: false)
+        guard let model = controller.quotaSources else { throw QuotaSourceError.invalid }
+        return (state, coordinator, model, controller)
     }
     nonisolated static func output(_ args: [String]) -> CLIOutput {
         if args.first == "cost" { return CLIOutput(stdout: Data(#"[{"daily":[]}]"#.utf8)) }
@@ -30,16 +33,16 @@ enum QuotaSourceSettingsTests {
         do {
             var calls: [([String], Data?)] = []; var leaks = 0
             let secret = UUID().uuidString
-            let (state, coordinator, model) = try prepare { _, args, env, input in
+            let (state, coordinator, model, controller) = try prepare { _, args, env, input in
                 guard env["CODEXBAR_CONFIG"]?.contains("/meowmac/build/") == true else { throw QuotaSourceError.invalid }
                 calls.append((args, input)); return output(args)
             }
-            defer { model.close(); try? FileManager.default.removeItem(at: root) }
+            defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
             let provider = QuotaSourceTests.router
             model.add(provider); model.setKey(secret, provider: provider)
             guard model.rowDirty(provider), !model.canTest(provider) else { return false }
             model.setEnabled(false, provider: .codex)
-            await model.save()
+            guard await model.save(), !model.isDirty else { return false }
             _ = await wait(coordinator)
             let writes = calls.filter { $0.0.first == "config" }.map(\.0)
             guard writes == [["config", "disable", "--provider", "codex", "--json"],
@@ -51,33 +54,41 @@ enum QuotaSourceSettingsTests {
             let rawClient = CodexBarClient(path: "/synthetic/cli", environment: environment, executor: { _, _, _, _ in CLIOutput(stdout: Data(secret.utf8), stderr: Data(secret.utf8)) }, rawOutput: { _, _, _ in leaks += 1 })
             try rawClient.setAPIKey(secret, provider: provider)
             let before = calls.count
-            model.remove(provider); await model.save()
+            model.remove(provider)
+            guard await model.save() else { return false }
             guard calls.count == before, !state.quotaProviders.contains(provider), leaks == 0 else { return false }
-            return true
+            model.setEnabled(true, provider: .codex)
+            guard model.isDirty else { return false }
+            model.discard()
+            return !model.isDirty && model.draft == model.saved
+                && model.draft.first(where: { $0.provider == .codex })?.enabled == false
+                && controller.window != nil
         } catch { print("额度设置命令测试失败：\(error)"); return false }
     }
     static func partialFailure() async -> Bool {
         do {
-            let (_, coordinator, model) = try prepare { _, args, _, _ in
+            let (_, coordinator, model, controller) = try prepare { _, args, _, _ in
                 if args.contains("openrouter"), args.first == "config" { return CLIOutput(status: 1) }
                 return output(args)
             }
-            defer { model.close(); try? FileManager.default.removeItem(at: root) }
+            defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
             model.add(QuotaSourceTests.router)
             model.setEnabled(false, provider: .codex)
-            await model.save()
+            guard !(await model.save()) else { return false }
             guard model.saved.first(where: { $0.provider == .codex })?.enabled == false,
                   model.saved.allSatisfy({ $0.provider != QuotaSourceTests.router }),
                   model.draft.contains(where: { $0.provider == QuotaSourceTests.router }),
                   model.errors[QuotaSourceTests.router] != nil, model.isDirty,
                   coordinator.sourceEnabled[.codex] == false else { return false }
-            return true
+            model.discard()
+            return !model.isDirty && model.errors.isEmpty && model.draft == model.saved
+                && model.draft.first(where: { $0.provider == .codex })?.enabled == false
         } catch { return false }
     }
     static func disabledRestart() async -> Bool {
         do {
             var enabled = true, usages: [String] = [], events: [String] = []
-            let (state, first, _) = try prepare { _, args, _, _ in
+            let (state, first, _, controller) = try prepare { _, args, _, _ in
                 if args.contains("disable") { enabled = false }
                 if args.contains("providers") {
                     events.append("providers")
@@ -86,9 +97,13 @@ enum QuotaSourceSettingsTests {
                 if args.first == "usage" { usages.append(args[2]); events.append("usage") }
                 return output(args)
             }
-            defer { try? FileManager.default.removeItem(at: root) }
+            defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
             try first.replaceSources(QuotaSourceList(providers: [.claude, QuotaSourceTests.router]))
-            let model = QuotaSourceSettingsModel(state: state, coordinator: first, catalog: all)
+            controller.closeWithoutConfirmation()
+            let settings = SettingsWindowController(state: state, quotaCoordinator: first, quotaCatalog: all)
+            settings.open(section: .quotaSources, load: false)
+            defer { settings.closeWithoutConfirmation() }
+            guard let model = settings.quotaSources else { return false }
             model.setEnabled(false, provider: .claude); await model.save()
             guard await wait(first), !enabled else { return false }
             usages = []; events = []
@@ -101,12 +116,12 @@ enum QuotaSourceSettingsTests {
     static func startupStatusFailure() async -> Bool {
         do {
             var calls = 0
-            let (_, first, _) = try prepare { _, args, _, _ in
+            let (_, first, _, controller) = try prepare { _, args, _, _ in
                 if args.contains("providers") { return CLIOutput(status: 1) }
                 if args.first == "usage" { calls += 1 }
                 return output(args)
             }
-            defer { try? FileManager.default.removeItem(at: root) }
+            defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
             try first.replaceSources(QuotaSourceList(providers: [QuotaSourceTests.router]))
             let state = PanelState()
             let restarted = QuotaCoordinator(state: state, config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: first.client, sourceStore: first.sourceStore)
@@ -118,12 +133,12 @@ enum QuotaSourceSettingsTests {
     static func throttles(_ mode: Int) async -> Bool {
         do {
             var now = Date(timeIntervalSince1970: 1_000_000), claudeCalls = 0
-            let (state, coordinator, model) = try prepare { _, args, _, _ in
+            let (state, coordinator, model, controller) = try prepare { _, args, _, _ in
                 if args.first == "usage", args.contains("claude") { claudeCalls += 1 }
                 return output(args)
             }
             state.now = { now }
-            defer { model.close(); try? FileManager.default.removeItem(at: root) }
+            defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
             if mode == 0 {
                 coordinator.requestRefresh([.claude]); guard await wait(coordinator), claudeCalls == 1 else { return false }
                 now = now.addingTimeInterval(60); model.test(.claude)
@@ -145,13 +160,13 @@ enum QuotaSourceSettingsTests {
     }
     static func credentials() async -> Bool {
         do {
-            let (state, _, model) = try prepare { _, args, _, _ in
+            let (state, _, model, controller) = try prepare { _, args, _, _ in
                 if args.contains("providers") {
                     return CLIOutput(stdout: Data(#"[{"provider":"opencodego","displayName":"OpenCode Go","enabled":true},{"provider":"openrouter","displayName":"OpenRouter","enabled":true}]"#.utf8))
                 }
                 return CLIOutput(stdout: Data(#"{"providers":[{"id":"opencodego","apiKey":"[REDACTED]"},{"id":"openrouter"}]}"#.utf8))
             }
-            defer { model.close(); try? FileManager.default.removeItem(at: root) }
+            defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
             await model.load()
             guard model.credentialText(.opencodego) == "已配置" else { return false }
             state.quotaAttempts[.opencodego] = QuotaAttempt(at: state.now(), success: true, message: "成功")
@@ -190,16 +205,13 @@ enum QuotaSourceSettingsTests {
     static func addAfterRemoveAndSearch() async -> Bool {
         do {
             let data = try JSONSerialization.data(withJSONObject: all.map { ["provider": $0.id, "displayName": $0.displayName, "enabled": true] as [String: Any] })
-            let (state, coordinator, _) = try prepare { _, args, _, _ in
+            let (state, coordinator, model, controller) = try prepare { _, args, _, _ in
                 if args.contains("providers") { return CLIOutput(stdout: data) }
                 if args.contains("dump") { return CLIOutput(stdout: Data(#"{"providers":[]}"#.utf8)) }
                 return output(args)
             }
-            defer { try? FileManager.default.removeItem(at: root) }
-            let controller = QuotaSourceSettingsController(state: state, coordinator: coordinator)
-            controller.present(load: false)
-            guard let window = controller.window, let model = controller.model else { return false }
-            defer { window.close() }
+            defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
+            guard let window = controller.window else { return false }
             await model.load()
             let added = Set(model.draft.map(\.provider))
             guard !model.available.contains(where: { added.contains($0.provider) }) else { print("可添加列表含已添加渠道"); return false }
@@ -224,19 +236,16 @@ enum QuotaSourceSettingsTests {
     static func controlsAndPreviews() async -> Bool {
         do {
             let data = try JSONSerialization.data(withJSONObject: all.map { ["provider": $0.id, "displayName": $0.displayName, "enabled": true] as [String: Any] })
-            let (state, coordinator, _) = try prepare { _, args, _, _ in
+            let (state, _, model, controller) = try prepare { _, args, _, _ in
                 if args.contains("providers") { return CLIOutput(stdout: data) }
                 if args.contains("dump") { return CLIOutput(stdout: Data(#"{"providers":[]}"#.utf8)) }
                 if args.contains("openrouter"), args.first == "config" { return CLIOutput(status: 1) }
                 return output(args)
             }
-            defer { try? FileManager.default.removeItem(at: root) }
-            let controller = QuotaSourceSettingsController(state: state, coordinator: coordinator)
-            controller.present(load: false)
-            guard let window = controller.window, let model = controller.model else { return false }
-            defer { window.close() }
+            defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
+            guard let window = controller.window else { return false }
             await model.load()
-            controller.present(load: false)
+            controller.open(section: .quotaSources, load: false)
             guard controller.window === window else { return false }
             func capture(_ name: String) throws {
                 guard let path = ProcessInfo.processInfo.environment["MEOWMAC_CONFIG_RENDER_DIR"] else { return }
@@ -263,8 +272,24 @@ enum QuotaSourceSettingsTests {
             await model.save(); SettingsControlTestSupport.settle(window)
             guard model.errors[QuotaSourceTests.router] != nil, model.key(QuotaSourceTests.router).isEmpty, field.stringValue.isEmpty else { return false }
             try capture("quota-settings-error")
-            model.cancel()
-            return controller.window == nil && state.quotaProviders == [.claude, .codex, .deepseek, .opencodego]
+            guard !controller.navigation.request(.section(.general)),
+                  controller.navigation.pending == .section(.general),
+                  controller.navigation.section == .quotaSources else { return false }
+            await controller.navigation.resolve(.keepEditing)
+            guard controller.navigation.section == .quotaSources, model.isDirty,
+                  controller.navigation.pending == nil else { return false }
+            guard !controller.navigation.request(.section(.general)) else { return false }
+            await controller.navigation.resolve(.save)
+            guard controller.navigation.section == .quotaSources, model.isDirty,
+                  controller.navigation.pending == nil else { return false }
+            guard NetworkSettingsTests.click(window, id: "quota-source.cancel") else { return false }
+            guard controller.window === window && !model.isDirty && model.editingKeys.isEmpty,
+                  model.draft == model.saved && state.quotaProviders == [.claude, .codex, .deepseek, .opencodego] else { return false }
+            model.add(QuotaSourceTests.router)
+            guard !controller.navigation.request(.section(.general)) else { return false }
+            await controller.navigation.resolve(.discard)
+            return controller.navigation.section == .general && controller.window === window
+                && !model.isDirty && model.draft == model.saved
         } catch { print("额度设置真实控件失败：\(error)"); return false }
     }
 }

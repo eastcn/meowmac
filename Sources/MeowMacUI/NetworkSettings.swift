@@ -9,7 +9,7 @@ public enum NetworkSettingsTab: String, CaseIterable {
 }
 
 @MainActor
-public final class NetworkSettingsModel: ObservableObject {
+public final class NetworkSettingsModel: ObservableObject, SettingsDraftSession {
     public let network: AppModel
     @Published public var tab: NetworkSettingsTab = .sites
     @Published public private(set) var savedAt: Date?
@@ -19,7 +19,6 @@ public final class NetworkSettingsModel: ObservableObject {
     private var progress: CheckProgress?
     private var checkedAt: Date?
     private var subscriptions: Set<AnyCancellable> = []
-    public var onClose: () -> Void = {}
 
     public init(network: AppModel) {
         self.network = network
@@ -48,10 +47,13 @@ public final class NetworkSettingsModel: ObservableObject {
         network.openSettings(); tab = .sites
         savedAt = nil; completedAt = nil; expected = nil; started = false; progress = nil; checkedAt = nil
     }
-    public func cancel() {
+    public var isDirty: Bool { network.settingsDraft.hasChanges(comparedTo: network.settings) }
+    public var canSave: Bool { network.canSaveSettings }
+    public var isBusy: Bool { false }
+    public func discard() {
         network.settingsDraft = SettingsDraft(settings: network.settings)
-        network.route = .main; onClose()
     }
+    public func cancel() { discard() }
     @discardableResult public func save() -> Bool {
         guard network.canSaveSettings, let value = network.settingsValidation.settings else { return false }
         savedAt = network.now(); completedAt = nil; expected = value
@@ -85,27 +87,6 @@ public final class NetworkSettingsModel: ObservableObject {
     }
 }
 
-@MainActor
-public final class NetworkSettingsController: NSObject, NSWindowDelegate {
-    public private(set) var window: NSWindow?
-    public let model: NetworkSettingsModel
-    public init(network: AppModel) { model = NetworkSettingsModel(network: network); super.init() }
-    public func present() {
-        if let window { window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
-        model.open()
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 720), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "网络设置"; window.isReleasedWhenClosed = false; window.delegate = self
-        window.contentView = NSHostingView(rootView: NetworkSettingsView(model: model))
-        model.onClose = { [weak self] in self?.window?.close() }
-        self.window = window; window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
-    }
-    public func windowWillClose(_ notification: Notification) {
-        model.network.settingsDraft = SettingsDraft(settings: model.network.settings)
-        model.network.route = .main
-        window?.delegate = nil; window = nil
-    }
-}
-
 public struct NetworkSettingsView: View {
     @ObservedObject var model: NetworkSettingsModel
     @ObservedObject var network: AppModel
@@ -113,8 +94,6 @@ public struct NetworkSettingsView: View {
     private var validation: SettingsDraft.Validation { network.settingsValidation }
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("网络设置").font(.title2.bold())
-            Text("管理网络检测目标和预期；保存后按新设置重新检测。").font(.callout).foregroundStyle(.secondary)
             HStack(spacing: 6) {
                 ForEach(NetworkSettingsTab.allCases, id: \.self) { tab in
                     NetworkSettingsButton(title: tab.rawValue, id: "network.tab.\(tab)", error: model.errorTabs.contains(tab), selected: model.tab == tab) { model.tab = tab }
@@ -132,15 +111,7 @@ public struct NetworkSettingsView: View {
                     }
                 }.padding(.trailing, 8).frame(maxWidth: .infinity, alignment: .leading)
             }
-            Divider()
-            Text(model.statusText).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("network.status")
-            HStack {
-                if model.tab == .sites { Button("恢复默认站点") { network.settingsDraft.restoreDefaultSites() } }
-                Spacer()
-                NetworkSettingsButton(title: "取消", id: "network.cancel", key: "\u{1b}") { model.cancel() }.frame(width: 64, height: 26)
-                NetworkSettingsButton(title: "保存", id: "network.save", enabled: network.canSaveSettings, key: "\r") { model.save() }.frame(width: 64, height: 26)
-            }
-        }.padding(20).frame(width: 560, height: 720).background(Color(nsColor: .windowBackgroundColor))
+        }.padding(20).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     private func field(_ title: String, _ value: Binding<String>, error: String? = nil, id: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -173,7 +144,11 @@ public struct NetworkSettingsView: View {
                     }.padding(4)
                 }
             }
-            Button("添加站点") { network.settingsDraft.addSite() }.disabled(network.settingsDraft.sites.count >= 20)
+            HStack {
+                Button("添加站点") { network.settingsDraft.addSite() }.disabled(network.settingsDraft.sites.count >= 20)
+                Spacer()
+                Button("恢复默认站点") { network.settingsDraft.restoreDefaultSites() }
+            }
             errorText(validation.siteCountError)
             Divider()
             field("VPN 内网站点（可留空）", $network.settingsDraft.intranetURL, error: validation.intranetURLError)

@@ -32,6 +32,11 @@ enum NetworkSettingsTests {
         settings.disconnectedDNSRule = .equals
         return settings
     }
+    static func settingsController(_ network: AppModel) -> SettingsWindowController {
+        let controller = SettingsWindowController(state: PanelPreviewRenderer.syntheticState(), network: network)
+        controller.open(section: .network, load: false)
+        return controller
+    }
     static func roundTrip() -> Bool {
         let defaults = NetworkMemoryDefaults()
         let store = SettingsStore(defaults: defaults)
@@ -39,7 +44,9 @@ enum NetworkSettingsTests {
         let network = AppModel(settings: fixture())
         network.actions = .live(settingsStore: store, notifier: NotificationUITests.SpyNotifier(),
             loginItem: MainAppLoginItemController(environment: AppBundleEnvironment(bundleIdentifier: nil, bundlePath: "")), recheck: {}, settingsDidChange: { received = $0 })
-        let model = NetworkSettingsModel(network: network); model.open()
+        let controller = settingsController(network)
+        defer { controller.closeWithoutConfirmation() }
+        guard let model = controller.network else { return false }
         network.settingsDraft.addSite()
         network.settingsDraft.sites[0].name = "示例站点"
         network.settingsDraft.sites[0].url = "https://www.example.org"
@@ -57,9 +64,13 @@ enum NetworkSettingsTests {
               loaded.disconnectedDNSRule == .empty else { return false }
         network.settingsDraft.localCheckInterval = "99"; model.cancel()
         return network.settingsDraft.localCheckInterval == "30" && store.load() == loaded
+            && !model.isDirty && controller.window != nil
     }
     static func boundaries() -> Bool {
-        let network = AppModel(settings: fixture()), model = NetworkSettingsModel(network: AppModel(settings: fixture()))
+        let network = AppModel(settings: fixture())
+        let controller = settingsController(network)
+        defer { controller.closeWithoutConfirmation() }
+        guard let model = controller.network else { return false }
         // 每轮从已保存草稿重建，边界值既检查校验也检查保存按钮状态。
         let target = model.network
         for (key, values, tab) in [
@@ -73,19 +84,24 @@ enum NetworkSettingsTests {
                 // 与默认值相同的 5 分钟仍通过校验，但不是改动；添加另一个有效改动。
                 target.settingsDraft.canaryHost = "new.example.test"
                 let valid = i == 1 || i == 2
-                guard target.canSaveSettings == valid, model.errorTabs.contains(tab) == !valid else { return false }
+                guard target.canSaveSettings == valid, model.errorTabs.contains(tab) == !valid,
+                      model.isDirty, model.canSave == valid else { return false }
             }
         }
         target.settingsDraft = SettingsDraft(settings: target.settings)
         target.settingsDraft.intranetURL = "invalid URL"
-        guard !target.canSaveSettings, model.errorTabs == [.sites] else { return false }
+        guard !target.canSaveSettings, model.errorTabs == [.sites], model.isDirty else { return false }
+        model.discard()
+        guard !model.isDirty else { return false }
         network.settingsDraft.addSite(); network.settingsDraft.sites[0].url = "file:///tmp/example"
         return !network.canSaveSettings && !network.settingsValidation.siteErrors.isEmpty
     }
     static func status() -> Bool {
         var now = Date(timeIntervalSince1970: 1_000_000)
         let network = AppModel(settings: fixture(), now: { now }, timeZone: TimeZone(secondsFromGMT: 0)!)
-        let model = NetworkSettingsModel(network: network)
+        let controller = settingsController(network)
+        defer { controller.closeWithoutConfirmation() }
+        guard let model = controller.network else { return false }
         network.checkProgress = CheckProgress(kind: .full, completed: 1, total: 1)
         network.lastCheckedAt = now.addingTimeInterval(-1)
         network.settingsDraft.localCheckInterval = "30"
@@ -118,16 +134,16 @@ enum NetworkSettingsTests {
     }
     static func controlsAndPreviews() -> Bool {
         let network = AppModel(settings: fixture())
-        let controller = NetworkSettingsController(network: network); controller.present()
-        guard let window = controller.window else { return false }
-        defer { window.close() }
-        controller.present(); guard controller.window === window else { return false }
+        let controller = settingsController(network)
+        guard let window = controller.window, let model = controller.network else { return false }
+        defer { controller.closeWithoutConfirmation() }
+        controller.open(section: .network, load: false); guard controller.window === window else { return false }
         network.settingsDraft.addSite()
         network.settingsDraft.sites[0].name = "示例站点"
         network.settingsDraft.sites[0].url = "https://www.example.org"
         do {
             for tab in NetworkSettingsTab.allCases {
-                guard click(window, id: "network.tab.\(tab)"), controller.model.tab == tab else { return false }
+                guard click(window, id: "network.tab.\(tab)"), model.tab == tab else { return false }
                 guard let selected = SettingsControlTestSupport.element(window, id: "network.tab.\(tab)") as? NSButton,
                       let titleColor = selected.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor,
                       selected.bezelColor == nil, titleColor == .controlAccentColor else { print("选中分页文字与底色同色"); return false }
@@ -147,7 +163,7 @@ enum NetworkSettingsTests {
                     field.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: field))
                     SettingsControlTestSupport.settle(window)
                     guard network.settingsDraft.localCheckInterval == "4", !network.canSaveSettings,
-                          controller.model.errorTabs.contains(.frequency),
+                          model.errorTabs.contains(.frequency),
                           SettingsControlTestSupport.element(window, id: "network.save")?.isAccessibilityEnabled() == false else { return false }
                 }
                 if let path = ProcessInfo.processInfo.environment["MEOWMAC_CONFIG_RENDER_DIR"] {
@@ -161,7 +177,8 @@ enum NetworkSettingsTests {
                 }
             }
             guard click(window, id: "network.cancel") else { return false }
-            return controller.window == nil && !network.settingsDraft.hasChanges(comparedTo: network.settings)
+            return controller.window === window && !network.settingsDraft.hasChanges(comparedTo: network.settings)
+                && !model.isDirty && model.tab == .frequency
         } catch { print("网络设置预览失败：\(error)"); return false }
     }
 }

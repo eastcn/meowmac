@@ -14,7 +14,7 @@ public struct QuotaSourceDraft: Equatable, Identifiable {
 }
 
 @MainActor
-public final class QuotaSourceSettingsModel: ObservableObject {
+public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSession {
     @Published public private(set) var saved: [QuotaSourceDraft]
     @Published public private(set) var draft: [QuotaSourceDraft]
     @Published public private(set) var catalog: [QuotaCatalogEntry]
@@ -26,7 +26,6 @@ public final class QuotaSourceSettingsModel: ObservableObject {
     @Published private var failedKeys = Set<QuotaProvider>()
     @Published public private(set) var busy = false
     @Published public private(set) var status = "尚未修改"
-    public var onClose: () -> Void = {}
     private let state: PanelState
     private let coordinator: QuotaCoordinator
     private var refreshSince: Date?
@@ -49,6 +48,8 @@ public final class QuotaSourceSettingsModel: ObservableObject {
         return list.filter { $0.displayName.localizedCaseInsensitiveContains(keyword) || $0.provider.rawValue.localizedCaseInsensitiveContains(keyword) }
     }
     public var isDirty: Bool { draft != saved || !keys.isEmpty || !failedKeys.isEmpty }
+    public var canSave: Bool { isDirty && !busy && state.quotaSourceRecoveryReason == nil }
+    public var isBusy: Bool { busy }
     public func rowDirty(_ provider: QuotaProvider) -> Bool {
         draft.first { $0.provider == provider } != saved.first { $0.provider == provider } || keys[provider] != nil || failedKeys.contains(provider)
     }
@@ -75,10 +76,12 @@ public final class QuotaSourceSettingsModel: ObservableObject {
         draft[index].enabled = value
     }
     public func cancelKey(_ provider: QuotaProvider) { keys.removeValue(forKey: provider); editingKeys.remove(provider); failedKeys.remove(provider) }
-    public func cancel() {
+    public func discard() {
         guard !busy else { return }
-        keys.removeAll(); failedKeys.removeAll(); draft = saved; onClose()
+        keys.removeAll(); failedKeys.removeAll(); editingKeys.removeAll(); errors.removeAll()
+        draft = saved; status = state.quotaSourceRecoveryReason ?? "尚未修改"
     }
+    public func cancel() { discard() }
     public func close() { keys.removeAll(); editingKeys.removeAll() }
 
     public func load() async {
@@ -130,8 +133,8 @@ public final class QuotaSourceSettingsModel: ObservableObject {
         return "已保存，正在刷新 \(refreshedProviders.count) 个渠道…" + (remaining > 0 ? "（合并请求，约 \(Int(ceil(remaining))) 秒后继续）" : "")
     }
 
-    public func save() async {
-        guard !busy, isDirty else { return }
+    @discardableResult public func save() async -> Bool {
+        guard canSave else { return !busy && !isDirty && state.quotaSourceRecoveryReason == nil }
         busy = true; refreshSince = nil
         defer { keys.removeAll(); busy = false }
         let desired = draft
@@ -143,7 +146,7 @@ public final class QuotaSourceSettingsModel: ObservableObject {
                 try coordinator.replaceSources(QuotaSourceList(providers: retained.map(\.provider)))
                 saved = retained
             }
-        } catch { status = error.localizedDescription; logger.error("额度渠道清单保存失败"); return }
+        } catch { status = error.localizedDescription; logger.error("额度渠道清单保存失败"); return false }
         let client = coordinator.client
         for row in desired where rowDirty(row.provider) {
             let provider = row.provider
@@ -179,6 +182,7 @@ public final class QuotaSourceSettingsModel: ObservableObject {
             refreshedProviders = changed; refreshSince = state.now()
             coordinator.requestRefresh(changed, includeDisabled: true)
         } else { status = "部分保存失败：成功项已生效，请修正标红的项" }
+        return errors.isEmpty && !isDirty
     }
 }
 
@@ -204,29 +208,6 @@ struct QuotaSecureField: NSViewRepresentable {
         if field.stringValue != value { field.stringValue = value }
     }
     static func dismantleNSView(_ field: NSSecureTextField, coordinator: Coordinator) { field.stringValue = ""; field.delegate = nil }
-}
-
-@MainActor
-public final class QuotaSourceSettingsController: NSObject, NSWindowDelegate {
-    public private(set) var window: NSWindow?
-    public private(set) var model: QuotaSourceSettingsModel?
-    private let state: PanelState
-    private let coordinator: QuotaCoordinator
-    public init(state: PanelState, coordinator: QuotaCoordinator) { self.state = state; self.coordinator = coordinator }
-    public func present(load: Bool = true) {
-        if let window { window.makeKeyAndOrderFront(nil); NSApplication.shared.activate(ignoringOtherApps: true); return }
-        let model = QuotaSourceSettingsModel(state: state, coordinator: coordinator)
-        self.model = model; model.onClose = { [weak self] in self?.window?.close() }
-        let controller = NSHostingController(rootView: QuotaSourceSettingsView(model: model, state: state))
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 650), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "额度源设置"; window.isReleasedWhenClosed = false; window.delegate = self
-        window.contentViewController = controller
-        window.setContentSize(NSSize(width: 540, height: min(720, (NSScreen.main?.visibleFrame.height ?? 800) - 60)))
-        self.window = window; window.center(); window.makeKeyAndOrderFront(nil)
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        if load { Task { await model.load() } }
-    }
-    public func windowWillClose(_ notification: Notification) { model?.close(); window?.delegate = nil; window = nil; model = nil }
 }
 
 struct QuotaSourceSettingsView: View {
@@ -281,12 +262,7 @@ struct QuotaSourceSettingsView: View {
                 if let provider = keys.sorted(by: { $0.rawValue < $1.rawValue }).first { proxy.scrollTo(provider.rawValue, anchor: .bottom) }
             }
             }
-            Divider()
-            HStack { Spacer(); Button("取消") { model.cancel() }.disabled(model.busy).accessibilityIdentifier("quota-source.cancel")
-                Button("保存") { Task { await model.save() } }.buttonStyle(.borderedProminent).disabled(!model.isDirty || model.busy || state.quotaSourceRecoveryReason != nil).accessibilityIdentifier("quota-source.save")
-            }.padding(.horizontal, 20).padding(.vertical, 12)
-            Text(model.statusText).font(.caption).foregroundStyle(model.errors.isEmpty ? Color.secondary : Color.red).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 20).padding(.bottom, 12).accessibilityIdentifier("quota-source.status")
-        }.frame(width: 540).background(Color(nsColor: .windowBackgroundColor))
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     private func channel(_ row: QuotaSourceDraft) -> some View {
         let provider = row.provider
