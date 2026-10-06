@@ -115,7 +115,7 @@ public final class CleaningController {
             state.cleanTerminalPreference = preference
         } catch {
             let alert = NSAlert(); alert.alertStyle = .warning
-            alert.messageText = "清理终端未保存"
+            alert.messageText = "终端未保存"
             alert.informativeText = "配置文件无法写入。请检查配置文件，原来的终端选择仍然有效。"
             alert.addButton(withTitle: "好")
             _ = present(alert)

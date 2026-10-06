@@ -267,6 +267,8 @@ enum SelfTestMain {
             }
             return opened && config && folder && quit && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
+        tests.append(("UI.AIAgentSettings/生产控件与保存失败回读", { AIAgentSettingsTests.controls() }))
+        tests.append(("UI.AIAgentSettings/通用栏合成截图", { AIAgentSettingsTests.previews() }))
         tests.append(("UI.Settings/即时设置回调与条件", { ImmediateSettingsTests.callbacks() }))
         tests.append(("UI.Settings/六栏合成窗口预览", { await ImmediateSettingsTests.previews() }))
         tests.append(("UI.Settings/空渠道入口", { ImmediateSettingsTests.quotaLink() }))

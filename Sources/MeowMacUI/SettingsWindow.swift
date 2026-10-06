@@ -200,7 +200,7 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
     public func catDidChange() { appearance.catDidChange() }
     private func prepare(_ section: SettingsSection) {
-        if section == .general { state.onPrepareCleanTerminalMenu() }
+        if section == .general { state.onPrepareCleanTerminalMenu(); state.onDetectAIAgents() }
         if section == .notifications { state.onPrepareNotificationMenu() }
     }
     public func request(_ destination: SettingsNavigation.Destination) {

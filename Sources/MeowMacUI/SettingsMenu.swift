@@ -29,7 +29,7 @@ public enum SettingsMenu {
     }
     public static func cleanTerminalMenu(state: PanelState) -> NSMenu {
         state.onPrepareCleanTerminalMenu()
-        let menu = NSMenu(title: "清理终端"); menu.autoenablesItems = false
+        let menu = NSMenu(title: "终端"); menu.autoenablesItems = false
         for terminal in CleanTerminal.allCases {
             var title = terminal.name
             if terminal == .automatic, let selected = terminal.resolved(available: state.availableCleanTerminals) {

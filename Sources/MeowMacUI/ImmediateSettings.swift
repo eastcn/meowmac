@@ -26,6 +26,11 @@ public struct ImmediateSettingsActions {
     }
     public func terminalEnabled(_ terminal: CleanTerminal) -> Bool { terminal == .automatic || state.availableCleanTerminals.contains(terminal) }
     public func selectTerminal(_ terminal: CleanTerminal) { guard terminalEnabled(terminal) else { return }; state.onSelectCleanTerminal(terminal) }
+    public var installedAgents: Set<AIAgent> { Set(state.aiAgentInstallations.map(\.agent)) }
+    public func agentEnabled(_ agent: AIAgent) -> Bool { agent == .automatic || installedAgents.contains(agent) }
+    public func selectAgent(_ agent: AIAgent) { guard agentEnabled(agent) else { return }; state.onSelectAIAgent(agent) }
+    public func setAIEntry(_ enabled: Bool) { state.onSetAIDiagnosisEntry(enabled) }
+    public func detectAgents() { state.onDetectAIAgents() }
     public func setLogin(_ enabled: Bool) { state.onToggleLogin(enabled) }
     public func selectCat(_ id: String) { state.onSelectCat(id) }
     public func importHistory() { guard state.showsCodexBarImport else { return }; state.onImportCodexBarHistory() }
@@ -61,15 +66,16 @@ struct ImmediateSettingsView: View {
                 SettingsImmediateToggle(title: "登录时启动 MeowMac", id: "settings.login", value: Binding(get: { state.loginEnabled }, set: actions.setLogin)).frame(height: 24)
                     .padding(8).frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text("清理").font(.headline)
-            Text("点面板底部“清理”时打开的终端").font(.caption).foregroundStyle(.secondary)
+            Text("终端").font(.headline)
+            Text("清理和 AI 排查的命令行工具在这里打开").font(.caption).foregroundStyle(.secondary)
             GroupBox {
-                Picker("清理终端", selection: Binding(get: { state.cleanTerminalPreference }, set: actions.selectTerminal)) {
+                Picker("终端", selection: Binding(get: { state.cleanTerminalPreference }, set: actions.selectTerminal)) {
                     ForEach(CleanTerminal.allCases, id: \.self) { terminal in
                         Text(actions.terminalTitle(terminal)).tag(terminal).disabled(!actions.terminalEnabled(terminal))
                     }
                 }.accessibilityIdentifier("settings.terminal").padding(8)
             }
+            aiDiagnosis
             Text("数据").font(.headline)
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
@@ -84,6 +90,44 @@ struct ImmediateSettingsView: View {
                         Button("打开配置文件…", action: state.onOpenConfig).accessibilityIdentifier("settings.config")
                         Button("在访达中显示", action: state.onShowConfigFolder).accessibilityIdentifier("settings.config-folder")
                     }.buttonStyle(.link)
+                }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+    private var aiDiagnosis: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("AI 诊断").font(.headline)
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    SettingsImmediateToggle(title: "显示‘用 AI 排查’入口", id: "settings.ai-entry", value: Binding(get: { state.aiDiagnosisEntry }, set: actions.setAIEntry)).frame(height: 24)
+                    HStack {
+                        Text("默认 agent")
+                        Spacer()
+                        AIAgentPicker(agents: AIAgent.allCases, available: actions.installedAgents, id: "settings.ai-agent",
+                            selection: Binding(get: { state.aiAgentPreference }, set: { if let agent = $0 { actions.selectAgent(agent) } }))
+                            .frame(width: 260, height: 28)
+                    }
+                    Divider()
+                    HStack {
+                        Text("检测结果").fontWeight(.semibold)
+                        Spacer()
+                        SettingsActionButton(title: "重新检测", id: "settings.ai-detect", action: actions.detectAgents).frame(width: 88, height: 28)
+                    }
+                    ForEach(AIAgent.agents, id: \.self) { agent in
+                        let installed = state.aiAgentInstallations.first { $0.agent == agent }
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(agent.name)
+                                Spacer(minLength: 8)
+                                Text(installed == nil ? "未安装" : "已安装").foregroundStyle(.secondary)
+                                Text(agent.launchDescription).foregroundStyle(.secondary).frame(width: 116, alignment: .trailing)
+                            }
+                            if let directory = installed?.displayDirectory(home: FileManager.default.homeDirectoryForCurrentUser.path) {
+                                Text(directory).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }.font(.callout).fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let error = state.aiSettingsError { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
                 }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
