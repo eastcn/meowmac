@@ -2,6 +2,7 @@ import Foundation
 
 public struct LocalConfig: Codable, Equatable {
     public var schemaVersion = 1
+    public var alertRules = AlertRuleSet()
     public var quotaRemainingWarn = 0.20
     public var diskRemainingWarn = 0.10
     public var runawayCPU = 90.0
@@ -33,7 +34,7 @@ public struct LocalConfig: Codable, Equatable {
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, quotaRemainingWarn, diskRemainingWarn, runawayCPU, runawaySeconds
+        case alertRules, schemaVersion, quotaRemainingWarn, diskRemainingWarn, runawayCPU, runawaySeconds
         case sleepAssertionSeconds, memoryPressureSeconds, fairThermalSeconds, fanHighFraction, fanHighSeconds, sourceFailureCount
         case memoryNormalLoad, memoryWarnLoad, memoryCriticalLoad, idleFrameSeconds, fullFrameSeconds
         case quotaRefreshSeconds, sessionPollSeconds, sessionFinishDelaySeconds, manualMergeSeconds
@@ -43,6 +44,7 @@ public struct LocalConfig: Codable, Equatable {
     public init(from decoder: Decoder) throws {
         let fields = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = LocalConfig()
+        alertRules = (try? fields.decodeIfPresent(AlertRuleSet.self, forKey: .alertRules)) ?? AlertRuleSet()
         schemaVersion = try fields.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? defaults.schemaVersion
         quotaRemainingWarn = try fields.decodeIfPresent(Double.self, forKey: .quotaRemainingWarn) ?? defaults.quotaRemainingWarn
         diskRemainingWarn = try fields.decodeIfPresent(Double.self, forKey: .diskRemainingWarn) ?? defaults.diskRemainingWarn
@@ -106,6 +108,37 @@ public enum ConfigStore {
     }
 
     private static func saveField(_ key: String, value: Any, to url: URL) throws {
+        try updateObject(at: url) { $0[key] = value }
+    }
+
+    public static func saveAlertRules(_ rules: AlertRuleSet, changedBuiltin: Set<BuiltinAlertRule> = [],
+                                      restoringDefaults: Bool = false, to url: URL = defaultURL) throws {
+        let valid = try rules.validated()
+        try updateObject(at: url) { object in
+            var root = object["alertRules"] as? [String: Any] ?? [:]
+            var builtin = root["builtin"] as? [String: Any] ?? [:]
+            let targets = restoringDefaults ? Set(BuiltinAlertRule.allCases) : changedBuiltin
+            for rule in targets {
+                for key in rule.legacyKeys { object.removeValue(forKey: key) }
+                if restoringDefaults { builtin.removeValue(forKey: rule.id); continue }
+                var fields = builtin[rule.id] as? [String: Any] ?? [:]
+                let value = valid.builtin[rule.id] ?? rule.defaults
+                let data = try JSONEncoder().encode(value)
+                let encoded = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+                let defaults = try JSONSerialization.jsonObject(with: JSONEncoder().encode(rule.defaults)) as! [String: Any]
+                for key in ["enabled", "threshold", "durationSeconds", "fairThermalSeconds", "fanHighSeconds"] {
+                    fields.removeValue(forKey: key)
+                    if let item = encoded[key], (item as? NSObject) != (defaults[key] as? NSObject) { fields[key] = item }
+                }
+                if fields.isEmpty { builtin.removeValue(forKey: rule.id) } else { builtin[rule.id] = fields }
+            }
+            root["builtin"] = builtin
+            root["custom"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(valid.custom))
+            object["alertRules"] = root
+        }
+    }
+
+    private static func updateObject(at url: URL, update: (inout [String: Any]) throws -> Void) throws {
         var object: [String: Any]
         do {
             let data = try Data(contentsOf: url)
@@ -116,10 +149,9 @@ public enum ConfigStore {
             }
             object = existing
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            let data = try JSONEncoder().encode(LocalConfig())
-            object = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+            object = ["schemaVersion": 1]
         }
-        object[key] = value
+        try update(&object)
         let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)

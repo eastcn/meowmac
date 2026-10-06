@@ -128,6 +128,7 @@ enum SelfTestMain {
             ("System.Cleaning/可执行检查与缺失历史", { CleaningTests.filesAndHistory() }),
             ("Core.System/mo 清理历史", { SelfTestMain.moHistory() }),
         ]
+        for test in AlertRuleTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }
         for test in SensorTests.tests { tests.append((test.0, { test.1() })) }
         for test in SensorUITests.tests { tests.append((test.0, { test.1() })) }
