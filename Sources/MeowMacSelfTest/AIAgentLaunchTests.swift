@@ -45,7 +45,8 @@ enum AIAgentLaunchTests {
         var terminalAvailable = true, finish: ((Error?) -> Void)?
         let controller = AIAgentController(state: state, configURL: URL(fileURLWithPath: "/example/config.json"),
             detect: { detectionCount += 1; return installed }, findTerminal: { terminalAvailable && $0 == .ghostty ? URL(fileURLWithPath: "/example/Ghostty.app") : nil },
-            launchTerminal: { _, _, script, completion in terminals.append(script); finish = completion },
+            launchTerminal: { _, _, agent, executable, prompt, work, completion in
+                terminals.append(AIAgentCommand.script(agent: agent, executable: executable, prompt: prompt, workingDirectory: work, runnerExecutable: "/example/MeowMac", reportPath: "/example/report")); finish = completion },
             launchDesktop: { app, url, completion in desktops.append((app, url)); completion(nil) },
             copy: { copies.append($0) }, prepareDirectory: { _ in }, readLast: { .gemini }, recordSuccess: { recorded.append($0) })
         let preview = controller.preview(prompt: "合成提示词 ' \n第二行")
@@ -82,7 +83,7 @@ enum AIAgentLaunchTests {
         let controller = AIAgentController(state: state,
             detect: { [.init(agent: .codex, location: URL(fileURLWithPath: "/example/codex"))] },
             findTerminal: { $0 == .ghostty ? URL(fileURLWithPath: "/example/Ghostty.app") : nil },
-            launchTerminal: { _, _, _, completion in finish = completion }, prepareDirectory: { _ in },
+            launchTerminal: { _, _, _, _, _, _, completion in finish = completion }, prepareDirectory: { _ in },
             readLast: { nil }, recordSuccess: { recorded.append($0) })
         var session: AIDiagnosisSession? = controller.preview(prompt: "合成提示词")
         weak var weakSession = session
@@ -104,7 +105,7 @@ enum AIAgentLaunchTests {
             let prompt = "合成 ' \" \n$(touch injected) `touch injected2`"
             for agent in [AIAgent.claudeCode, .codex, .openCode, .gemini, .qoder] {
                 let script = root.appendingPathComponent("agent.command")
-                try Data(AIAgentCommand.script(agent: agent, executable: executable.path, prompt: prompt, workingDirectory: work.path).utf8).write(to: script)
+                try Data(AIAgentCommand.script(agent: agent, executable: executable.path, prompt: prompt, workingDirectory: work.path, runnerExecutable: Bundle.main.executableURL!.path, reportPath: root.appendingPathComponent("result.json").path).utf8).write(to: script)
                 let process = Process(); process.executableURL = URL(fileURLWithPath: "/bin/sh"); process.arguments = [script.path]
                 process.environment = ["PATH": "/usr/bin:/bin"]
                 let input = Pipe(), output = Pipe(); process.standardInput = input; process.standardOutput = output; process.standardError = output
@@ -113,6 +114,7 @@ enum AIAgentLaunchTests {
                 let fields = try Data(contentsOf: marker).split(separator: 0, omittingEmptySubsequences: false).dropLast().map { String(decoding: $0, as: UTF8.self) }
                 guard process.terminationStatus == 7, Array(fields.dropFirst(2)) == agent.arguments(prompt: prompt),
                       fields.first == work.path, fields[1].hasPrefix(root.path + ":"),
+                      try JSONDecoder().decode(AIAgentLaunchReport.self, from: Data(contentsOf: root.appendingPathComponent("result.json"))).pid != nil,
                       text.contains("状态 7"), !FileManager.default.fileExists(atPath: script.path),
                       !FileManager.default.fileExists(atPath: work.appendingPathComponent("injected").path),
                       !FileManager.default.fileExists(atPath: work.appendingPathComponent("injected2").path) else { return false }
@@ -132,9 +134,10 @@ enum AIAgentLaunchTests {
             try Data(("#!/bin/sh\nprintf '%s' \"$1\" > " + CleaningCommand.quote(marker.path) + "\n").utf8).write(to: executable)
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
             let error: Error? = await withCheckedContinuation { continuation in
-                TerminalScriptLauncher.launch(terminal: .ghostty, application: application,
-                    script: AIAgentCommand.script(agent: .codex, executable: executable.path, prompt: prompt, workingDirectory: work.path),
-                    scriptPrefix: "agent-test") { continuation.resume(returning: $0) }
+                AIAgentTerminalLauncher.launch(terminal: .ghostty, application: application, agent: .codex,
+                    executable: executable.path, prompt: prompt, workingDirectory: work.path, reportRoot: root,
+                    openTerminal: { TerminalScriptLauncher.launch(terminal: $0, application: $1, script: $2, scriptPrefix: "agent-test", completion: $3) },
+                    completion: { continuation.resume(returning: $0) })
             }
             guard error == nil else { print("假 agent 启动错误：\(String(describing: error))"); return false }
             for _ in 0..<100 where !FileManager.default.fileExists(atPath: marker.path) { try await Task.sleep(nanoseconds: 100_000_000) }

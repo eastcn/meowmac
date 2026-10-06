@@ -32,6 +32,9 @@ stage="$work_dir/MeowMac.app"
 iconset="$work_dir/MeowMac.iconset"
 mkdir -p "$stage/Contents/MacOS" "$stage/Contents/Resources" "$iconset"
 cp "$binary" "$stage/Contents/MacOS/MeowMac"
+# 命令行入口在 AppKit 启动前分流；独立进程名让安装只等待主应用退出。
+cp "$binary" "$stage/Contents/MacOS/MeowMacAgentRunner"
+codesign --force --sign - "$stage/Contents/MacOS/MeowMacAgentRunner"
 resource_bundle="$(dirname "$binary")/MeowMac_MeowMacUI.bundle"
 [[ -d "$resource_bundle" ]] || { printf '未找到渠道图标资源包\n' >&2; exit 1; }
 cp -R "$resource_bundle" "$stage/Contents/Resources/"

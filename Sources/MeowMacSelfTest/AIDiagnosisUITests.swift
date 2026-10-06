@@ -14,7 +14,7 @@ enum AIDiagnosisUITests {
                          .init(agent: .claudeDesktop, location: URL(fileURLWithPath: "/example/Claude.app"))]
         let controller = AIAgentController(state: state, detect: { detected += 1; return installed },
             findTerminal: { $0 == .ghostty ? URL(fileURLWithPath: "/example/Ghostty.app") : nil },
-            launchTerminal: { _, _, _, finish in launches += 1; finish(nil) },
+            launchTerminal: { _, _, _, _, _, _, finish in launches += 1; finish(nil) },
             launchDesktop: { _, _, finish in launches += 1; finish(nil) }, copy: { copies.append($0) },
             prepareDirectory: { _ in }, readLast: { nil }, recordSuccess: { _ in })
         let preview = AIDiagnosisWindowController(controller: controller)

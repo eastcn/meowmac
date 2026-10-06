@@ -20,7 +20,7 @@ public final class AIDiagnosisSession: ObservableObject {
 /// 外部动作全部可注入。预览只检测，复制和启动分别由用户动作触发。
 @MainActor
 public final class AIAgentController {
-    public typealias TerminalLauncher = CleaningController.Launcher
+    public typealias TerminalLauncher = (CleanTerminal, URL, AIAgent, String, String, String, @escaping (Error?) -> Void) -> Void
     public typealias DesktopLauncher = (URL, URL?, @escaping (Error?) -> Void) -> Void
     private let state: PanelState
     private let configURL: URL
@@ -47,7 +47,7 @@ public final class AIAgentController {
         self.state = state; self.configURL = configURL
         self.detect = detect ?? { AIAgentDetector(findApplication: { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }).detect() }
         self.findTerminal = findTerminal
-        self.launchTerminal = launchTerminal ?? { TerminalScriptLauncher.launch(terminal: $0, application: $1, script: $2, scriptPrefix: "agent", completion: $3) }
+        self.launchTerminal = launchTerminal ?? { AIAgentTerminalLauncher.launch(terminal: $0, application: $1, agent: $2, executable: $3, prompt: $4, workingDirectory: $5, completion: $6) }
         self.launchDesktop = launchDesktop ?? { application, url, completion in
             let configuration = NSWorkspace.OpenConfiguration(); configuration.activates = true
             let finished: @Sendable (NSRunningApplication?, Error?) -> Void = { _, error in Task { @MainActor in completion(error) } }
@@ -102,7 +102,7 @@ public final class AIAgentController {
             }
             // 窗口关闭不取消已发出的启动；成功历史独立于预览会话的寿命。
             self.lastSuccessful = agent
-            session?.message = [.qoder, .chatGPT, .deepSeekHarness].contains(agent) ? "已复制，请粘贴" : "已打开 " + agent.name
+            session?.message = [.qoder, .chatGPT, .deepSeekHarness].contains(agent) ? "已复制，请粘贴" : (agent.executableName == nil ? "已打开 " : "已启动 ") + agent.name
             do { try self.recordSuccess(agent) }
             catch {
                 if let session { session.message = (session.message ?? "") + "；上次 agent 记录未保存" }
@@ -119,7 +119,7 @@ public final class AIAgentController {
             catch { fail(session, "无法准备排查工作目录：" + error.localizedDescription); return }
             if agent == .qoder { copy(session.prompt) }
             session.launching = true; session.message = nil
-            launchTerminal(terminal, application, AIAgentCommand.script(agent: agent, executable: installed.location.path, prompt: session.prompt, workingDirectory: workingDirectory.path), completion)
+            launchTerminal(terminal, application, agent, installed.location.path, session.prompt, workingDirectory.path, completion)
         } else {
             if [.chatGPT, .deepSeekHarness].contains(agent) { copy(session.prompt) }
             session.launching = true; session.message = nil

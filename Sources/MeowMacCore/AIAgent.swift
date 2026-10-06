@@ -65,7 +65,8 @@ public enum AIAgent: String, Codable, CaseIterable {
 }
 
 public enum AIAgentCommand {
-    public static func script(agent: AIAgent, executable: String, prompt: String, workingDirectory: String) -> String {
+    public static func script(agent: AIAgent, executable: String, prompt: String, workingDirectory: String,
+                              runnerExecutable: String, reportPath: String) -> String {
         let quote = CleaningCommand.quote
         let parent = URL(fileURLWithPath: executable).deletingLastPathComponent().path
         let arguments = agent.arguments(prompt: prompt).map(quote).joined(separator: " ")
@@ -73,16 +74,8 @@ public enum AIAgentCommand {
         #!/bin/sh
         trap '/bin/rm -f -- "$0"' EXIT
         export PATH=\(quote(parent + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")):"$PATH"
-        if ! cd -- \(quote(workingDirectory)); then
-            printf '%s\\n' '无法进入 AI 排查工作目录。请返回 MeowMac 重试或复制提示词。'
-            status=1
-        elif [ ! -f \(quote(executable)) ] || [ ! -x \(quote(executable)) ]; then
-            printf '%s\\n' 'agent 不再可执行。请返回 MeowMac 重新检测或复制提示词。'
-            status=127
-        else
-            \(quote(executable)) \(arguments)
-            status=$?
-        fi
+        \(quote(runnerExecutable)) --run-ai-agent \(quote(reportPath)) \(quote(workingDirectory)) \(quote(executable)) \(arguments)
+        status=$?
         printf '\\nAI 排查命令已退出（状态 %s）。按回车关闭窗口。\\n' "$status"
         read -r acknowledgement
         exit "$status"

@@ -9,6 +9,7 @@ import AppKit
 @main
 enum SelfTestMain {
     @MainActor static func main() {
+        if let status = AIAgentTerminalLauncher.handleCommandLine(Array(CommandLine.arguments.dropFirst())) { exit(status) }
         // 原生控件会泵送 RunLoop；由 AppKit 托管主循环，避免 async-main 提前结束。
         NSApplication.shared.setActivationPolicy(.accessory)
         Task { @MainActor in await runTests() }
@@ -139,6 +140,9 @@ enum SelfTestMain {
         tests.append(("UI.Reminders/启动到期切猫与快照", { ReminderIntegrationTests.runtime() }))
         tests.append(("UI.Reminders/真实弹出面板与超高筛选", { await ReminderIntegrationTests.popover() }))
         tests.append(("System.AIAgent/固定目录与可执行检测", { AIAgentLaunchTests.detection() }))
+        tests.append(("UI.AIAgent/CLI 启动失败与复制入口", { await AIAgentStartupTests.failures() }))
+        tests.append(("UI.AIAgent/CLI 执行确认与关闭预览", { await AIAgentStartupTests.success() }))
+        tests.append(("UI.AIAgent/终端成功但未回传超时", { await AIAgentStartupTests.timeout() }))
         tests.append(("UI.AIAgent/关闭预览后启动成功仍记住", { AIAgentLaunchTests.completionAfterClose() }))
         tests.append(("UI.AIAgent/八种启动与失败反馈", { AIAgentLaunchTests.controller() }))
         tests.append(("Core.AIAgent/实际 shell 参数与工作目录", { AIAgentLaunchTests.shell() }))

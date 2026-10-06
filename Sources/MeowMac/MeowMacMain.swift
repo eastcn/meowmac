@@ -5,6 +5,7 @@ import MeowMacUI
 enum MeowMacMain {
     @MainActor static func main() async {
         let args = Array(CommandLine.arguments.dropFirst())
+        if let status = AIAgentTerminalLauncher.handleCommandLine(args) { exit(status) }
         if args.first == "--snapshot-json" {
             do {
                 guard args.count == 1 || (args.count == 3 && args[1] == "--dump-raw") else { throw CocoaError(.validationMissingMandatoryProperty) }
