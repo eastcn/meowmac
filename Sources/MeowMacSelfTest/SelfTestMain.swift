@@ -128,6 +128,11 @@ enum SelfTestMain {
             ("System.Cleaning/可执行检查与缺失历史", { CleaningTests.filesAndHistory() }),
             ("Core.System/mo 清理历史", { SelfTestMain.moHistory() }),
         ]
+        tests.append(("UI.Settings.AlertRules/关闭通知的新规则不会抢先通知", { (try? AlertSettingsTests.notificationOrder()) ?? false }))
+        tests.append(("UI.Settings.AlertRules/全部开关、字段和表单写盘", { (try? AlertSettingsTests.controls()) ?? false }))
+        tests.append(("UI.Settings.AlertRules/真实数字框、启用和新建入口", { (try? AlertSettingsTests.nativeFields()) ?? false }))
+        tests.append(("UI.Settings.AlertRules/上限和坏文件保留", { (try? AlertSettingsTests.limitsAndBroken()) ?? false }))
+        tests.append(("UI.Settings.AlertRules/合成真实窗口预览", { await AlertSettingsTests.previews() }))
         for test in CustomRuleTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         for test in RuleClockTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         for test in AlertRuleTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }

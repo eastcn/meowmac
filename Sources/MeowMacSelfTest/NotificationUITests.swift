@@ -197,9 +197,10 @@ enum NotificationUITests {
             guard let window = controller.window else { return false }
             SettingsControlTestSupport.settle(window)
             @MainActor func toggle(_ id: String) -> NSSwitch? { SettingsControlTestSupport.element(window, id: id) as? NSSwitch }
+            @MainActor func bell(_ id: String) -> NSButton? { SettingsControlTestSupport.element(window, id: "alerts.notify." + id) as? NSButton }
             guard let global = toggle("settings.notifications"), global.state == .on,
-                  let source = toggle("settings.notification.source"), source.state == .off,
-                  toggle("settings.notification.network")?.state == .on,
+                  let source = bell("source.failure"), source.state == .off,
+                  bell("network.fault")?.state == .on,
                   state.notificationsAuthorized == false else { return false }
             state.onOpenNotificationSystemSettings()
             source.state = .on; _ = source.sendAction(source.action, to: source.target)
@@ -208,8 +209,8 @@ enum NotificationUITests {
             guard saved?.enabled == false else { return false }
             state.notificationsAuthorized = true
             SettingsControlTestSupport.settle(window)
-            let categories = NotificationCategory.allCases.compactMap { toggle("settings.notification." + $0.rawValue) }
-            guard state.notificationsAuthorized == true, categories.count == 9,
+            let categories = NotificationCategory.allCases.flatMap(NotificationSettings.ruleIDs).compactMap { bell($0) }
+            guard state.notificationsAuthorized == true, categories.count == 10,
                   categories.allSatisfy({ !$0.isEnabled }) else { return false }
             controller.open(section: .general, load: false)
             controller.open(section: .notifications, load: false)

@@ -58,15 +58,15 @@ enum ImmediateSettingsTests {
         state.onSetNotificationSettings = { values.append($0); state.notificationSettings = $0 }
         global.state = .on; _ = global.sendAction(global.action, to: global.target); SettingsControlTestSupport.settle(window)
         guard state.notificationSettings.enabled else { return false }
-        guard let category = SettingsControlTestSupport.element(window, id: "settings.notification.source") as? NSSwitch else { return false }
+        guard let category = SettingsControlTestSupport.element(window, id: "alerts.notify.source.failure") as? NSButton else { return false }
         state.onSetNotificationSettings = { values.append($0) }
         category.state = .off; _ = category.sendAction(category.action, to: category.target)
         guard state.notificationSettings.categories.contains(.source), category.state == .on,
               values.last?.categories.contains(.source) == false else { return false }
         state.onSetNotificationSettings = { values.append($0); state.notificationSettings = $0 }
         global.state = .off; _ = global.sendAction(global.action, to: global.target); SettingsControlTestSupport.settle(window)
-        return NotificationCategory.allCases.allSatisfy { category in
-            (SettingsControlTestSupport.element(window, id: "settings.notification." + category.rawValue) as? NSSwitch)?.isEnabled == false
+        return NotificationCategory.allCases.flatMap(NotificationSettings.ruleIDs).allSatisfy { id in
+            (SettingsControlTestSupport.element(window, id: "alerts.notify." + id) as? NSButton)?.isEnabled == false
         }
     }
     static func previews() async -> Bool {

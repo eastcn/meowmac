@@ -194,7 +194,7 @@ struct SettingsImmediateToggle: View {
     var body: some View { HStack { Text(title); Spacer(); NativeSettingsSwitch(id: id, value: $value, enabled: enabled).frame(width: 38, height: 24) } }
 }
 
-private struct NativeSettingsSwitch: NSViewRepresentable {
+struct NativeSettingsSwitch: NSViewRepresentable {
     let id: String
     @Binding var value: Bool
     var enabled: Bool

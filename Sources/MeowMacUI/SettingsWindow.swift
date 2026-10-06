@@ -15,7 +15,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
         case .cats: return "猫"
         case .network: return "网络"
         case .quotaSources: return "额度源"
-        case .notifications: return "通知"
+        case .notifications: return "提醒"
         }
     }
     public var subtitle: String {
@@ -25,7 +25,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
         case .cats: return "选择后立即切换菜单栏的猫"
         case .network: return "检测引擎：TunCanary。保存后立即重新检测"
         case .quotaSources: return "数据来源：CodexBarCLI。启用状态与 CodexBar 共用"
-        case .notifications: return "由 MeowMac 统一发送，更改立即生效"
+        case .notifications: return "规则决定什么时候提醒；铃铛决定是否发系统通知。更改立即生效"
         }
     }
     public var symbol: String {
@@ -175,16 +175,21 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         if let section { request(.section(section)) }
     }
+    public private(set) var alertRules: AlertRuleSettingsModel!
+    public var alertConfigURL: URL = ConfigStore.defaultURL
     private func resetSessions(load: Bool) {
+        alertRules = AlertRuleSettingsModel(state: state, configURL: alertConfigURL)
         subscriptions.removeAll()
         appearance = AppearanceSettingsModel(state: state)
         network = networkModel.map { NetworkSettingsModel(network: $0) }
         network?.open()
         quotaSources = quotaCoordinator.map { QuotaSourceSettingsModel(state: state, coordinator: $0, catalog: quotaCatalog) }
         navigation.sessions = [.appearance: appearance]
-        for section in [SettingsSection.general, .cats, .notifications] {
+        for section in [SettingsSection.general, .cats] {
             sectionViews[section] = { [state] in AnyView(ImmediateSettingsView(state: state, section: section)) }
         }
+        sectionViews[.notifications] = { [weak self] in guard let self else { return AnyView(EmptyView()) }; return AnyView(AlertRuleSettingsView(model: self.alertRules, state: self.state)) }
+        observe(alertRules)
         observe(appearance); observe(state)
         sectionViews[.appearance] = { [weak self] in guard let self else { return AnyView(EmptyView()) }; return AnyView(AppearanceSettingsView(model: self.appearance, state: self.state)) }
         if let network {
@@ -274,7 +279,8 @@ struct SettingsWindowView: View {
                 else { Spacer() }
                 Divider()
                 HStack(spacing: 8) {
-                    Text(navigation.current?.statusText ?? "更改立即生效").font(.caption).foregroundStyle(navigation.section == .quotaSources && controller.quotaSources?.errors.isEmpty == false ? Color.red : Color.secondary).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier(navigation.section == .network ? "network.status" : navigation.section == .quotaSources ? "quota-source.status" : "settings.status")
+                    if navigation.section == .notifications { SettingsActionButton(title: "恢复默认…", id: "alerts.defaults") { controller.alertRules.confirmation = .defaults }.frame(width: 92, height: 28) }
+                    Text(navigation.current?.statusText ?? (navigation.section == .notifications ? controller.alertRules.status : "更改立即生效")).font(.caption).foregroundStyle(navigation.section == .quotaSources && controller.quotaSources?.errors.isEmpty == false ? Color.red : Color.secondary).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier(navigation.section == .network ? "network.status" : navigation.section == .quotaSources ? "quota-source.status" : "settings.status")
                     if let session = navigation.current {
                         let prefix = navigation.section == .network ? "network" : navigation.section == .quotaSources ? "quota-source" : "settings"
                         SettingsActionButton(title: "取消", id: prefix + ".cancel", enabled: session.isDirty && !session.isBusy && !navigation.saving) { navigation.discardCurrent() }.frame(width: 64, height: 28)
