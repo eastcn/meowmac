@@ -14,6 +14,7 @@ public struct ReminderFacts: Codable, Equatable {
     public var cpuPercent: Double?
     public var duration: TimeInterval?
     public var pressurePercent: Double?
+    public var pressureThreshold: Double?
     public var diskRemainingFraction: Double?
     public var diskAvailableBytes: Int64?
     public var thermalState: String?
@@ -24,11 +25,12 @@ public struct ReminderFacts: Codable, Equatable {
     public var balance: String?
     public var balanceThreshold: String?
     public init(subject: String? = nil, remainingPercent: Double? = nil, secondsUntilExhaustion: TimeInterval? = nil,
-                cpuPercent: Double? = nil, duration: TimeInterval? = nil, pressurePercent: Double? = nil,
+                cpuPercent: Double? = nil, duration: TimeInterval? = nil, pressurePercent: Double? = nil, pressureThreshold: Double? = nil,
                 diskRemainingFraction: Double? = nil, diskAvailableBytes: Int64? = nil, thermalState: String? = nil,
                 failures: Int? = nil, cachedAt: Date? = nil, hint: String? = nil, balance: String? = nil, balanceThreshold: String? = nil) {
         self.subject = subject; self.remainingPercent = remainingPercent; self.secondsUntilExhaustion = secondsUntilExhaustion
         self.cpuPercent = cpuPercent; self.duration = duration; self.pressurePercent = pressurePercent
+        self.pressureThreshold = pressureThreshold
         self.diskRemainingFraction = diskRemainingFraction; self.diskAvailableBytes = diskAvailableBytes
         self.thermalState = thermalState; self.failures = failures; self.cachedAt = cachedAt; self.hint = hint
         self.balance = balance; self.balanceThreshold = balanceThreshold
@@ -71,17 +73,21 @@ public struct ReminderBatch {
     public var reminders: [Reminder]
     public var confirmedKinds: Set<ReminderKind>
     public var confirmedKeys: Set<String>
+    public var disabledQuotaRules: Set<String> = []
     public init(reminders: [Reminder], confirmedKinds: Set<ReminderKind> = [], confirmedKeys: Set<String> = []) {
         self.reminders = reminders; self.confirmedKinds = confirmedKinds; self.confirmedKeys = confirmedKeys
     }
     public func confirms(_ key: String, kind: ReminderKind) -> Bool {
         confirmedKinds.contains(kind) || confirmedKeys.contains(key)
+            || (kind == .quotaLow && disabledQuotaRules.contains(key.hasSuffix(".balance") ? "quota.balance" : "quota.low"))
     }
 }
 
 public enum ReminderCollector {
     /// 统一检测入口。确认“恢复”必须有该来源的有效数据。
-    public static func collect(_ input: HealthInputs, config: LocalConfig) -> ReminderBatch {
+    public static func collect(_ input: HealthInputs, config originalConfig: LocalConfig) -> ReminderBatch {
+        let rules = originalConfig.alertRules
+        let config = rules.detectorConfig(originalConfig)
         var batch = ReminderBatch(reminders: [])
         func add(_ reminder: Reminder) { batch.reminders.append(reminder) }
         let networkValid = input.networkConfirmed && input.network != .gray
@@ -194,14 +200,16 @@ public enum ReminderCollector {
                              facts: ReminderFacts(subject: process.name, cpuPercent: process.cpuPercent,
                                                   duration: energy.runawayDurations[process.pid] ?? config.runawaySeconds)))
             }
-            let memoryValid = valid && input.system?.memoryPressure != .unavailable && input.system != nil
-            if memoryValid { batch.confirmedKinds.insert(.memory) }
-            if energy.prolongedMemoryPressure {
+
+        }
+        for evaluation in input.ruleEvaluations where evaluation.rule.id == BuiltinAlertRule.memory.id {
+            batch.confirmedKinds.insert(.memory)
+            if evaluation.triggered {
+                let pressure = evaluation.reading.value, threshold = evaluation.rule.threshold
                 add(Reminder(kind: .memory, object: "system", tab: .system, title: "内存压力持续偏高",
-                             detail: "已持续 " + MetricFormat.duration(energy.memoryPressureDuration ?? config.memoryPressureSeconds),
-                             sampledAt: input.energyUpdatedAt, confirmed: memoryValid,
-                             facts: ReminderFacts(duration: energy.memoryPressureDuration ?? config.memoryPressureSeconds,
-                                                  pressurePercent: input.system?.memoryPressurePercent)))
+                    detail: "压力 \(Int(pressure.rounded()))%，超过 \(Int(threshold.rounded()))% · 已持续 " + MetricFormat.duration(evaluation.duration),
+                    sampledAt: evaluation.reading.sampledAt,
+                    facts: ReminderFacts(duration: evaluation.duration, pressurePercent: pressure, pressureThreshold: threshold)))
             }
         }
         for (source, failures) in input.failedSources.sorted(by: { $0.key < $1.key }) {
@@ -221,6 +229,19 @@ public enum ReminderCollector {
                              facts: ReminderFacts(subject: name, failures: failures, cachedAt: cachedAt)))
             }
         }
+        let kindRules: [ReminderKind: BuiltinAlertRule] = [.network: .network, .disk: .disk, .process: .process,
+            .memory: .memory, .thermal: .thermal, .cooling: .cooling, .source: .source, .quotaPace: .pace]
+        for (kind, rule) in kindRules where !rules.enabled(rule, config: originalConfig) {
+            batch.reminders.removeAll { $0.kind == kind }
+            batch.confirmedKinds.insert(kind)
+        }
+        for reminder in batch.reminders where reminder.kind == .quotaLow {
+            let rule: BuiltinAlertRule = reminder.object.hasSuffix(".balance") ? .balance : .quotaLow
+            if !rules.enabled(rule, config: originalConfig) { batch.confirmedKeys.insert(reminder.id) }
+        }
+        batch.reminders.removeAll { $0.kind == .quotaLow && !rules.enabled($0.object.hasSuffix(".balance") ? .balance : .quotaLow, config: originalConfig) }
+        // 没有额度数据时也明确确认被停用的窗口或余额规则。
+        batch.disabledQuotaRules = Set([BuiltinAlertRule.quotaLow, .balance].filter { !rules.enabled($0, config: originalConfig) }.map(\.id))
         return batch
     }
     private static func sourceObject(_ source: String) -> String {

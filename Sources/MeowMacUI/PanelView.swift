@@ -118,7 +118,8 @@ public final class PanelState: ObservableObject {
     @Published public var fairSince: Date? { didSet { refreshReminders() } }
     /// 风扇转速开始持续超过阈值的时刻（D14）。
     @Published public var fanHighSince: Date? { didSet { refreshReminders() } }
-    @Published public var configResult: ConfigLoadResult
+    public var ruleClock = RuleClock()
+    @Published public var configResult: ConfigLoadResult { didSet { refreshReminders() } }
     @Published public var lastRefreshedAt: Date?
     @Published public var selectedTab: PanelTab = .system
     @Published public var chartHoverDate: Date?

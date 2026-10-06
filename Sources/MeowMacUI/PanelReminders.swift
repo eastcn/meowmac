@@ -5,18 +5,20 @@ import os
 
 @MainActor
 public extension PanelState {
-    var reminderBatch: ReminderBatch {
+    var ruleInputs: HealthInputs {
         let signals = networkModel?.overall.faults.map {
             NetworkReminderSignal(key: $0.key.rawValue, message: $0.message,
                                   level: $0.severity == .critical ? .severe : .warn, hint: $0.hint)
         }
         let completed = networkModel.map { $0.checkProgress == nil && $0.lastCheckedAt != nil && !$0.overall.isSwitching } ?? true
-        return ReminderCollector.collect(HealthInputs(system: snapshot, energy: energy,
+        return HealthInputs(system: snapshot, energy: energy,
             quotaUsedPercent: quotas.values.filter { quotaProviders.contains($0.provider) }.flatMap { $0.windows.map(\.usedPercent) }, network: networkTone,
             failedSources: failures.filter { key, _ in !key.hasPrefix("quota.") || (key == "quota.codex-resets" && quotaProviders.contains(.codex)) || quotaProviders.contains(where: { "quota." + $0.rawValue == key }) }, fairSince: fairSince, now: now(), quotaSnapshots: quotas.values.filter { quotaProviders.contains($0.provider) },
             networkSignals: signals, networkConfirmed: completed, networkCheckedAt: networkModel?.lastCheckedAt,
-            energyUpdatedAt: energyUpdatedAt, fanHighSince: fanHighSince, balanceWarn: quotaSources.balanceWarn), config: configResult.config)
+            energyUpdatedAt: energyUpdatedAt, fanHighSince: fanHighSince, balanceWarn: quotaSources.balanceWarn, ruleEvaluations: ruleClock.evaluations)
     }
+    var reminderBatch: ReminderBatch { ReminderCollector.collect(ruleInputs, config: configResult.config) }
+    func rulesWillSleep() { ruleClock.sleep(); refreshReminders(updateClock: false) }
     var projectedReminders: ReminderTracker {
         var value = reminderTracker; value.reconcile(reminderBatch, now: now()); return value
     }
@@ -58,7 +60,11 @@ public extension PanelState {
         reminderSaveAttempt = nil
         refreshReminders()
     }
-    func refreshReminders() {
+    func refreshReminders(updateClock: Bool = true) {
+        if updateClock {
+            let rules = configResult.config.alertRules
+            ruleClock.update(rules: [rules.memoryRule(config: configResult.config)] + rules.custom, input: ruleInputs)
+        }
         let before = reminderTracker.records
         let batch = reminderBatch
         var value = reminderTracker; value.reconcile(batch, now: now())

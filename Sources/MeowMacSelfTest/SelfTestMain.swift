@@ -128,6 +128,7 @@ enum SelfTestMain {
             ("System.Cleaning/可执行检查与缺失历史", { CleaningTests.filesAndHistory() }),
             ("Core.System/mo 清理历史", { SelfTestMain.moHistory() }),
         ]
+        for test in RuleClockTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         for test in AlertRuleTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }
         for test in SensorTests.tests { tests.append((test.0, { test.1() })) }
@@ -521,12 +522,13 @@ enum SelfTestMain {
         let now = Date(timeIntervalSince1970: 1_000_000)
         let snapshot = SystemSnapshot(timestamp: now, cpuUsage: 0.3, memoryPressure: .warn, swapUsedBytes: 0,
             diskAvailableBytes: 5, diskTotalBytes: 100, networkReceivedBytesPerSecond: nil,
-            networkSentBytesPerSecond: nil, battery: BatteryMetrics(temperatureCelsius: 40, systemPowerWatts: 8), thermal: .fair)
+            networkSentBytesPerSecond: nil, battery: BatteryMetrics(temperatureCelsius: 40, systemPowerWatts: 8), thermal: .fair, memoryPressurePercent: 80)
         let process = ProcessEnergy(pid: 42, name: "Example", cpuPercent: 95, impact: 12)
         let assertion = SleepAssertion(pid: 43, type: "PreventSystemSleep", startedAt: now.addingTimeInterval(-7200))
         let energy = EnergyDiagnosis(topFive: [process], runaway: [process], longAssertions: [assertion], prolongedMemoryPressure: true)
         let input = HealthInputs(system: snapshot, energy: energy, quotaUsedPercent: [], network: .green,
-            failedSources: [:], fairSince: now.addingTimeInterval(-300), now: now)
+            failedSources: [:], fairSince: now.addingTimeInterval(-300), now: now,
+            ruleEvaluations: [RuleClockTests.memoryEvaluation(endingAt: now)])
         let result = HealthEvaluator.evaluate(input, config: LocalConfig())
         return result.level == .warn && result.issues.count == 3 && result.coolingHint
             && result.issues.contains { $0.message.contains("磁盘") }

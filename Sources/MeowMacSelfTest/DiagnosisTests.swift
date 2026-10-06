@@ -9,9 +9,13 @@ enum DiagnosisTests {
         let config = LocalConfig()
         let state = PanelState(configResult: ConfigLoadResult(config: config, error: nil))
         state.now = { now }
-        state.snapshot = SystemSnapshot(timestamp: now, cpuUsage: 0.6, memoryPressure: .critical, swapUsedBytes: 0,
-            diskAvailableBytes: 50, diskTotalBytes: 100, networkReceivedBytesPerSecond: 0, networkSentBytesPerSecond: 0,
-            battery: BatteryMetrics(temperatureCelsius: 35, systemPowerWatts: 8), thermal: .nominal)
+        func snapshot(at time: Date) -> SystemSnapshot {
+            SystemSnapshot(timestamp: time, cpuUsage: 0.6, memoryPressure: .critical, swapUsedBytes: 0,
+                diskAvailableBytes: 50, diskTotalBytes: 100, networkReceivedBytesPerSecond: 0, networkSentBytesPerSecond: 0,
+                battery: BatteryMetrics(temperatureCelsius: 35, systemPowerWatts: 8), thermal: .nominal, memoryPressurePercent: 80)
+        }
+        state.now = { now.addingTimeInterval(-900) }
+        state.snapshot = snapshot(at: state.now())
         let process = ProcessEnergy(pid: 42, name: "ExampleWorker", cpuPercent: 240, impact: 30)
         let assertion = SleepAssertion(pid: 43, type: "PreventSystemSleep", startedAt: now.addingTimeInterval(-10_800), processName: "ExampleSync")
         var tracker = EnergyTracker()
@@ -22,6 +26,10 @@ enum DiagnosisTests {
         for minute in stride(from: -840, through: 0, by: 60) {
             state.energy = tracker.evaluate(processes: [process], assertions: [assertion], pressure: .critical,
                 now: now.addingTimeInterval(TimeInterval(minute)), config: config)
+        }
+        for second in stride(from: -898, through: 0, by: 2) {
+            state.now = { now.addingTimeInterval(TimeInterval(second)) }
+            state.snapshot = snapshot(at: state.now())
         }
         let rows = state.diagnosisRows
         guard rows.count == 2 else { return false }

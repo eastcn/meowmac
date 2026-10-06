@@ -201,7 +201,7 @@ public enum BuiltinAlertRule: String, CaseIterable, Codable, Identifiable {
     }
     public var defaults: AlertRuleOverride {
         switch self {
-        case .memory: return .init(enabled: true, threshold: 70, durationSeconds: 600)
+        case .memory: return .init(enabled: true, threshold: 61, durationSeconds: 600)
         case .disk: return .init(enabled: true, threshold: 10)
         case .process: return .init(enabled: true, threshold: 90, durationSeconds: 600)
         case .cooling: return .init(enabled: true, threshold: 80, fairThermalSeconds: 300, fanHighSeconds: 300)

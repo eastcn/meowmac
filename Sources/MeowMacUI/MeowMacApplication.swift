@@ -54,6 +54,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        for reason in configResult.config.alertRules.diagnostics { logger.error("提醒规则读取：\(reason, privacy: .public)") }
         CatRuntime.initialize(state: panelState, store: catStore)
         startNotifications()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -158,6 +159,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
                 self?.panelState.refreshReminders()
             }
         })
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification,
+                                                                            object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.panelState.rulesWillSleep() }
+        })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in self?.panelState.refreshReminders(); self?.sample(); self?.sampleEnergy(); self?.startEnergyLoop() }
@@ -186,7 +191,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         if latest.thermal == .fair {
             if panelState.fairSince == nil { panelState.fairSince = latest.timestamp }
         } else { panelState.fairSince = nil }
-        let fanHighSince = FanHighTracker.next(since: panelState.fanHighSince, readings: latest.sensors, at: latest.timestamp, config: configResult.config)
+        let fanHighSince = FanHighTracker.next(since: panelState.fanHighSince, readings: latest.sensors, at: latest.timestamp, config: panelState.configResult.config.alertRules.detectorConfig(panelState.configResult.config))
         if fanHighSince != panelState.fanHighSince { panelState.fanHighSince = fanHighSince }
         frameInterval = panelState.catDisplay().frameInterval
     }
@@ -237,7 +242,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         let sampledAt = Date()
         panelState.energyUpdatedAt = sampledAt
         panelState.energy = energyTracker.evaluate(processes: processes,
-            pressure: snapshot?.memoryPressure ?? .unavailable, now: sampledAt, config: configResult.config, coverage: coverage)
+            pressure: snapshot?.memoryPressure ?? .unavailable, now: sampledAt, config: panelState.configResult.config.alertRules.detectorConfig(panelState.configResult.config), coverage: coverage)
         panelState.failures["energy"] = 0
     }
 
