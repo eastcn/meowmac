@@ -15,7 +15,7 @@ enum AlertRuleTests {
         }),
         ("Core.AlertRules/越界回退默认，不回退旧值", {
             let c = try decode(#"{"diskRemainingWarn":0.3,"alertRules":{"builtin":{"system.disk":{"threshold":99},"system.memory":{"durationSeconds":-1},"source.failure":{"threshold":2.5}}}}"#)
-            return disk(c) == 10 && c.alertRules.memoryRule(config: c).durationSeconds == 600
+            return c.alertRules.diagnostics.count == 3 && disk(c) == 10 && c.alertRules.memoryRule(config: c).durationSeconds == 600
                 && c.alertRules.effective(.source, config: c).threshold == 2
         }),
         ("Core.AlertRules/未知指标保留，坏单条丢弃", {
@@ -59,6 +59,10 @@ enum AlertRuleTests {
             defer { try? FileManager.default.removeItem(at: url) }
             do { try ConfigStore.saveAlertRules(AlertRuleSet(), to: url); return false } catch {}
             return try Data(contentsOf: url) == original && ConfigStore.load(from: url).error != nil
+        }),
+        ("Core.AlertRules/坏规则根结构保留原因", {
+            let c = try decode(#"{"alertRules":"bad","diskRemainingWarn":0.3}"#)
+            return c.alertRules.diagnostics.count == 1 && disk(c) == 30
         }),
         ("Core.AlertRules/14 个指标和 11 条内置规则", {
             AlertMetric.allCases.count == 14 && BuiltinAlertRule.allCases.count == 11

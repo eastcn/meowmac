@@ -44,7 +44,8 @@ public struct LocalConfig: Codable, Equatable {
     public init(from decoder: Decoder) throws {
         let fields = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = LocalConfig()
-        alertRules = (try? fields.decodeIfPresent(AlertRuleSet.self, forKey: .alertRules)) ?? AlertRuleSet()
+        do { alertRules = try fields.decodeIfPresent(AlertRuleSet.self, forKey: .alertRules) ?? AlertRuleSet() }
+        catch { alertRules = AlertRuleSet(diagnostics: ["提醒规则结构无效，已回退默认规则"]) }
         schemaVersion = try fields.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? defaults.schemaVersion
         quotaRemainingWarn = try fields.decodeIfPresent(Double.self, forKey: .quotaRemainingWarn) ?? defaults.quotaRemainingWarn
         diskRemainingWarn = try fields.decodeIfPresent(Double.self, forKey: .diskRemainingWarn) ?? defaults.diskRemainingWarn

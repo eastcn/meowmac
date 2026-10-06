@@ -250,8 +250,8 @@ public struct AlertRuleSet: Codable, Equatable {
     public var builtin: [String: AlertRuleOverride]
     public var custom: [CustomAlertRule]
     public private(set) var diagnostics: [String] = []
-    public init(builtin: [String: AlertRuleOverride] = [:], custom: [CustomAlertRule] = []) {
-        self.builtin = builtin; self.custom = custom
+    public init(builtin: [String: AlertRuleOverride] = [:], custom: [CustomAlertRule] = [], diagnostics: [String] = []) {
+        self.builtin = builtin; self.custom = custom; self.diagnostics = diagnostics
     }
     private enum CodingKeys: String, CodingKey { case builtin, custom }
     private struct Key: CodingKey {
@@ -267,7 +267,12 @@ public struct AlertRuleSet: Codable, Equatable {
             do {
                 let values = try c.nestedContainer(keyedBy: Key.self, forKey: .builtin)
                 for key in values.allKeys {
-                    do { builtin[key.stringValue] = try values.decode(AlertRuleOverride.self, forKey: key) }
+                    do {
+                        let override = try values.decode(AlertRuleOverride.self, forKey: key)
+                        builtin[key.stringValue] = override
+                        do { _ = try AlertRuleSet(builtin: [key.stringValue: override]).validated() }
+                        catch { diagnostics.append("内置规则 \(key.stringValue) 越界字段已回退默认值") }
+                    }
                     catch { diagnostics.append("内置规则 \(key.stringValue) 无效，已丢弃") }
                 }
             } catch { diagnostics.append("内置规则列表无效，已回退默认值") }
