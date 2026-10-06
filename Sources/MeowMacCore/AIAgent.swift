@@ -58,6 +58,8 @@ public enum AIAgent: String, Codable, CaseIterable {
         var parts = URLComponents()
         parts.scheme = "claude"; parts.host = "code"; parts.path = "/new"
         parts.queryItems = [URLQueryItem(name: "q", value: prompt)]
+        // URL 的表单式查询解码会把裸加号视为空格，必须编码字面量加号。
+        parts.percentEncodedQuery = parts.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         return parts.url
     }
 }

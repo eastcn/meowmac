@@ -26,6 +26,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             SettingsMenu.presentCleanTerminals(state: self.panelState, anchor: button)
         })
     private lazy var aiAgentController = AIAgentController(state: panelState)
+    private lazy var aiDiagnosisWindow = AIDiagnosisWindowController(controller: aiAgentController)
     private var settingsWindow: SettingsWindowController?
     private let logger = Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "app")
     private let collector = SystemCollector()
@@ -109,6 +110,11 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         panelState.onSetAIDiagnosisEntry = { [weak self] in self?.aiAgentController.setEntry($0) }
         panelState.onDetectAIAgents = { [weak self] in self?.aiAgentController.refresh() }
         _ = aiAgentController
+        panelState.onAIDiagnosis = { [weak self] in
+            guard let self else { return }
+            self.aiDiagnosisWindow.open(prompt: self.panelState.aiDiagnosisPrompt)
+            self.popover?.performClose(nil)
+        }
         panelState.onOpenConfig = { [weak self] in self?.openConfig() }
         panelState.onShowConfigFolder = { [weak self] in self?.showConfigFolder() }
         panelState.onSelectCat = { [weak self] id in self?.selectCat(id) }

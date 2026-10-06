@@ -33,6 +33,7 @@ enum AIAgentCoreTests {
             && AIAgent.automatic.resolved(available: all, lastSuccessful: .gemini) == .gemini
             && AIAgent.gemini.resolved(available: [.codex]) == .codex
             && AIAgent.codex.resolved(available: all, lastSuccessful: .gemini) == .codex
+            && parts.percentEncodedQuery?.contains("%2B") == true && parts.percentEncodedQuery?.contains("+") == false
             && parts.scheme == "claude" && parts.host == "code" && parts.path == "/new" && parts.queryItems == [URLQueryItem(name: "q", value: text)]
             && AIAgent.claudeCode.arguments(prompt: text) == [text] && AIAgent.codex.arguments(prompt: text) == [text]
             && AIAgent.openCode.arguments(prompt: text) == ["--prompt", text] && AIAgent.gemini.arguments(prompt: text) == ["-i", text]

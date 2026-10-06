@@ -93,14 +93,19 @@ public final class AIAgentController {
             fail(session, "所选 agent 未安装或不再可执行。请重新打开预览，或复制提示词。"); return
         }
         let completion: (Error?) -> Void = { [weak self, weak session] error in
-            guard let self, let session else { return }
-            session.launching = false
-            if let error { self.fail(session, error.localizedDescription); return }
+            guard let self else { return }
+            session?.launching = false
+            if let error {
+                if let session { self.fail(session, error.localizedDescription) }
+                else { self.logger.error("agent 启动失败：\(error.localizedDescription, privacy: .private)") }
+                return
+            }
+            // 窗口关闭不取消已发出的启动；成功历史独立于预览会话的寿命。
             self.lastSuccessful = agent
-            session.message = [.qoder, .chatGPT, .deepSeekHarness].contains(agent) ? "已复制，请粘贴" : "已打开 " + agent.name
+            session?.message = [.qoder, .chatGPT, .deepSeekHarness].contains(agent) ? "已复制，请粘贴" : "已打开 " + agent.name
             do { try self.recordSuccess(agent) }
             catch {
-                session.message = (session.message ?? "") + "；上次 agent 记录未保存"
+                if let session { session.message = (session.message ?? "") + "；上次 agent 记录未保存" }
                 self.logger.error("上次 agent 记录保存失败：\(error.localizedDescription, privacy: .private)")
             }
         }

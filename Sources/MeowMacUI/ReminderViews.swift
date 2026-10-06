@@ -73,6 +73,7 @@ private struct ReminderRow: View {
                     Text("需要持续关注，检测恢复后消除").font(Design.caption).foregroundStyle(Design.secondary)
                 }
                 HStack {
+                    if state.showsAIDiagnosis(for: reminder) { AIDiagnosisEntry(state: state, id: "reminder.ai." + reminder.id) }
                     Button("查看详情") { state.showReminderDetail(reminder) }.accessibilityIdentifier("reminder.detail.\(reminder.id)")
                     Spacer(minLength: 0)
                     if state.snoozeDeadline(reminder) != nil {

@@ -139,6 +139,7 @@ enum SelfTestMain {
         tests.append(("UI.Reminders/启动到期切猫与快照", { ReminderIntegrationTests.runtime() }))
         tests.append(("UI.Reminders/真实弹出面板与超高筛选", { await ReminderIntegrationTests.popover() }))
         tests.append(("System.AIAgent/固定目录与可执行检测", { AIAgentLaunchTests.detection() }))
+        tests.append(("UI.AIAgent/关闭预览后启动成功仍记住", { AIAgentLaunchTests.completionAfterClose() }))
         tests.append(("UI.AIAgent/八种启动与失败反馈", { AIAgentLaunchTests.controller() }))
         tests.append(("Core.AIAgent/实际 shell 参数与工作目录", { AIAgentLaunchTests.shell() }))
         tests.append(("UI.AIAgent.Live/Ghostty 假 agent", { await AIAgentLaunchTests.liveGhostty() }))
@@ -267,6 +268,9 @@ enum SelfTestMain {
             }
             return opened && config && folder && quit && SettingsMenu.configurationFile.deletingLastPathComponent() == SettingsMenu.configurationDirectory
         }))
+        tests.append(("UI.AIDiagnosis/只读预览与取消复制启动", { AIDiagnosisUITests.preview() }))
+        tests.append(("UI.AIDiagnosis/生产面板入口与热提醒", { await AIDiagnosisUITests.entry() }))
+        tests.append(("UI.AIDiagnosis/360pt 原生浅深预览", { await AIDiagnosisUITests.screenshots() }))
         tests.append(("UI.AIAgentSettings/生产控件与保存失败回读", { AIAgentSettingsTests.controls() }))
         tests.append(("UI.AIAgentSettings/通用栏合成截图", { AIAgentSettingsTests.previews() }))
         tests.append(("UI.Settings/即时设置回调与条件", { ImmediateSettingsTests.callbacks() }))

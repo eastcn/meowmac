@@ -76,6 +76,21 @@ enum AIAgentLaunchTests {
         let empty = controller.preview(prompt: "empty")
         return empty.selected == nil && empty.installations.isEmpty && copies.isEmpty
     }
+    static func completionAfterClose() -> Bool {
+        let state = PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil))
+        var finish: ((Error?) -> Void)?, recorded: [AIAgent] = []
+        let controller = AIAgentController(state: state,
+            detect: { [.init(agent: .codex, location: URL(fileURLWithPath: "/example/codex"))] },
+            findTerminal: { $0 == .ghostty ? URL(fileURLWithPath: "/example/Ghostty.app") : nil },
+            launchTerminal: { _, _, _, completion in finish = completion }, prepareDirectory: { _ in },
+            readLast: { nil }, recordSuccess: { recorded.append($0) })
+        var session: AIDiagnosisSession? = controller.preview(prompt: "合成提示词")
+        weak var weakSession = session
+        controller.launch(session!); session = nil
+        guard weakSession == nil else { return false }
+        finish?(nil)
+        return controller.lastSuccessful == .codex && recorded == [.codex]
+    }
     static func shell() -> Bool {
         let root = URL(fileURLWithPath: "build/acceptance/ai-agent-launch/shell-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

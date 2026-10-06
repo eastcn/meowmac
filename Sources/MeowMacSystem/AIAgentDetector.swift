@@ -1,5 +1,6 @@
 import Foundation
 import MeowMacCore
+import os
 
 public struct AIAgentInstallation: Equatable {
     public let agent: AIAgent
@@ -24,7 +25,14 @@ public struct AIAgentDetector {
                     var directory: ObjCBool = false
                     return FileManager.default.fileExists(atPath: path, isDirectory: &directory)
                         && !directory.boolValue && FileManager.default.isExecutableFile(atPath: path)
-                }, nodeVersions: @escaping (String) -> [String] = { (try? FileManager.default.contentsOfDirectory(atPath: $0)) ?? [] },
+                }, nodeVersions: @escaping (String) -> [String] = { path in
+                    do { return try FileManager.default.contentsOfDirectory(atPath: path) }
+                    catch let error as CocoaError where error.code == .fileReadNoSuchFile { return [] }
+                    catch {
+                        Logger(subsystem: AppIdentity.bundleID, category: "ai-agent").error("nvm 目录检测失败：\(error.localizedDescription, privacy: .private)")
+                        return []
+                    }
+                },
                 findApplication: @escaping (String) -> URL?) {
         self.home = home; self.isExecutable = isExecutable; self.nodeVersions = nodeVersions; self.findApplication = findApplication
     }

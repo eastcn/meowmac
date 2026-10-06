@@ -147,7 +147,7 @@ struct DiagnosisCard: View {
                         HStack(alignment: .firstTextBaseline, spacing: Design.gap) {
                             Circle().fill(Design.state(row.level)).frame(width: Design.checkDot, height: Design.checkDot)
                                 .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + Design.smallGap }
-                            Text(row.name).font(Design.title).lineLimit(1).layoutPriority(2)
+                            Text(row.name).font(Design.title).fixedSize(horizontal: false, vertical: true).layoutPriority(2)
                             Text(row.detail).font(Design.caption).foregroundStyle(Design.secondary).lineLimit(1).truncationMode(.tail)
                             Spacer(minLength: Design.gap)
                             Text(row.value).font(Design.title).foregroundStyle(Design.stateText(row.level)).monospacedDigit().layoutPriority(2)
@@ -155,8 +155,13 @@ struct DiagnosisCard: View {
                                 .foregroundStyle(Design.secondary).monospacedDigit().lineLimit(1).layoutPriority(1)
                         }.help(row.name + "：" + row.detail + "，" + row.duration)
                     }
-                    Text("建议用 AI 诊断：把进程名和数值交给 AI 助手排查").font(Design.caption).foregroundStyle(Design.secondary)
-                        .lineLimit(1).truncationMode(.tail)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(state.diagnosisHint).font(Design.caption).foregroundStyle(Design.secondary).fixedSize(horizontal: false, vertical: true)
+                        if state.showsAIDiagnosis {
+                            Spacer(minLength: Design.gap)
+                            AIDiagnosisEntry(state: state, id: "diagnosis.ai")
+                        }
+                    }
                 }
             }
         }
