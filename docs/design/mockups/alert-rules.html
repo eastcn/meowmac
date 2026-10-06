@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>提醒规则设置</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --page: light-dark(#e9e9ee, #161618);
+    --surface: light-dark(#f7f7f9, #252527);
+    --sidebar: light-dark(#ececf0cc, #2c2c2fcc);
+    --field: light-dark(#fff, #202022);
+    --text: light-dark(#1d1d1f, #f2f2f7);
+    --muted: light-dark(#66666c, #aaaab0);
+    --rule: light-dark(#dcdce0, #434348);
+    --blue: light-dark(#0069df, #70b0ff);
+    --selected: light-dark(#dfe9fb, #2b405d);
+    --red: light-dark(#c9342b, #ff6b60);
+    --green: light-dark(#2f8a3e, #5fd078);
+    --orange: light-dark(#b85e00, #ffae4d);
+    --shadow: light-dark(#00000024, #00000066);
+  }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); padding: 24px 16px 48px;
+    font: 13px/1.5 -apple-system, "SF Pro Text", "PingFang SC", system-ui, sans-serif; }
+  button, select, input { font: inherit; color: inherit; }
+  .top { max-width: 1120px; margin: 0 auto 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
+  .top h1 { font-size: 17px; margin: 0; }
+  .top p { margin: 0; color: var(--muted); font-size: 12px; flex: 1 1 320px; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; background: var(--field); }
+  .seg button { border: 0; background: transparent; padding: 4px 12px; min-height: 28px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--rule); }
+  .seg button[aria-pressed="true"] { background: var(--selected); color: var(--blue); font-weight: 600; }
+  .row-wrap { max-width: 1120px; margin: auto; display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .cap { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+  /* 窗口 */
+  .win { position: relative; width: 760px; max-width: 100%; height: 620px; background: var(--surface); border: 1px solid var(--rule);
+    border-radius: 12px; box-shadow: 0 16px 36px var(--shadow); overflow: hidden; display: flex; }
+  .side { width: 190px; flex: none; background: var(--sidebar); border-right: 1px solid var(--rule); padding: 38px 10px 10px; backdrop-filter: blur(20px); }
+  .lights { position: absolute; top: 13px; left: 14px; display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+  .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+  .nav { display: flex; align-items: center; gap: 9px; width: 100%; border: 0; background: transparent; padding: 6px 9px; border-radius: 7px; text-align: left; }
+  .nav .ic { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: #fff; font-size: 12px; flex: none; }
+  .nav[aria-current="true"] { background: var(--selected); color: var(--blue); font-weight: 600; }
+  .nav .badge { margin-left: auto; font-size: 11px; color: var(--orange); font-weight: 600; }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .head { padding: 14px 24px 10px; border-bottom: 1px solid var(--rule); }
+  .head h2 { margin: 0; font-size: 15px; }
+  .head p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+  .body { flex: 1; overflow: auto; padding: 14px 24px 16px; }
+  .foot { border-top: 1px solid var(--rule); padding: 10px 20px; display: flex; gap: 8px; align-items: center; }
+  .foot .st { flex: 1; color: var(--muted); font-size: 11px; }
+  .act { border: 1px solid var(--rule); border-radius: 6px; padding: 4px 14px; min-height: 28px; background: var(--field); cursor: pointer; }
+  .pri { background: var(--blue); color: light-dark(#fff, #071c35); border-color: var(--blue); }
+  .danger { color: var(--red); }
+  h3 { margin: 16px 0 2px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+  h3:first-child { margin-top: 0; }
+  h3 small { color: var(--muted); font-size: 11px; font-weight: 400; }
+  .list { border: 1px solid var(--rule); border-radius: 8px; background: var(--field); margin-top: 8px; }
+  .row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 12px; }
+  .item + .item, .list > .row + .row, .item + .row { border-top: 1px solid var(--rule); }
+  .row .n { flex: 1; min-width: 0; }
+  .row .n b { font-weight: 500; }
+  .row .n small { display: block; color: var(--muted); font-size: 11px; }
+  .row.off .n b, .row.off .n small { opacity: .5; }
+  .clickable { cursor: pointer; }
+  .chev { color: var(--muted); font-size: 10px; width: 10px; transition: transform .12s; }
+  .item.open .chev { transform: rotate(90deg); }
+  .lv { font-size: 10px; padding: 0 6px; border-radius: 9px; border: 1px solid currentColor; margin-left: 6px; vertical-align: 1px; font-weight: 500; }
+  .lv.warn { color: var(--orange); } .lv.severe { color: var(--red); } .lv.mark { color: var(--muted); } .lv.custom { color: var(--blue); }
+  .state { font-size: 11px; min-width: 64px; text-align: right; white-space: nowrap; }
+  .state.ok { color: var(--green); } .state.fire { color: var(--orange); font-weight: 600; } .state.sev { color: var(--red); font-weight: 600; }
+  .state.snz, .state.na, .state.off { color: var(--muted); }
+  .bell { border: 0; background: transparent; cursor: pointer; font-size: 14px; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; }
+  .bell[aria-pressed="false"] { opacity: .3; filter: grayscale(1); }
+  .bell:disabled { opacity: .15; cursor: default; }
+  .tog { position: relative; width: 32px; height: 18px; border-radius: 9px; background: var(--rule); border: 0; cursor: pointer; flex: none; }
+  .tog::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .12s; }
+  .tog[aria-checked="true"] { background: var(--blue); }
+  .tog[aria-checked="true"]::after { left: 16px; }
+  .tog:disabled { opacity: .4; }
+  .edit { padding: 4px 12px 12px 54px; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; font-size: 12px; }
+  .edit label { color: var(--muted); }
+  .edit .ro { color: var(--muted); }
+  .num { display: inline-flex; align-items: center; gap: 4px; }
+  .num input { width: 64px; border: 1px solid var(--rule); border-radius: 6px; background: var(--field); padding: 2px 6px; text-align: right; }
+  .num input.bad { border-color: var(--red); }
+  .err { color: var(--red); font-size: 11px; grid-column: 2; }
+  .edit .acts { grid-column: 2; display: flex; gap: 8px; }
+  .link { border: 0; background: transparent; color: var(--blue); cursor: pointer; padding: 0; font-size: 12px; }
+  .banner { border: 1px solid var(--orange); color: var(--orange); border-radius: 8px; padding: 8px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .note { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+  .add { width: 100%; border: 0; background: transparent; color: var(--blue); text-align: left; padding: 10px 12px; cursor: pointer; }
+  /* 新建规则 */
+  .sheet { position: absolute; inset: 0; background: #0003; display: none; align-items: flex-start; justify-content: center; padding-top: 48px; }
+  .sheet.on { display: flex; }
+  .box { width: 420px; max-width: calc(100% - 32px); background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px; box-shadow: 0 12px 28px var(--shadow); }
+  .box > p { margin: 0 0 12px; font-weight: 600; }
+  .form { display: grid; grid-template-columns: 72px 1fr; gap: 8px 10px; align-items: center; font-size: 12px; }
+  .form label { color: var(--muted); text-align: right; }
+  .form select, .form input[type=text] { border: 1px solid var(--rule); border-radius: 6px; background: var(--field); padding: 3px 6px; min-height: 26px; width: 100%; }
+  .form .inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .form .inline select { width: auto; }
+  .live { grid-column: 2; color: var(--muted); font-size: 11px; }
+  .live b { color: var(--text); font-weight: 600; }
+  .summary { grid-column: 1 / -1; margin-top: 4px; padding: 8px 10px; border-radius: 8px; background: var(--selected); color: var(--blue); font-size: 12px; }
+  .box .b { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+  /* 右侧预览 */
+  .notif { width: 340px; max-width: 100%; background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 10px 24px var(--shadow); padding: 10px 12px; display: flex; gap: 10px; }
+  .notif .app { width: 32px; height: 32px; border-radius: 8px; background: #ff9f0a; display: grid; place-items: center; flex: none; font-size: 18px; }
+  .notif b { font-size: 13px; } .notif small { display: block; color: var(--muted); font-size: 12px; }
+  .panel { width: 340px; max-width: 100%; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 10px 12px; margin-top: 16px; }
+  .panel .r { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; }
+  .panel .r + .r { border-top: 1px solid var(--rule); }
+  .panel .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); margin-top: 6px; flex: none; }
+  .panel .r small { display: block; color: var(--muted); font-size: 11px; }
+  .panel .r .k { margin-left: auto; color: var(--blue); font-size: 11px; white-space: nowrap; }
+  .spec { max-width: 1120px; margin: 24px auto 0; color: var(--muted); font-size: 12px; }
+  .spec li { margin: 3px 0; }
+  @media (max-width: 800px) {
+    .win { flex-direction: column; height: auto; }
+    .side { width: 100%; padding-top: 34px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .nav { width: auto; }
+    .body { max-height: 640px; }
+    .edit { padding-left: 12px; }
+    .state { min-width: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>设置 → 提醒 · 设计稿</h1>
+  <p>原“通知”栏改名“提醒”，一处列出全部规则。数据全部为合成；HTML 只确认结构、字段和文案，材质与尺寸以实机为准。点规则行展开编辑，点“＋ 新建规则”试表单。</p>
+  <span class="seg" id="theme"><button type="button" data-t="auto" aria-pressed="true">跟随系统</button><button type="button" data-t="light">浅色</button><button type="button" data-t="dark">深色</button></span>
+</div>
+
+<div class="row-wrap">
+  <div>
+    <p class="cap">设置窗口：760 × 620 pt，沿用统一设置窗口的侧栏和材质。本栏更改立即生效。</p>
+    <section class="win" aria-label="设置窗口">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <nav class="side" id="side"></nav>
+      <div class="main">
+        <div class="head"><h2>提醒</h2><p>规则决定什么时候提醒；铃铛决定是否发系统通知。更改立即生效</p></div>
+        <div class="body" id="body"></div>
+        <div class="foot"><span class="st" id="status">已保存</span><button class="act" type="button" data-a="reset">恢复默认…</button></div>
+      </div>
+      <div class="sheet" id="sheet"><div class="box" id="box"></div></div>
+    </section>
+  </div>
+  <div>
+    <p class="cap">自定义规则触发后：系统通知（D41 的去重与冷却）</p>
+    <div class="notif"><span class="app">🐱</span><div><b>Swap 偏高</b><small>Swap 已用 6.2 GB，超过 4 GB · 已持续 12 分钟</small></div></div>
+    <p class="cap" style="margin-top:20px">同时出现在面板的“全部提醒”里，与内置规则同列</p>
+    <div class="panel">
+      <div class="r"><span class="dot"></span><div>内存压力持续偏高<small>压力 78%，超过 70% · 已持续 14 分钟</small></div></div>
+      <div class="r"><span class="dot"></span><div>Swap 偏高<small>6.2 GB，超过 4 GB · 已持续 12 分钟</small></div><span class="k">我已知道…</span></div>
+      <div class="r"><span class="dot" style="background:var(--muted)"></span><div>Claude 5 小时额度剩余不足<small>已暂缓，到 16:30</small></div></div>
+    </div>
+  </div>
+</div>
+
+<ul class="spec">
+  <li>规则行：启用开关、名称和档位、条件摘要、当前状态、通知铃铛。状态取值：正常、触发中、严重、已暂缓、读不到、已停用。</li>
+  <li>停用规则后整行变淡，铃铛不可点；各页的原始数值和风险色照常显示（D42、D40）。</li>
+  <li>展开后可调字段用数字框，失焦或回车即校验并保存；越界时保留原值并在下方提示范围。不可调字段只读显示，保证能看到真实条件。</li>
+  <li>“发送系统通知”总开关只管通知，不影响检测。关闭时所有铃铛变灰。</li>
+  <li>新建规则：指标按分组下拉，额度指标多出渠道和窗口两项（默认“任一”）；表单实时显示当前值和规则摘要。最多 32 条，达到上限时“＋ 新建规则”变灰并说明。</li>
+  <li>恢复默认：只恢复内置规则的阈值、时长、启用和铃铛，不删除自定义规则；需要确认。</li>
+  <li>配置文件损坏时，栏顶显示橙色横幅“配置文件无效，已按默认规则运行”，并提供“打开配置文件…”。</li>
+</ul>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  // 指标目录（design.md 第 4 节），当前值为合成数据。
+  const METRICS = [
+    { g: '系统', id: 'cpu.usage', name: 'CPU 使用率', unit: '%', now: 23 },
+    { g: '系统', id: 'memory.pressure', name: '内存压力', unit: '%', now: 78 },
+    { g: '系统', id: 'memory.used', name: '内存已用', unit: '%', now: 71 },
+    { g: '系统', id: 'swap.used', name: 'Swap 已用', unit: 'GB', now: 6.2 },
+    { g: '系统', id: 'disk.free', name: '磁盘剩余', unit: '%', now: 34 },
+    { g: '系统', id: 'disk.freeBytes', name: '磁盘剩余', unit: 'GB', now: 168 },
+    { g: '系统', id: 'net.down', name: '网络下行', unit: 'MB/s', now: 1.4 },
+    { g: '系统', id: 'net.up', name: '网络上行', unit: 'MB/s', now: 0.2 },
+    { g: '能耗与温度', id: 'power.system', name: '整机功耗', unit: 'W', now: 9.8 },
+    { g: '能耗与温度', id: 'battery.temp', name: '电池温度', unit: '°C', now: 31.5 },
+    { g: '能耗与温度', id: 'cpu.temp', name: 'CPU 温度', unit: '°C', now: 52 },
+    { g: '能耗与温度', id: 'gpu.temp', name: 'GPU 温度', unit: '°C', now: null },
+    { g: '能耗与温度', id: 'fan.speed', name: '风扇转速', unit: '% 最大值', now: 0 },
+    { g: '额度', id: 'quota.remaining', name: '额度窗口剩余', unit: '%', now: 41, scoped: true },
+  ];
+  const PROVIDERS = ['任一渠道', 'Claude', 'Codex', 'DeepSeek', 'OpenCodeGo'];
+  const WINDOWS = ['任一窗口', '5 小时', '每周'];
+
+  // f: 可调字段 [键, 标签, 单位, 最小, 最大]
+  const BUILTIN = [
+    { grp: '系统', id: 'system.memory', name: '内存压力持续偏高', lv: 'warn', on: true, bell: true, state: 'fire',
+      v: { th: 70, dur: 10 }, f: [['th', '压力 ≥', '%', 1, 99], ['dur', '持续', '分钟', 1, 1440]],
+      sum: (v) => `压力 ≥ ${v.th}%，持续 ${v.dur} 分钟`, ro: '口径同面板的压力%：100 减 kern.memorystatus_level' },
+    { grp: '系统', id: 'system.disk', name: '磁盘剩余不足', lv: 'warn', on: true, bell: true, state: 'ok',
+      v: { th: 10 }, f: [['th', '剩余 <', '%', 1, 50]], sum: (v) => `剩余 < ${v.th}%` },
+    { grp: '系统', id: 'system.process', name: '进程 CPU 持续偏高', lv: 'warn', on: true, bell: true, state: 'ok',
+      v: { th: 90, dur: 10 }, f: [['th', '单进程 ≥', '% 单核', 10, 800], ['dur', '持续', '分钟', 1, 1440]],
+      sum: (v) => `单个进程 ≥ ${v.th}%，持续 ${v.dur} 分钟` },
+    { grp: '系统', id: 'system.thermal', name: '系统已降频', lv: 'warn', on: true, bell: true, state: 'ok',
+      v: {}, f: [], sum: () => 'thermalState 达到 serious 或以上', ro: '系统判定，没有可调阈值' },
+    { grp: '系统', id: 'system.cooling', name: '建议降温', lv: 'mark', on: true, bell: null, state: 'ok',
+      v: { fair: 5, fan: 80, fanDur: 5 }, f: [['fair', 'fair 持续', '分钟', 1, 120], ['fan', '风扇 ≥', '% 最大值', 50, 100], ['fanDur', '风扇持续', '分钟', 1, 120]],
+      sum: (v) => `fair 持续 ${v.fair} 分钟，或风扇 ≥ ${v.fan}% 持续 ${v.fanDur} 分钟`, ro: '只在总览条加标记，不影响猫，不发通知' },
+    { grp: '额度', id: 'quota.low', name: '额度剩余不足', lv: 'warn', on: true, bell: true, state: 'snz',
+      v: { th: 20 }, f: [['th', '任一窗口剩余 <', '%', 1, 90]], sum: (v) => `任一窗口剩余 < ${v.th}%` },
+    { grp: '额度', id: 'quota.balance', name: '余额不足', lv: 'warn', on: true, bell: true, state: 'ok',
+      v: {}, f: [], sum: () => '每个渠道单独设阈值', ro: '阈值在“额度源”栏按渠道修改', jump: '额度源' },
+    { grp: '额度', id: 'quota.pace', name: '额度偏快', lv: 'warn', on: true, bell: true, state: 'ok',
+      v: {}, f: [], sum: () => '按当前速度会在重置前用完', ro: '计算方法见 SPEC「节奏的计算」' },
+    { grp: '网络', id: 'network.fault', name: '网络故障', lv: 'severe', on: true, bell: true, state: 'ok',
+      v: {}, f: [], sum: () => 'DNS 泄漏、TUN 失效、站点探测失败等', ro: '由 TunCanary 判定，只能开关' },
+    { grp: '网络', id: 'network.egress', name: '出口 IP 变化', lv: 'mark', on: true, bell: true, state: 'ok', notifyOnly: true,
+      v: {}, f: [], sum: () => '只通知，不进提醒列表', ro: '由 TunCanary 判定，只能开关' },
+    { grp: '数据源', id: 'source.failure', name: '数据源失效', lv: 'warn', on: true, bell: false, state: 'na',
+      v: { n: 2 }, f: [['n', '连续失败', '次', 1, 10]], sum: (v) => `连续 ${v.n} 次采集失败` },
+  ];
+  const defaults = structuredClone(BUILTIN.map((r) => ({ id: r.id, v: r.v, on: r.on, bell: r.bell })));
+  const st = {
+    auth: true, notify: true, open: 'system.memory', errors: {}, status: '已保存',
+    custom: [{ id: 'u-3fa91c02', name: 'Swap 偏高', metric: 'swap.used', cmp: 'gte', th: 4, dur: 5, lv: 'warn', on: true, bell: true, state: 'fire' }],
+    draft: null, confirm: null,
+  };
+
+  const LV = { warn: '提醒', severe: '严重', mark: '标记' };
+  const STATE = { ok: ['正常', 'ok'], fire: ['触发中', 'fire'], sev: ['严重', 'sev'], snz: ['已暂缓', 'snz'], na: ['读不到', 'na'], off: ['已停用', 'off'] };
+  const metric = (id) => METRICS.find((m) => m.id === id);
+  const fmt = (n) => (n == null ? '读不到' : String(n));
+  const customSum = (c) => {
+    const m = metric(c.metric);
+    const scope = m.scoped ? `${c.provider || '任一渠道'} ${c.window || '任一窗口'}，` : '';
+    return `${scope}${m.name} ${c.cmp === 'gte' ? '≥' : '≤'} ${c.th} ${m.unit}${c.dur ? `，持续 ${c.dur} 分钟` : ''}`;
+  };
+
+  const tog = (on, k) => `<button type="button" class="tog" role="switch" aria-checked="${on}" data-k="${k}" aria-label="启用"></button>`;
+  const bell = (r, k) => r.bell === null
+    ? '<span class="bell" title="不发通知" style="opacity:.25">–</span>'
+    : `<button type="button" class="bell" aria-pressed="${r.bell && st.notify}" data-k="${k}" ${!r.on || !st.notify ? 'disabled' : ''} title="发系统通知">🔔</button>`;
+  const stateCell = (r) => { const [t, c] = STATE[r.on ? r.state : 'off']; return `<span class="state ${c}">${t}</span>`; };
+
+  function builtinRow(r) {
+    const open = st.open === r.id;
+    const edit = !open ? '' : `<div class="edit">
+      ${r.f.map(([k, l, u, mn, mx]) => `<label>${l}</label><span class="num"><input inputmode="decimal" data-f="${r.id}:${k}" value="${r.v[k]}" class="${st.errors[r.id + ':' + k] ? 'bad' : ''}">${u}</span>
+        ${st.errors[r.id + ':' + k] ? `<span class="err">范围 ${mn}～${mx} ${u}，已保留原值</span>` : ''}`).join('')}
+      ${r.ro ? `<label>说明</label><span class="ro">${r.ro}${r.jump ? ` <button class="link" type="button">前往“${r.jump}”</button>` : ''}</span>` : ''}
+      <label>档位</label><span class="ro">${LV[r.lv]}${r.lv === 'warn' && !['system.memory', 'system.process', 'system.thermal'].includes(r.id) ? ' · 可限时暂缓' : r.lv === 'warn' ? ' · 不可暂缓，恢复后消除' : ''}</span>
+    </div>`;
+    return `<div class="item ${open ? 'open' : ''}">
+      <div class="row ${r.on ? '' : 'off'}">${tog(r.on, 'on:' + r.id)}
+        <span class="n clickable" data-open="${r.id}"><b><span class="chev">▶</span> ${r.name}<span class="lv ${r.lv}">${LV[r.lv]}</span></b><small>${r.sum(r.v)}</small></span>
+        ${stateCell(r)}${bell(r, 'bell:' + r.id)}</div>${edit}</div>`;
+  }
+  function customRow(c) {
+    const open = st.open === c.id;
+    const edit = !open ? '' : `<div class="edit">
+      <label>阈值</label><span class="num"><input inputmode="decimal" data-c="${c.id}:th" value="${c.th}">${metric(c.metric).unit}</span>
+      <label>持续</label><span class="num"><input inputmode="numeric" data-c="${c.id}:dur" value="${c.dur}">分钟</span>
+      <label>当前值</label><span class="ro">${fmt(metric(c.metric).now)} ${metric(c.metric).unit}</span>
+      <span class="acts"><button class="link" type="button" data-a="edit:${c.id}">编辑全部字段…</button><button class="link danger" type="button" data-a="del:${c.id}">删除</button></span>
+    </div>`;
+    return `<div class="item ${open ? 'open' : ''}">
+      <div class="row ${c.on ? '' : 'off'}">${tog(c.on, 'con:' + c.id)}
+        <span class="n clickable" data-open="${c.id}"><b><span class="chev">▶</span> ${esc(c.name)}<span class="lv ${c.lv}">${LV[c.lv]}</span><span class="lv custom">自定义</span></b><small>${customSum(c)}</small></span>
+        ${stateCell(c)}${bell(c, 'cbell:' + c.id)}</div>${edit}</div>`;
+  }
+
+  function render() {
+    $('#side').innerHTML = [['通用', '⚙︎', '#8e8e93'], ['外观', '◐', '#5856d6'], ['猫', '🐱', '#ff9f0a'], ['网络', '◎', '#007aff'], ['额度源', '◔', '#34c759'], ['提醒', '🔔', '#ff3b30']]
+      .map(([n, ic, c]) => `<div class="nav" ${n === '提醒' ? 'aria-current="true"' : ''}><span class="ic" style="background:${c}">${ic}</span>${n}${n === '提醒' ? '<span class="badge">2</span>' : ''}</div>`).join('');
+    const groups = ['系统', '额度', '网络', '数据源'];
+    const full = st.custom.length >= 32;
+    $('#body').innerHTML = `
+      ${st.auth ? '' : '<div class="banner">系统通知未授权，MeowMac 发不出通知。<button class="link" data-a="auth">打开系统设置…</button></div>'}
+      <h3>系统通知</h3>
+      <div class="list"><div class="row"><span class="n">发送系统通知<small>只管通知，不影响检测。同一问题持续期间只发一次</small></span>${tog(st.notify, 'notify')}</div></div>
+      ${groups.map((g) => `<h3>${g}<small>${g === '系统' ? '2 秒评估一次' : g === '额度' ? '随额度刷新评估' : g === '网络' ? '来自 TunCanary 的判定' : ''}</small></h3>
+        <div class="list">${BUILTIN.filter((r) => r.grp === g).map(builtinRow).join('')}</div>`).join('')}
+      <h3>自定义<small>${st.custom.length} / 32 条</small></h3>
+      <div class="list">${st.custom.map(customRow).join('')}
+        <button class="add" type="button" data-a="new" ${full ? 'disabled' : ''}>＋ 新建规则${full ? '（已达上限 32 条）' : ''}</button></div>
+      <p class="note">规则存在 config.json，也可以通过“打开配置文件…”修改；铃铛开关只在这里改。</p>`;
+    $('#status').textContent = st.status;
+    renderSheet();
+  }
+
+  function renderSheet() {
+    const sheet = $('#sheet');
+    if (st.confirm) {
+      sheet.classList.add('on');
+      $('#box').innerHTML = `<p>${st.confirm.title}</p><small style="color:var(--muted)">${st.confirm.text}</small>
+        <div class="b"><button class="act" data-s="cancel">取消</button><button class="act pri" data-s="ok">${st.confirm.ok}</button></div>`;
+      return;
+    }
+    if (!st.draft) { sheet.classList.remove('on'); return; }
+    sheet.classList.add('on');
+    const d = st.draft; const m = metric(d.metric);
+    const opts = [...new Set(METRICS.map((x) => x.g))].map((g) => `<optgroup label="${g}">${METRICS.filter((x) => x.g === g)
+      .map((x) => `<option value="${x.id}" ${x.id === d.metric ? 'selected' : ''}>${x.name}（${x.unit}）</option>`).join('')}</optgroup>`).join('');
+    const hit = m.now != null && (d.cmp === 'gte' ? m.now >= d.th : m.now <= d.th);
+    $('#box').innerHTML = `<p>${d.editing ? '编辑规则' : '新建规则'}</p>
+      <div class="form">
+        <label>名称</label><input type="text" data-d="name" value="${esc(d.name)}" placeholder="例如：Swap 偏高">
+        <label>指标</label><select data-d="metric">${opts}</select>
+        ${m.scoped ? `<label>对象</label><span class="inline"><select data-d="provider">${PROVIDERS.map((p) => `<option ${p === d.provider ? 'selected' : ''}>${p}</option>`).join('')}</select>
+          <select data-d="window">${WINDOWS.map((w) => `<option ${w === d.window ? 'selected' : ''}>${w}</option>`).join('')}</select></span>` : ''}
+        <label>条件</label><span class="inline"><select data-d="cmp"><option value="gte" ${d.cmp === 'gte' ? 'selected' : ''}>≥</option><option value="lte" ${d.cmp === 'lte' ? 'selected' : ''}>≤</option></select>
+          <span class="num"><input data-d="th" value="${d.th}">${m.unit}</span></span>
+        <span class="live">当前值 <b>${fmt(m.now)}${m.now == null ? '' : ' ' + m.unit}</b>${m.now == null ? '：本机读不到这个指标，规则不会触发' : hit ? '，按这个阈值现在就会触发' : ''}</span>
+        <label>持续</label><span class="num"><input data-d="dur" value="${d.dur}">分钟（0 表示立即）</span>
+        <label>档位</label><span class="inline"><select data-d="lv"><option value="warn" ${d.lv === 'warn' ? 'selected' : ''}>提醒：猫变橙色，可限时暂缓</option><option value="severe" ${d.lv === 'severe' ? 'selected' : ''}>严重：猫停下，不可暂缓</option></select></span>
+        <label>通知</label><span class="inline">${`<button type="button" class="tog" role="switch" aria-checked="${d.bell}" data-k="dbell"></button>`} 触发时发系统通知</span>
+        <div class="summary">${esc(d.name || '未命名规则')}：${customSum(d)}</div>
+      </div>
+      <div class="b"><button class="act" data-s="cancel">取消</button><button class="act pri" data-s="save" ${d.name.trim() ? '' : 'disabled'}>${d.editing ? '保存' : '添加'}</button></div>`;
+  }
+
+  function saved(msg) { st.status = msg + ' · 已保存'; }
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('button, [data-open]');
+    if (!t) return;
+    if (t.dataset.t) {
+      document.querySelectorAll('#theme button').forEach((b) => b.setAttribute('aria-pressed', b === t));
+      t.dataset.t === 'auto' ? document.documentElement.removeAttribute('data-theme') : document.documentElement.setAttribute('data-theme', t.dataset.t);
+      return;
+    }
+    if (t.dataset.open) { st.open = st.open === t.dataset.open ? null : t.dataset.open; return render(); }
+    const k = t.dataset.k;
+    if (k === 'notify') { st.notify = !st.notify; saved(st.notify ? '已开启系统通知' : '已关闭系统通知'); return render(); }
+    if (k === 'dbell') { st.draft.bell = !st.draft.bell; return renderSheet(); }
+    if (k && k.startsWith('on:')) { const r = BUILTIN.find((x) => x.id === k.slice(3)); r.on = !r.on; saved(`${r.on ? '已启用' : '已停用'}“${r.name}”`); return render(); }
+    if (k && k.startsWith('bell:')) { const r = BUILTIN.find((x) => x.id === k.slice(5)); r.bell = !r.bell; saved(`“${r.name}”${r.bell ? '会' : '不再'}发通知`); return render(); }
+    if (k && k.startsWith('con:')) { const c = st.custom.find((x) => x.id === k.slice(4)); c.on = !c.on; saved(`${c.on ? '已启用' : '已停用'}“${c.name}”`); return render(); }
+    if (k && k.startsWith('cbell:')) { const c = st.custom.find((x) => x.id === k.slice(6)); c.bell = !c.bell; saved(`“${c.name}”${c.bell ? '会' : '不再'}发通知`); return render(); }
+    const a = t.dataset.a;
+    if (a === 'auth') { st.auth = true; return render(); }
+    if (a === 'new') { st.draft = { name: '', metric: 'memory.pressure', cmp: 'gte', th: 85, dur: 5, lv: 'warn', bell: true, provider: '任一渠道', window: '任一窗口' }; return renderSheet(); }
+    if (a && a.startsWith('edit:')) { st.draft = { ...structuredClone(st.custom.find((x) => x.id === a.slice(5))), editing: true }; return renderSheet(); }
+    if (a && a.startsWith('del:')) { const c = st.custom.find((x) => x.id === a.slice(4)); st.confirm = { title: `删除“${c.name}”？`, text: '对应的提醒、暂缓和通知记录会一起清掉。', ok: '删除', run: () => { st.custom = st.custom.filter((x) => x !== c); saved(`已删除“${c.name}”`); } }; return renderSheet(); }
+    if (a === 'reset') { st.confirm = { title: '恢复内置规则的默认设置？', text: '阈值、持续时长、启用和通知开关回到默认。自定义规则保留。', ok: '恢复默认', run: () => { defaults.forEach((d) => Object.assign(BUILTIN.find((r) => r.id === d.id), structuredClone(d))); st.errors = {}; saved('已恢复默认'); } }; return renderSheet(); }
+    const s = t.dataset.s;
+    if (s === 'cancel') { st.draft = null; st.confirm = null; return render(); }
+    if (s === 'ok') { st.confirm.run(); st.confirm = null; return render(); }
+    if (s === 'save') {
+      const d = st.draft;
+      if (d.editing) { Object.assign(st.custom.find((x) => x.id === d.id), d); delete st.custom.find((x) => x.id === d.id).editing; saved(`已更新“${d.name}”`); }
+      else { const id = 'u-' + Math.random().toString(16).slice(2, 10).padEnd(8, '0'); const m = metric(d.metric);
+        const hit = m.now != null && (d.cmp === 'gte' ? m.now >= d.th : m.now <= d.th);
+        st.custom.push({ ...d, id, on: true, state: m.now == null ? 'na' : hit && !d.dur ? (d.lv === 'severe' ? 'sev' : 'fire') : 'ok' }); st.open = id; saved(`已添加“${d.name}”`); }
+      st.draft = null; return render();
+    }
+  });
+
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.dataset.f) {
+      const [id, k] = t.dataset.f.split(':'); const r = BUILTIN.find((x) => x.id === id); const [, , , mn, mx] = r.f.find((f) => f[0] === k);
+      const n = Number(t.value);
+      if (!Number.isFinite(n) || n < mn || n > mx) { st.errors[t.dataset.f] = true; }
+      else { delete st.errors[t.dataset.f]; r.v[k] = n; saved(`“${r.name}”已更新`); }
+      return render();
+    }
+    if (t.dataset.c) { const [id, k] = t.dataset.c.split(':'); const c = st.custom.find((x) => x.id === id); const n = Number(t.value); if (Number.isFinite(n) && n >= 0) { c[k] = n; saved(`“${c.name}”已更新`); } return render(); }
+    if (t.dataset.d) { const k = t.dataset.d; st.draft[k] = ['th', 'dur'].includes(k) ? Number(t.value) : t.value; return renderSheet(); }
+  });
+  document.addEventListener('input', (e) => {
+    if (e.target.dataset.d === 'name') { st.draft.name = e.target.value; const b = document.querySelector('[data-s="save"]'); if (b) b.disabled = !st.draft.name.trim(); document.querySelector('.summary').textContent = `${st.draft.name || '未命名规则'}：${customSum(st.draft)}`; }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.target.dataset.f || e.target.dataset.c)) e.target.blur(); });
+
+  render();
+})();
+</script>
+</body>
+</html>
