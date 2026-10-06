@@ -9,7 +9,7 @@ import time
 
 if os.environ.get('MEOWMAC_LIVE') != '1':
     raise SystemExit('实机校准需 MEOWMAC_LIVE=1')
-path = pathlib.Path(os.environ.get('MEOWMAC_CALIBRATION_OUTPUT', 'build/acceptance/alert-rules/memory-calibration.csv'))
+path = pathlib.Path('build/acceptance/alert-rules/memory-calibration.csv')
 path.parent.mkdir(parents=True, exist_ok=True)
 start = time.monotonic()
 count = 0

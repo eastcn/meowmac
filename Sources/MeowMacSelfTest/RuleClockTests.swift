@@ -64,6 +64,27 @@ enum RuleClockTests {
             r.enabled = true; clock.update(rules: [r], input: input(12))
             return clock.evaluations.first?.duration == 0
         }),
+        ("Core.RuleClock/首次读取旧缓存从当前观察时刻计时", {
+            let rule = AlertRule(id: "u-12345678", name: "额度持续", metric: "quota.remaining", comparison: .lte, threshold: 50, durationSeconds: 3600)
+            var clock = RuleClock()
+            func cached(_ sampled: Double, observed: Double) -> HealthInputs {
+                let snapshot = QuotaSnapshot(provider: .claude, source: "fixture", updatedAt: base.addingTimeInterval(sampled),
+                    windows: [.init(usedPercent: 80, windowMinutes: 300, resetsAt: base.addingTimeInterval(30000), resetDescription: nil)], paceSummary: nil, credits: nil)
+                return HealthInputs(system: nil, energy: nil, quotaUsedPercent: [], network: .green, failedSources: [:], fairSince: nil,
+                    now: base.addingTimeInterval(observed), quotaSnapshots: [snapshot])
+            }
+            clock.update(rules: [rule], input: cached(0, observed: 1800))
+            clock.update(rules: [rule], input: cached(3600, observed: 3600))
+            return clock.evaluations.first?.duration == 1800 && clock.evaluations.first?.triggered == false
+        }),
+        ("Core.RuleClock/改名和严重升级保留持续时长", {
+            var clock = RuleClock(); var r = rule()
+            for second in stride(from: 0.0, through: 10, by: 2) { clock.update(rules: [r], input: input(second)) }
+            r.name = "新名称"; r.level = .severe
+            clock.update(rules: [r], input: input(10))
+            return clock.evaluations.first?.duration == 10 && clock.evaluations.first?.triggered == true
+                && clock.evaluations.first?.rule.name == "新名称" && clock.evaluations.first?.rule.level == .severe
+        }),
         ("Core.RuleClock/额度休眠 60 分钟不累计、缓存不重计", {
             var clock = RuleClock()
             let r = AlertRule(id: "u-12345678", name: "额度规则", metric: "quota.remaining", comparison: .lte, threshold: 50, durationSeconds: 3600)

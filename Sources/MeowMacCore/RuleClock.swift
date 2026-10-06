@@ -30,14 +30,21 @@ public struct RuleClock {
     }
     public mutating func update(rules: [AlertRule], input: HealthInputs) {
         let live = Dictionary(rules.filter { $0.enabled && $0.available }.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        entries = entries.filter { _, entry in live[entry.fingerprint.id] == entry.fingerprint }
+        entries = entries.filter { _, entry in
+            guard let rule = live[entry.fingerprint.id] else { return false }
+            let previous = entry.fingerprint
+            return rule.metric == previous.metric && rule.comparison == previous.comparison
+                && rule.threshold == previous.threshold && rule.durationSeconds == previous.durationSeconds && rule.scope == previous.scope
+        }
         var next: [RuleEvaluation] = []
         for rule in live.values.sorted(by: { $0.id < $1.id }) {
             guard let metric = AlertMetric(rawValue: rule.metric) else { continue }
             for reading in metric.read(input) where rule.scope?.contains(reading) ?? true {
                 let key = rule.id + "." + reading.object
                 if let previous = entries[key], reading.sampledAt <= previous.last {
-                    if reading.sampledAt == previous.last, let evaluation = previous.evaluation { next.append(evaluation) }
+                    if reading.sampledAt == previous.last, let evaluation = previous.evaluation {
+                        next.append(RuleEvaluation(rule: rule, reading: reading, duration: evaluation.duration, triggered: evaluation.triggered))
+                    }
                     continue
                 }
                 var entry = entries[key] ?? Entry(fingerprint: rule, since: nil, last: reading.sampledAt, latched: false, resetAt: reading.resetAt, evaluation: nil)
@@ -50,8 +57,8 @@ public struct RuleClock {
                 }
                 entry.resetAt = reading.resetAt
                 if rule.comparison.matches(reading.value, threshold: rule.threshold) {
-                    if entry.since == nil { entry.since = reading.sampledAt }
-                    if reading.sampledAt.timeIntervalSince(entry.since!) >= rule.durationSeconds { entry.latched = true }
+                    if entry.since == nil { entry.since = max(reading.sampledAt, input.now) }
+                    if max(0, reading.sampledAt.timeIntervalSince(entry.since!)) >= rule.durationSeconds { entry.latched = true }
                 } else { entry.since = nil; entry.latched = false }
                 entry.last = reading.sampledAt
                 let evaluation = RuleEvaluation(rule: rule, reading: reading,
