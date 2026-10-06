@@ -119,7 +119,14 @@ public final class PanelState: ObservableObject {
     /// 风扇转速开始持续超过阈值的时刻（D14）。
     @Published public var fanHighSince: Date? { didSet { refreshReminders() } }
     public var ruleClock = RuleClock()
-    @Published public var configResult: ConfigLoadResult { didSet { refreshReminders() } }
+    var pendingAlertRuleResets = Set<String>()
+    @Published public var configResult: ConfigLoadResult {
+        didSet {
+            let removed = Set(oldValue.config.alertRules.builtin.keys).subtracting(configResult.config.alertRules.builtin.keys)
+            pendingAlertRuleResets.formUnion(removed.filter { BuiltinAlertRule(rawValue: $0) != nil })
+            refreshReminders()
+        }
+    }
     @Published public var lastRefreshedAt: Date?
     @Published public var selectedTab: PanelTab = .system
     @Published public var chartHoverDate: Date?

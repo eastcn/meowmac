@@ -17,7 +17,11 @@ public extension PanelState {
             networkSignals: signals, networkConfirmed: completed, networkCheckedAt: networkModel?.lastCheckedAt,
             energyUpdatedAt: energyUpdatedAt, fanHighSince: fanHighSince, balanceWarn: quotaSources.balanceWarn, ruleEvaluations: ruleClock.evaluations)
     }
-    var reminderBatch: ReminderBatch { ReminderCollector.collect(ruleInputs, config: configResult.config) }
+    var reminderBatch: ReminderBatch {
+        var batch = ReminderCollector.collect(ruleInputs, config: configResult.config)
+        batch.resetRuleIDs = pendingAlertRuleResets
+        return batch
+    }
     func rulesWillSleep() { ruleClock.sleep(); refreshReminders(updateClock: false) }
     var projectedReminders: ReminderTracker {
         var value = reminderTracker; value.reconcile(reminderBatch, now: now()); return value
@@ -43,14 +47,17 @@ public extension PanelState {
         let titles: [ReminderKind: String] = [.quotaLow: "额度剩余不足", .quotaPace: "额度偏快", .disk: "磁盘剩余不足", .source: "数据源失效"]
         let placeholders = loaded.records.map { record -> Reminder in
             let object = String(record.key.dropFirst(record.kind.rawValue.count + 1))
-            let providerObject = object.hasPrefix("quota.") ? String(object.dropFirst(6)) : object
-            let isProviderReminder = [.quotaLow, .quotaPace].contains(record.kind)
+            let customID = object.split(separator: ".").first.map(String.init)
+            let customRule = record.kind == .custom ? configResult.config.alertRules.custom.first { $0.id == customID } : nil
+            let providerObject = record.kind == .custom ? String(object.dropFirst((customID?.count ?? 0) + 1))
+                : object.hasPrefix("quota.") ? String(object.dropFirst(6)) : object
+            let isProviderReminder = customRule?.metric == AlertMetric.quotaRemaining.id || [.quotaLow, .quotaPace].contains(record.kind)
                 || (record.kind == .source && object.hasPrefix("quota."))
             let provider = !isProviderReminder ? nil : object == "quota.codex-resets" ? .codex
                 : providerObject.split(separator: ".").first.flatMap { QuotaProvider(rawValue: String($0)) }
-            let tab: PanelTab = record.kind == .quotaLow || record.kind == .quotaPace || object.hasPrefix("quota") ? .quota : object == "network" ? .network : .system
+            let tab: PanelTab = customRule.flatMap { AlertMetric(rawValue: $0.metric)?.tab } ?? (record.kind == .quotaLow || record.kind == .quotaPace || object.hasPrefix("quota") ? .quota : object == "network" ? .network : .system)
             return Reminder(kind: record.kind, object: object, tab: tab,
-                            title: (provider.map { $0.displayName + " · " } ?? "") + (titles[record.kind] ?? "待确认问题"),
+                            title: customRule?.name ?? ((provider.map { $0.displayName + " · " } ?? "") + (titles[record.kind] ?? "待确认问题")),
                             detail: "等待新的检测结果", resetAt: record.cycleResetAt, confirmed: false, provider: provider)
         }
         value.reconcile(ReminderBatch(reminders: placeholders), now: now())
@@ -73,7 +80,12 @@ public extension PanelState {
             activeSnoozeID = nil
         }
         onRemindersRefreshed(value, batch)
-        if before != value.records { reminderPersistenceDirty = true }
+        pendingAlertRuleResets = []
+        if before != value.records {
+            reminderPersistenceDirty = true
+            // 停用、删除与恢复默认要立即清除磁盘记录，不受普通恢复的重试间隔限制。
+            if before.contains(where: { batch.forgets($0.key) }) { reminderSaveAttempt = nil }
+        }
         guard reminderPersistenceDirty, let store = reminderStore,
               reminderSaveAttempt.map({ now().timeIntervalSince($0) >= 60 }) ?? true else { return }
         reminderSaveAttempt = now()
@@ -99,7 +111,7 @@ public extension PanelState {
         guard let reminder = reminderTracker.current[id], reminder.canSnooze else { throw SnoozeError.invalid("当前提醒已改变，不能暂缓") }
         let end: Date
         if untilReset {
-            guard [.quotaLow, .quotaPace].contains(reminder.kind), reminder.confirmed, let reset = reminder.resetAt, reset.timeIntervalSince(now()) >= 60 else { throw SnoozeError.invalid("没有可靠的未来重置时间") }
+            guard reminder.isCycleReminder, reminder.confirmed, let reset = reminder.resetAt, reset.timeIntervalSince(now()) >= 60 else { throw SnoozeError.invalid("没有可靠的未来重置时间") }
             end = reset
         } else {
             guard let seconds, seconds.isFinite, seconds >= 60, seconds <= 30 * 86400 else { throw SnoozeError.invalid("时长须为 1 分钟至 30 天") }

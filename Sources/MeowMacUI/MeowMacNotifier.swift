@@ -47,7 +47,7 @@ public final class MeowMacNotifier: NSObject, UserNotifying, UNUserNotificationC
 
     public static func request(for notice: SystemNotice, at date: Date) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
-        content.title = NotificationContent.title
+        content.title = notice.title ?? NotificationContent.title
         content.subtitle = notice.subtitle
         content.body = notice.body
         content.threadIdentifier = "meowmac." + notice.tab.rawValue
@@ -96,7 +96,7 @@ public final class NotificationCoordinator {
     /// `batch` 是这一轮的检测结果：只有它确认过的键才算恢复，刚启动没有数据时不会把记录误判为恢复。
     public func process(_ tracker: ReminderTracker, batch: ReminderBatch?, now: Date, redact: (String) -> String = { $0 }) {
         let decision = NotificationDecider.decide(reminders: tracker.sorted(), isSnoozed: { tracker.isSnoozed($0, now: now) },
-                                                  records: records, settings: settings, now: now,
+                                                  records: records.filter { key, _ in batch?.forgets(key) != true }, settings: settings, now: now,
                                                   confirmsRecovery: { key in
             guard let batch else { return true }
             guard let kind = key.split(separator: ".", maxSplits: 1).first.flatMap({ ReminderKind(rawValue: String($0)) }) else { return true }
@@ -112,8 +112,9 @@ public final class NotificationCoordinator {
     /// TunCanary 的出口告警：IP 变化和地域超出范围发通知，地域恢复不发。
     /// IP 变化的告警不带地区，取该目标最新一条成功观测的地区；那条没有地区（查询失败或被限流）就不写，
     /// 不借用旧 IP 的地区。
+    public var egressRuleEnabled = true
     public func process(_ alert: EgressAlert, history: [EgressObservation] = [], redact: (String) -> String) {
-        guard alert.kind != .regionRecovered, settings.allows(.egress) else { return }
+        guard egressRuleEnabled, alert.kind != .regionRecovered, settings.allows(ruleID: "network.egress") else { return }
         let latest = history.last { $0.result.target == alert.target && $0.result.isSuccess }
         let latestCountry = latest.flatMap { $0.geo?.ip == $0.result.ip ? $0.geo?.countryCode : nil }
         let place = (alert.countryCode ?? latestCountry).map(EgressRegions.name) ?? ""
@@ -125,7 +126,7 @@ public final class NotificationCoordinator {
 
     public func removeProviders(_ providers: [QuotaProvider]) {
         records = records.filter { key, _ in !providers.contains { provider in
-            key.hasPrefix("quotaLow." + provider.rawValue + ".") || key.hasPrefix("quotaPace." + provider.rawValue + ".") || key == "source.quota." + provider.rawValue
+            (key.hasPrefix("custom.") && key.contains("." + provider.rawValue + ".")) || key.hasPrefix("quotaLow." + provider.rawValue + ".") || key.hasPrefix("quotaPace." + provider.rawValue + ".") || key == "source.quota." + provider.rawValue
         } }
         persist()
     }

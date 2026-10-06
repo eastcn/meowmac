@@ -14,7 +14,7 @@ public enum NotificationCategory: String, Codable, CaseIterable {
         case .memory: self = .memory
         case .thermal: self = .thermal
         case .source: self = .source
-        case .cooling: return nil
+        case .cooling, .custom: return nil
         }
     }
 
@@ -39,9 +39,66 @@ public enum NotificationCategory: String, Codable, CaseIterable {
 /// 通知开关，本机设置，不进猫包。
 public struct NotificationSettings: Codable, Equatable {
     public var enabled = true
-    public var categories = NotificationCategory.defaultEnabled
-    public init() {}
+    public var rules: [String: Bool] = [:]
+    public init() { rules = Self.defaultRules }
+    public static var defaultRules: [String: Bool] {
+        Dictionary(BuiltinAlertRule.allCases.map { ($0.id, $0 != .source && $0 != .cooling) }, uniquingKeysWith: { first, _ in first })
+    }
+    /// 兼容旧菜单和旧文件。写盘仍带类别，独立规则开关以 rules 为准。
+    public var categories: Set<NotificationCategory> {
+        get { Set(NotificationCategory.allCases.filter { category in Self.ruleIDs(category).contains { rules[$0] ?? Self.defaultRules[$0] ?? true } }) }
+        set { for category in NotificationCategory.allCases { for id in Self.ruleIDs(category) { rules[id] = newValue.contains(category) } } }
+    }
+    public static func ruleIDs(_ category: NotificationCategory) -> [String] {
+        switch category {
+        case .network: return ["network.fault"]
+        case .egress: return ["network.egress"]
+        case .quotaLow: return ["quota.low", "quota.balance"]
+        case .quotaPace: return ["quota.pace"]
+        case .disk: return ["system.disk"]
+        case .process: return ["system.process"]
+        case .memory: return ["system.memory"]
+        case .thermal: return ["system.thermal"]
+        case .source: return ["source.failure"]
+        }
+    }
+    public func allows(ruleID: String) -> Bool { enabled && (rules[ruleID] ?? Self.defaultRules[ruleID] ?? true) }
     public func allows(_ category: NotificationCategory) -> Bool { enabled && categories.contains(category) }
+    private enum CodingKeys: String, CodingKey { case enabled, categories, rules }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        if let categories = try c.decodeIfPresent([String].self, forKey: .categories) {
+            self.categories = Set(categories.compactMap(NotificationCategory.init(rawValue:)))
+        }
+        if let rules = try c.decodeIfPresent([String: Bool].self, forKey: .rules) {
+            self.rules.merge(rules) { _, new in new }
+        }
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(enabled, forKey: .enabled); try c.encode(categories.map(\.rawValue).sorted(), forKey: .categories)
+        try c.encode(rules, forKey: .rules)
+    }
+}
+
+public func ruleID(for reminder: Reminder) -> String? { ruleID(forKey: reminder.id) }
+public func ruleID(forKey key: String) -> String? {
+    let fields = key.split(separator: ".")
+    guard let kindName = fields.first, let kind = ReminderKind(rawValue: String(kindName)) else { return nil }
+    switch kind {
+    case .custom: return fields.count >= 3 ? String(fields[1]) : nil
+    case .quotaLow: return key.hasSuffix(".balance") ? "quota.balance" : "quota.low"
+    case .quotaPace: return "quota.pace"
+    case .disk: return "system.disk"
+    case .process: return "system.process"
+    case .memory: return "system.memory"
+    case .thermal: return "system.thermal"
+    case .network: return "network.fault"
+    case .source: return "source.failure"
+    case .cooling: return nil
+    }
 }
 
 /// 某个提醒的通知状态。恢复后保留到冷却结束，用来判断能否再次通知。
@@ -101,9 +158,9 @@ public enum NotificationDecider {
         }
         var out: [Reminder] = []
         for reminder in reminders where reminder.level > .normal {
-            guard let category = NotificationCategory(kind: reminder.kind), reminder.confirmed else { continue }
+            guard let ruleID = ruleID(for: reminder), reminder.confirmed else { continue }
             let key = reminder.id
-            let quota = category == .quotaLow || category == .quotaPace
+            let quota = reminder.isCycleReminder
             let cycle = quota ? reminder.resetAt : nil
             let old = next[key]
             var notify = true
@@ -130,7 +187,7 @@ public enum NotificationDecider {
                                            pendingAfterSnooze: true, lastSeenAt: now, notifiedLevel: old?.notifiedLevel ?? old?.level)
                 continue
             }
-            if notify && settings.allows(category) { out.append(reminder) }
+            if notify && settings.allows(ruleID: ruleID) { out.append(reminder) }
             // 恢复后重现算新的一轮：档位从当前档开始，之后升级为严重时能再通知。
             let restart = notify || old?.recoveredAt != nil
             let silentSince = notify ? nil : old?.recoveredAt ?? old?.silentSince
@@ -178,7 +235,9 @@ public struct SystemNotice: Equatable {
     public let subtitle: String
     public let body: String
     public let sound: Bool
-    public init(key: String, tab: PanelTab, subtitle: String, body: String, sound: Bool) {
+    public let title: String?
+    public init(key: String, tab: PanelTab, subtitle: String, body: String, sound: Bool, title: String? = nil) {
+        self.title = title
         self.key = key; self.tab = tab; self.subtitle = subtitle; self.body = body; self.sound = sound
     }
 }
@@ -200,7 +259,7 @@ public enum NotificationContent {
         return SystemNotice(key: reminder.id, tab: reminder.tab,
                             subtitle: subtitle,
                             body: body(for: reminder, now: now, timeZone: timeZone, redact: redact),
-                            sound: reminder.level == .severe)
+                            sound: reminder.level == .severe, title: reminder.kind == .custom ? reminder.title : nil)
     }
 
     static func body(for reminder: Reminder, now: Date, timeZone: TimeZone, redact: (String) -> String) -> String {
@@ -233,6 +292,7 @@ public enum NotificationContent {
             return text
         case .memory:
             var text = facts.pressurePercent.map { "内存压力 " + percent($0) } ?? "内存压力持续偏高"
+            if let threshold = facts.pressureThreshold { text += "，超过 " + percent(threshold) }
             if let duration = facts.duration { text += "，已持续 " + MetricFormat.duration(duration) }
             return text
         case .thermal:
@@ -246,6 +306,8 @@ public enum NotificationContent {
         case .network:
             let hint = facts.hint.flatMap { $0.isEmpty ? nil : $0 }
             return redact(reminder.title + (hint.map { "。" + $0 } ?? ""))
+        case .custom:
+            return reminder.detail
         case .cooling:
             return reminder.title
         }

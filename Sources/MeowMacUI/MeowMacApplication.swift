@@ -70,6 +70,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             onTone: { [weak panelState] tone in panelState?.networkTone = tone },
             onEgressAlert: { [weak self] alert in
                 guard let self else { return }
+                self.notificationCoordinator?.egressRuleEnabled = self.panelState.configResult.config.alertRules.enabled(.egress, config: self.panelState.configResult.config)
                 let model = self.panelState.networkModel, redactor = model?.redactor
                 self.notificationCoordinator?.process(alert, history: model?.egressState.history ?? [],
                                                       redact: { redactor?.redact($0) ?? $0 })

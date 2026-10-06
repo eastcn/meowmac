@@ -101,7 +101,7 @@ struct SnoozeForm: View {
     @State private var error: String?
     private let presets: [(String, Double)] = [("30 分钟", 1800), ("1 小时", 3600), ("4 小时", 14400), ("1 天", 86400), ("2 天", 172800), ("3 天", 259200)]
     private var reliableReset: Date? {
-        guard reminder.confirmed, [.quotaLow, .quotaPace].contains(reminder.kind), let reset = reminder.resetAt,
+        guard reminder.confirmed, reminder.isCycleReminder, let reset = reminder.resetAt,
               reset.timeIntervalSince(state.now()) >= 60 else { return nil }; return reset
     }
     private var seconds: Double? { preset ?? unit.duration(custom) }

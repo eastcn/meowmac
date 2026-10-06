@@ -21,13 +21,8 @@ public final class NotificationStore {
 
     private struct Envelope: Codable {
         var schemaVersion = 1
-        var settings: Settings
+        var settings: NotificationSettings
         var records: [NotifiedRecord]
-    }
-    /// 类别按名称排序写盘，便于比对；未知类别丢弃，缺失字段用默认值。
-    private struct Settings: Codable {
-        var enabled: Bool
-        var categories: [String]
     }
 
     public func load() -> NotificationStoreLoad {
@@ -40,9 +35,7 @@ public final class NotificationStore {
             let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .millisecondsSince1970
             let envelope = try decoder.decode(Envelope.self, from: data)
             guard envelope.schemaVersion == 1 else { throw CocoaError(.fileReadCorruptFile) }
-            var settings = NotificationSettings()
-            settings.enabled = envelope.settings.enabled
-            settings.categories = Set(envelope.settings.categories.compactMap(NotificationCategory.init(rawValue:)))
+            let settings = envelope.settings
             let records = Dictionary(envelope.records.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
             return NotificationStoreLoad(settings: settings, records: records, recoveryReason: nil)
         } catch {
@@ -56,7 +49,7 @@ public final class NotificationStore {
     }
 
     public func save(settings: NotificationSettings, records: [String: NotifiedRecord]) throws {
-        let envelope = Envelope(settings: Settings(enabled: settings.enabled, categories: settings.categories.map(\.rawValue).sorted()),
+        let envelope = Envelope(settings: settings,
                                 records: records.values.sorted { $0.key < $1.key })
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .millisecondsSince1970; encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(envelope)

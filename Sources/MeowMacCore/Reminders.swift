@@ -1,8 +1,8 @@
 import Foundation
 
 public enum ReminderKind: String, Codable, CaseIterable {
-    case quotaLow, quotaPace, disk, source, process, memory, thermal, network, cooling
-    public var allowsSnooze: Bool { [.quotaLow, .quotaPace, .disk, .source].contains(self) }
+    case quotaLow, quotaPace, disk, source, process, memory, thermal, network, cooling, custom
+    public var allowsSnooze: Bool { [.quotaLow, .quotaPace, .disk, .source, .custom].contains(self) }
 }
 
 /// 写具体通知用的数值（D41）。面板不显示这些字段。
@@ -50,6 +50,9 @@ public struct Reminder: Identifiable, Codable, Equatable {
     public let provider: QuotaProvider?
     public var facts: ReminderFacts?
     public var id: String { kind.rawValue + "." + object }
+    public var isCycleReminder: Bool {
+        kind == .quotaPace || (kind == .quotaLow && !object.hasSuffix(".balance")) || (kind == .custom && tab == .quota)
+    }
     public var canSnooze: Bool { kind.allowsSnooze && level == .warn && SnoozeRecord.validKey(id, kind: kind) }
     public init(kind: ReminderKind, object: String, tab: PanelTab, level: HealthLevel = .warn,
                 title: String, detail: String = "", sampledAt: Date? = nil, resetAt: Date? = nil,
@@ -74,11 +77,19 @@ public struct ReminderBatch {
     public var confirmedKinds: Set<ReminderKind>
     public var confirmedKeys: Set<String>
     public var disabledQuotaRules: Set<String> = []
+    public var disabledRuleIDs: Set<String> = []
+    public var activeCustomRuleIDs: Set<String>? = nil
+    public var resetRuleIDs: Set<String> = []
+    public func forgets(_ key: String) -> Bool {
+        guard let id = ruleID(forKey: key) else { return false }
+        return disabledRuleIDs.contains(id) || resetRuleIDs.contains(id)
+            || (id.hasPrefix("u-") && activeCustomRuleIDs.map { !$0.contains(id) } == true)
+    }
     public init(reminders: [Reminder], confirmedKinds: Set<ReminderKind> = [], confirmedKeys: Set<String> = []) {
         self.reminders = reminders; self.confirmedKinds = confirmedKinds; self.confirmedKeys = confirmedKeys
     }
     public func confirms(_ key: String, kind: ReminderKind) -> Bool {
-        confirmedKinds.contains(kind) || confirmedKeys.contains(key)
+        forgets(key) || confirmedKinds.contains(kind) || confirmedKeys.contains(key)
             || (kind == .quotaLow && disabledQuotaRules.contains(key.hasSuffix(".balance") ? "quota.balance" : "quota.low"))
     }
 }
@@ -229,6 +240,20 @@ public enum ReminderCollector {
                              facts: ReminderFacts(subject: name, failures: failures, cachedAt: cachedAt)))
             }
         }
+        for evaluation in input.ruleEvaluations where evaluation.rule.id.hasPrefix("u-") {
+            let rule = evaluation.rule, reading = evaluation.reading
+            guard let metric = AlertMetric(rawValue: rule.metric) else { continue }
+            let object = rule.id + "." + reading.object
+            batch.confirmedKeys.insert("custom." + object)
+            if evaluation.triggered {
+                let detail = customRuleDetail(rule: rule, reading: reading, duration: evaluation.duration)
+                add(Reminder(kind: .custom, object: object, tab: metric.tab, level: rule.level.health,
+                    title: rule.name, detail: detail, sampledAt: reading.sampledAt, resetAt: reading.resetAt,
+                    provider: reading.provider))
+            }
+        }
+        batch.activeCustomRuleIDs = Set(rules.custom.filter(\.enabled).map(\.id))
+        batch.disabledRuleIDs = Set(BuiltinAlertRule.allCases.filter { !rules.enabled($0, config: originalConfig) }.map(\.id))
         let kindRules: [ReminderKind: BuiltinAlertRule] = [.network: .network, .disk: .disk, .process: .process,
             .memory: .memory, .thermal: .thermal, .cooling: .cooling, .source: .source, .quotaPace: .pace]
         for (kind, rule) in kindRules where !rules.enabled(rule, config: originalConfig) {
@@ -267,7 +292,7 @@ public struct SnoozeRecord: Codable, Equatable {
     public init(reminder: Reminder, acknowledgedAt: Date, until: Date) throws {
         guard reminder.canSnooze else { throw SnoozeError.invalid("这类问题需要持续提醒") }
         self.key = reminder.id; self.kind = reminder.kind; self.acknowledgedAt = acknowledgedAt
-        self.until = until; self.cycleResetAt = [.quotaLow, .quotaPace].contains(reminder.kind) ? reminder.resetAt : nil
+        self.until = until; self.cycleResetAt = reminder.isCycleReminder ? reminder.resetAt : nil
         try validate()
     }
     public static func validKey(_ key: String, kind: ReminderKind) -> Bool {
@@ -280,8 +305,8 @@ public struct SnoozeRecord: Codable, Equatable {
         guard Self.validKey(key, kind: kind), acknowledgedAt.timeIntervalSince1970.isFinite,
               until.timeIntervalSince1970.isFinite, duration >= 60,
               cycleResetAt.map({ $0.timeIntervalSince1970.isFinite }) ?? true,
-              cycleResetAt == nil || [.quotaLow, .quotaPace].contains(kind),
-              duration <= 30 * 86400 || ([.quotaLow, .quotaPace].contains(kind) && cycleResetAt == until) else {
+              cycleResetAt == nil || [.quotaLow, .quotaPace, .custom].contains(kind),
+              duration <= 30 * 86400 || ([.quotaLow, .quotaPace, .custom].contains(kind) && cycleResetAt == until) else {
             throw SnoozeError.invalid("暂缓记录的类型、身份或时间无效")
         }
     }
@@ -298,12 +323,14 @@ public struct ReminderTracker {
         current = current.filter { !keys.contains($0.key) }
         snoozes = snoozes.filter { key, _ in
             !keys.contains(key) && !providers.contains { provider in
-                key.hasPrefix("quotaLow." + provider.rawValue + ".") || key.hasPrefix("quotaPace." + provider.rawValue + ".") || key == "source.quota." + provider.rawValue
+                (key.hasPrefix("custom.") && key.contains("." + provider.rawValue + ".")) || key.hasPrefix("quotaLow." + provider.rawValue + ".") || key.hasPrefix("quotaPace." + provider.rawValue + ".") || key == "source.quota." + provider.rawValue
             }
         }
     }
 
     public mutating func reconcile(_ batch: ReminderBatch, now: Date) {
+        current = current.filter { !batch.forgets($0.key) }
+        snoozes = snoozes.filter { !batch.forgets($0.key) }
         let incoming = Dictionary(batch.reminders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for (key, old) in current where incoming[key] == nil {
             if batch.confirms(key, kind: old.kind) { current.removeValue(forKey: key); snoozes.removeValue(forKey: key) }
@@ -346,4 +373,16 @@ public struct ReminderTracker {
             .map { HealthIssue(level: $0.level, tab: $0.tab, message: $0.title) }
         return HealthSummary(level: issues.first?.level ?? .normal, issues: issues, coolingHint: all.contains { $0.kind == .cooling })
     }
+}
+
+/// 界面摘要和系统通知共用同一条规则与读数。
+public func customRuleDetail(rule: AlertRule, reading: MetricReading, duration: TimeInterval) -> String {
+    guard let metric = AlertMetric(rawValue: rule.metric) else { return "指标不可用" }
+    let subject = reading.subject.map { $0 + " · " } ?? ""
+    return subject + metric.name + " " + alertNumber(reading.value) + metric.unit
+        + (rule.comparison == .gte ? "，超过 " : "，低于 ") + alertNumber(rule.threshold) + metric.unit
+        + " · 已持续 " + MetricFormat.duration(duration)
+}
+public func alertNumber(_ value: Double) -> String {
+    value.rounded() == value ? String(format: "%.0f", value) : String(format: "%.1f", value)
 }
