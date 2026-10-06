@@ -1,11 +1,6 @@
 import SwiftUI
 import MeowMacCore
 
-public struct DiagnosisRow: Codable {
-    public let pid: Int32?
-    public let name: String, detail: String, value: String, duration: String
-    public let level: HealthLevel
-}
 public struct TrendValue: Codable {
     public let date: Date, value: Double
 }

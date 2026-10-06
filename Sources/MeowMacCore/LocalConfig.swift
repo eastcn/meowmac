@@ -26,6 +26,8 @@ public struct LocalConfig: Codable, Equatable {
     public var quotaHistoryDays = 90
     public var codexBarCLIPath = "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI"
     public var cleanTerminal = CleanTerminal.automatic
+    public var aiAgent = AIAgent.automatic
+    public var aiDiagnosisEntry = true
     public var moPath = "/opt/homebrew/bin/mo"
 
     public init() {}
@@ -35,7 +37,7 @@ public struct LocalConfig: Codable, Equatable {
         case sleepAssertionSeconds, memoryPressureSeconds, fairThermalSeconds, fanHighFraction, fanHighSeconds, sourceFailureCount
         case memoryNormalLoad, memoryWarnLoad, memoryCriticalLoad, idleFrameSeconds, fullFrameSeconds
         case quotaRefreshSeconds, sessionPollSeconds, sessionFinishDelaySeconds, manualMergeSeconds
-        case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath, cleanTerminal
+        case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath, cleanTerminal, aiAgent, aiDiagnosisEntry
     }
 
     public init(from decoder: Decoder) throws {
@@ -68,6 +70,8 @@ public struct LocalConfig: Codable, Equatable {
         quotaHistoryDays = try fields.decodeIfPresent(Int.self, forKey: .quotaHistoryDays) ?? defaults.quotaHistoryDays
         codexBarCLIPath = try fields.decodeIfPresent(String.self, forKey: .codexBarCLIPath) ?? defaults.codexBarCLIPath
         cleanTerminal = try fields.decodeIfPresent(CleanTerminal.self, forKey: .cleanTerminal) ?? defaults.cleanTerminal
+        aiAgent = try fields.decodeIfPresent(AIAgent.self, forKey: .aiAgent) ?? defaults.aiAgent
+        aiDiagnosisEntry = try fields.decodeIfPresent(Bool.self, forKey: .aiDiagnosisEntry) ?? defaults.aiDiagnosisEntry
         moPath = try fields.decodeIfPresent(String.self, forKey: .moPath) ?? defaults.moPath
     }
 }
@@ -90,6 +94,18 @@ public enum ConfigStore {
 
     /// 只更新清理终端字段，保留用户配置的其他字段和未知字段。
     public static func saveCleanTerminal(_ preference: CleanTerminal, to url: URL = defaultURL) throws {
+        try saveField("cleanTerminal", value: preference.rawValue, to: url)
+    }
+
+    public static func saveAIAgent(_ preference: AIAgent, to url: URL = defaultURL) throws {
+        try saveField("aiAgent", value: preference.rawValue, to: url)
+    }
+
+    public static func saveAIDiagnosisEntry(_ enabled: Bool, to url: URL = defaultURL) throws {
+        try saveField("aiDiagnosisEntry", value: enabled, to: url)
+    }
+
+    private static func saveField(_ key: String, value: Any, to url: URL) throws {
         var object: [String: Any]
         do {
             let data = try Data(contentsOf: url)
@@ -103,7 +119,7 @@ public enum ConfigStore {
             let data = try JSONEncoder().encode(LocalConfig())
             object = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         }
-        object["cleanTerminal"] = preference.rawValue
+        object[key] = value
         let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
