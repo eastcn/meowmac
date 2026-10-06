@@ -138,6 +138,14 @@ public final class PanelState: ObservableObject {
     public var networkCapture: NetworkCaptureInfo?
     @Published public var cleanTerminalPreference: CleanTerminal
     @Published public var availableCleanTerminals: Set<CleanTerminal> = []
+    @Published public var aiAgentPreference: AIAgent
+    @Published public var aiDiagnosisEntry: Bool
+    @Published public var aiAgentInstallations: [AIAgentInstallation] = []
+    @Published public var aiSettingsError: String?
+    public var onSelectAIAgent: (AIAgent) -> Void = { _ in }
+    public var onSetAIDiagnosisEntry: (Bool) -> Void = { _ in }
+    public var onDetectAIAgents: () -> Void = {}
+    public var onAIDiagnosis: () -> Void = {}
     @Published public var cleanLaunching = false
     @Published public var cleaningHistoryMessage: String?
     @Published public var lastCleaning: CleaningRecord?
@@ -238,6 +246,8 @@ public final class PanelState: ObservableObject {
     public init(configResult: ConfigLoadResult = ConfigStore.load()) {
         self.configResult = configResult
         self.cleanTerminalPreference = configResult.config.cleanTerminal
+        self.aiAgentPreference = configResult.config.aiAgent
+        self.aiDiagnosisEntry = configResult.config.aiDiagnosisEntry
     }
 
     public var health: HealthSummary {

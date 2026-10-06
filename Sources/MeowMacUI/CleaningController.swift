@@ -27,8 +27,10 @@ public enum CleaningAlerts {
     }
 }
 
+public typealias CleanTerminalLauncher = TerminalScriptLauncher
+
 @MainActor
-public enum CleanTerminalLauncher {
+public enum TerminalScriptLauncher {
     public static func configuration(terminal: CleanTerminal, script: URL) -> NSWorkspace.OpenConfiguration {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
@@ -40,10 +42,10 @@ public enum CleanTerminalLauncher {
     }
 
     public static func launch(terminal: CleanTerminal, application: URL, script: String,
-                              completion: @escaping (Error?) -> Void) {
+                              scriptPrefix: String = "clean", completion: @escaping (Error?) -> Void) {
         let directory = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/MeowMac/tmp", isDirectory: true)
-        let file = directory.appendingPathComponent("clean-" + UUID().uuidString + ".command")
+        let file = directory.appendingPathComponent(scriptPrefix + "-" + UUID().uuidString + ".command")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try Data(script.utf8).write(to: file, options: .atomic)
