@@ -109,6 +109,11 @@ public struct AlertScope: Codable, Equatable {
         (provider == nil || reading.provider?.rawValue == provider)
             && (window == nil || reading.object == (reading.provider?.rawValue ?? "") + "." + window!)
     }
+    /// 对象身份也用于清除已存记录，不依赖本轮能否采集到读数。
+    public func contains(object: String) -> Bool {
+        let parts = object.split(separator: ".", maxSplits: 1).map(String.init)
+        return (provider == nil || parts.first == provider) && (window == nil || parts.last == window)
+    }
 }
 public struct AlertRule: Codable, Equatable, Identifiable {
     public var id: String

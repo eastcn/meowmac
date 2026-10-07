@@ -124,6 +124,12 @@ public final class PanelState: ObservableObject {
         didSet {
             let removed = Set(oldValue.config.alertRules.builtin.keys).subtracting(configResult.config.alertRules.builtin.keys)
             pendingAlertRuleResets.formUnion(removed.filter { BuiltinAlertRule(rawValue: $0) != nil })
+            // 换指标后，旧提醒及记录即使对象仍叫 system，也不属于新的检测条件。
+            for rule in configResult.config.alertRules.custom {
+                if let previous = oldValue.config.alertRules.custom.first(where: { $0.id == rule.id }), previous.metric != rule.metric {
+                    pendingAlertRuleResets.insert(rule.id)
+                }
+            }
             refreshReminders()
         }
     }

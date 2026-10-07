@@ -79,9 +79,11 @@ public struct ReminderBatch {
     public var disabledQuotaRules: Set<String> = []
     public var disabledRuleIDs: Set<String> = []
     public var activeCustomRuleIDs: Set<String>? = nil
+    public var customRuleScopes: [String: AlertScope] = [:]
     public var resetRuleIDs: Set<String> = []
     public func forgets(_ key: String) -> Bool {
         guard let id = ruleID(forKey: key) else { return false }
+        if let scope = customRuleScopes[id], !scope.contains(object: String(key.dropFirst("custom.".count + id.count + 1))) { return true }
         return disabledRuleIDs.contains(id) || resetRuleIDs.contains(id)
             || (id.hasPrefix("u-") && activeCustomRuleIDs.map { !$0.contains(id) } == true)
     }
@@ -253,6 +255,7 @@ public enum ReminderCollector {
             }
         }
         batch.activeCustomRuleIDs = Set(rules.custom.filter(\.enabled).map(\.id))
+        batch.customRuleScopes = Dictionary(rules.custom.compactMap { rule in rule.scope.map { (rule.id, $0) } }, uniquingKeysWith: { first, _ in first })
         batch.disabledRuleIDs = Set(BuiltinAlertRule.allCases.filter { !rules.enabled($0, config: originalConfig) }.map(\.id))
         let kindRules: [ReminderKind: BuiltinAlertRule] = [.network: .network, .disk: .disk, .process: .process,
             .memory: .memory, .thermal: .thermal, .cooling: .cooling, .source: .source, .quotaPace: .pace]

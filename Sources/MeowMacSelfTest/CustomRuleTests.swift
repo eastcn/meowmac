@@ -4,12 +4,65 @@ import MeowMacUI
 
 enum CustomRuleTests {
     static let now = RuleClockTests.base
+    @MainActor static func editingFixture(_ rule: AlertRule) throws -> (URL, PanelState, AlertRuleSettingsModel, NotificationCoordinator, ReminderStore) {
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/acceptance/alert-rules/edit-" + UUID().uuidString)
+        var config = LocalConfig(); config.alertRules.custom = [rule]
+        let url = root.appendingPathComponent("config.json")
+        try ConfigStore.saveAlertRules(config.alertRules, to: url)
+        let state = PanelState(configResult: ConfigStore.load(from: url)); state.now = { now }
+        let reminders = ReminderStore(rootURL: root)
+        state.initializeReminders(store: reminders)
+        let coordinator = NotificationCoordinator(store: NotificationStore(rootURL: root), startedAt: now) { _ in }
+        state.onSetNotificationSettings = { settings in if coordinator.update(settings) { state.notificationSettings = coordinator.settings } }
+        state.onRemindersRefreshed = { tracker, batch in coordinator.process(tracker, batch: batch, now: state.now()) }
+        return (root, state, AlertRuleSettingsModel(state: state, configURL: url), coordinator, reminders)
+    }
+    @MainActor static func metricChanges() throws -> Bool {
+        for metric in ["quota.remaining", "swap.used"] {
+            let (root, state, model, coordinator, store) = try editingFixture(RuleClockTests.rule(duration: 0))
+            defer { try? FileManager.default.removeItem(at: root) }
+            state.snapshot = RuleClockTests.input(0).system
+            let key = "custom.u-12345678.system"
+            guard state.allReminders.contains(where: { $0.id == key }), coordinator.records[key] != nil else { return false }
+            try state.snooze(key, seconds: 3600)
+            model.beginEdit(model.custom[0]); model.draft?.metric = metric
+            guard model.saveDraft(), state.allReminders.isEmpty, store.load().records.isEmpty,
+                  coordinator.records.isEmpty, NotificationStore(rootURL: root).load().records.isEmpty,
+                  state.health.level == .normal else { return false }
+        }
+        return true
+    }
+    @MainActor static func scopeNarrowing() throws -> Bool {
+        let rule = AlertRule(id: "u-12345678", name: "额度偏低", metric: "quota.remaining", comparison: .lte, threshold: 50)
+        let (root, state, model, coordinator, store) = try editingFixture(rule)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for provider in [QuotaProvider.claude, .codex] {
+            state.quotas[provider] = .init(provider: provider, source: "fixture", updatedAt: now,
+                windows: ["primary", "secondary"].map { .init(usedPercent: 80, windowMinutes: 300, resetsAt: now.addingTimeInterval(18000), resetDescription: nil, identifier: $0) }, paceSummary: nil, credits: nil)
+        }
+        let keys = Set(state.allReminders.filter { $0.kind == .custom }.map(\.id))
+        guard keys.count == 4, Set(coordinator.records.keys).isSuperset(of: keys) else { return false }
+        for key in keys { try state.snooze(key, seconds: 3600) }
+        state.failures["quota"] = 1
+        model.beginEdit(model.custom[0]); model.draft?.scope = .init(provider: "codex")
+        guard model.saveDraft() else { return false }
+        let codex = Set(keys.filter { $0.contains(".codex.") })
+        guard Set(state.allReminders.map(\.id)) == codex, Set(store.load().records.map(\.key)) == codex,
+              Set(coordinator.records.keys) == codex, state.allReminders.allSatisfy({ !$0.confirmed }) else { return false }
+        model.beginEdit(model.custom[0]); model.draft?.scope = .init(provider: "codex", window: "primary")
+        guard model.saveDraft() else { return false }
+        let kept = Set(["custom.u-12345678.codex.primary"])
+        return Set(state.allReminders.map(\.id)) == kept && Set(store.load().records.map(\.key)) == kept
+            && Set(coordinator.records.keys) == kept && Set(NotificationStore(rootURL: root).load().records.keys) == kept
+    }
     static func custom(level: HealthLevel = .warn, quota: Bool = false, reset: Date? = nil) -> Reminder {
         .init(kind: .custom, object: "u-12345678." + (quota ? "claude.primary" : "system"), tab: quota ? .quota : .system,
               level: level, title: "自定义规则", detail: "内存压力 80%，超过 70% · 已持续 10 分钟",
               sampledAt: now, resetAt: reset, provider: quota ? .claude : nil)
     }
     static var tests: [(String, @MainActor () throws -> Bool)] { [
+        ("Core.CustomRule/编辑指标清除跨分组与同对象旧记录", { try metricChanges() }),
+        ("Core.CustomRule/多对象收窄在缺测时只清除排除对象", { try scopeNarrowing() }),
         ("Core.CustomRule/真实评估、正文、猫形态与暂缓档位", {
             var config = LocalConfig(); config.alertRules.custom = [RuleClockTests.rule(duration: 0)]
             let state = PanelState(configResult: .init(config: config, error: nil)); state.now = { now }
