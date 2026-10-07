@@ -34,6 +34,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var snapshot: SystemSnapshot?
     private var hasSystemBaseline = false
     private var energyLoop: EnergyLoopControl?
+    private let menuBarImage = MenuBarCatImage()
     private lazy var cadence = ApplicationCadence(
         display: { [weak self] in self?.panelState.catDisplay() ?? PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil)).catDisplay() },
         updateImage: { [weak self] _ in self?.updateCatImage() },
@@ -57,7 +58,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         CatRuntime.initialize(state: panelState, store: catStore)
         startNotifications()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = CatRenderer.image(cat: panelState.selectedCat, display: panelState.catDisplay(), frame: 0)
+        if let button = item.button { menuBarImage.assign(to: button, cat: panelState.selectedCat, display: panelState.catDisplay(), frame: 0) }
         item.button?.target = self
         item.button?.action = #selector(togglePopover)
         statusItem = item
@@ -363,7 +364,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     }
 
     private func updateCatImage() {
-        statusItem?.button?.image = CatRenderer.image(cat: panelState.selectedCat, display: panelState.catDisplay(), frame: cadence.frame)
+        if let button = statusItem?.button { menuBarImage.assign(to: button, cat: panelState.selectedCat, display: panelState.catDisplay(), frame: cadence.frame) }
     }
 
     private func selectCat(_ id: String) {

@@ -7,6 +7,7 @@ import MeowMacSystem
 
 @MainActor
 final class SelfPerformanceRunner {
+    private let menuBarImage = MenuBarCatImage()
     private var item: NSStatusItem?
     private var popover: NSPopover?
     private var cadence: ApplicationCadence?
@@ -91,6 +92,9 @@ final class SelfPerformanceRunner {
             let load = scene == "open-high" ? 0.9 : 0.24
             for index in -360...0 { state.chartHistory.append(fixture(at: epoch.addingTimeInterval(Double(index) * 10), load: load)) }
             self.state = state
+            menuBarImage.observe = { [weak self] event, seconds in
+                self?.count(event); self?.durations[event, default: 0] += seconds
+            }
             let reduced = scene == "closed-reduced"
             let cadence = ApplicationCadence(display: { state.catDisplay(reducedMotion: reduced) },
                 updateImage: { [weak self] frame in self?.updateImage(frame: frame, reduced: reduced) },
@@ -155,7 +159,8 @@ final class SelfPerformanceRunner {
                       "workSeconds": timing, "auxiliaryStart": auxiliaryStart, "auxiliaryEnd": auxiliary(parent: getpid()),
                       "stateChecks": ["panelShown": opened, "width": width, "stopped": scene.hasSuffix("stopped"), "reducedMotion": reduced,
                                       "frameChanges": frameChanges - changesStart, "scale": item.button?.window?.backingScaleFactor ?? 0,
-                                      "speedLines": finalDisplay.speedLines, "frameInterval": finalDisplay.frameInterval],
+                                      "speedLines": finalDisplay.speedLines, "frameInterval": finalDisplay.frameInterval,
+                                      "preparedImage": item.button?.image?.representations.first is NSBitmapImageRep, "cacheCount": menuBarImage.count],
                       "conditions": ["scene": scene, "cat": state.selectedCat!.id, "load": load, "fixture": "self-performance-v1", "warmup": warmup],
                       "experiment": ["omitImageAssignment": omitImage, "omitSystemUpdate": omitSystem,
                                      "notificationProbe": notificationProbe, "omitNotificationProcess": omitNotificationProcess],
@@ -175,11 +180,9 @@ final class SelfPerformanceRunner {
     private func updateImage(frame: Int, reduced: Bool) {
         guard let state else { return }
         if omitImage { count("omittedImageAssignment"); return }
-        let started = ProcessInfo.processInfo.systemUptime
-        item?.button?.image = CatRenderer.image(cat: state.selectedCat, display: state.catDisplay(reducedMotion: reduced), frame: frame,
-            observeDraw: { [weak self] seconds in self?.count("renderDraw"); self?.durations["renderDraw", default: 0] += seconds })
-        count("imageAssignment")
-        durations["imageAssignment", default: 0] += ProcessInfo.processInfo.systemUptime - started
+        if let button = item?.button {
+            menuBarImage.assign(to: button, cat: state.selectedCat, display: state.catDisplay(reducedMotion: reduced), frame: frame)
+        }
         if let previous = lastImageFrame, frame != previous { frameChanges += 1 }
         lastImageFrame = frame
     }

@@ -161,8 +161,11 @@ def validate(record, scene=None):
             raise ValueError('减少动态效果状态错误')
         if state['panelShown'] and abs(state['width'] - 360) > 0.5:
             raise ValueError('面板宽度错误')
-        if record['work']['frameTimer'] <= 0 or (not record.get('experiment', {}).get('omitImageAssignment') and record['work']['renderDraw'] <= 0):
-            raise ValueError('没有实际生产定时器或延迟绘制')
+        prepared = state.get('preparedImage') is True and type(state.get('cacheCount')) is int and 0 < state['cacheCount'] <= 32
+        if prepared and (not finite_number(record['work'].get('imagePreparation')) or not finite_number(record['work'].get('renderDraw'))):
+            raise ValueError('实际位图准备或绘制计数缺测')
+        if record['work']['frameTimer'] <= 0 or (not record.get('experiment', {}).get('omitImageAssignment') and record['work']['renderDraw'] <= 0 and not prepared):
+            raise ValueError('没有实际生产定时器、绘制或已准备位图')
         if record['work']['sampleTimer'] < int(record['requestedSeconds'] / 2) - 1:
             raise ValueError('生产采样没有按周期运行')
         if not scene.endswith('stopped') and scene != 'closed-reduced' and not record.get('experiment', {}).get('omitImageAssignment') and state['frameChanges'] <= 0:
@@ -370,6 +373,18 @@ def selftest():
             'work': {'frameTimer': 80, 'renderDraw': 80, 'sampleTimer': 15},
             'isolation': {key: False for key in ['applicationDelegate', 'networkBridge', 'quotaCLI', 'notifications', 'agent', 'realCollector', 'realConfiguration']}}
     validate(good, 'closed-stopped')
+    prepared = json.loads(json.dumps(good))
+    prepared['work'].update(renderDraw=0, imagePreparation=0)
+    prepared['stateChecks'].update(preparedImage=True, cacheCount=1)
+    validate(prepared, 'closed-stopped')
+    for field, value in [('preparedImage', False), ('cacheCount', 0), ('cacheCount', 33)]:
+        invalid = json.loads(json.dumps(prepared)); invalid['stateChecks'][field] = value
+        try:
+            validate(invalid, 'closed-stopped')
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('缺少实际已准备位图的零工作记录没有失败')
     probe = json.loads(json.dumps(good)); probe['mode'] = 'probe'; probe['requestedSeconds'] = 5
     probe['experiment'] = {'notificationProbe': True, 'omitNotificationProcess': True}
     probe['main']['elapsed'] = 5; probe['main']['cpuPercent'] = 6; probe['mainEnd']['uptime'] = 10
