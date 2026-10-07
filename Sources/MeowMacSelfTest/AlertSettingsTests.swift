@@ -55,6 +55,62 @@ enum AlertSettingsTests {
         model.confirmation = .delete(saved.id); model.confirm()
         return model.custom.isEmpty && ConfigStore.load(from: model.configURL).config.alertRules.custom.isEmpty
     }
+    static func invalidOverrides(restoring: Bool) throws -> Bool {
+        let (root, state, model) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try Data(#"{"diskRemainingWarn":0.3,"runawayCPU":120,"sourceFailureCount":8,"keep":7,"alertRules":{"builtin":{"system.disk":{"threshold":99},"source.failure":{"threshold":2.5},"system.process":{"enabled":false},"future.rule":{"threshold":123}}}}"#.utf8).write(to: model.configURL)
+        state.configResult = ConfigStore.load(from: model.configURL)
+        guard state.configResult.error == nil, model.value(.disk).threshold == 10 else { return false }
+        model.setNotify("system.disk", false)
+        if restoring {
+            model.confirmation = .defaults; model.confirm()
+            guard model.confirmation == nil, model.error == nil, model.notify("system.disk"), model.value(.process).enabled == true,
+                  model.value(.process).threshold == 90 else { return false }
+        } else {
+            guard model.setField(.memory, field: .threshold, text: "75"), model.value(.memory).threshold == 75,
+                  model.value(.process).threshold == 120, model.value(.process).enabled == false, !model.notify("system.disk") else { return false }
+            model.beginNew(); model.draft?.name = "Swap 偏高"; model.draftNotify = false
+            guard model.saveDraft(), model.custom.count == 1 else { return false }
+        }
+        let loaded = ConfigStore.load(from: model.configURL)
+        let object = try JSONSerialization.jsonObject(with: Data(contentsOf: model.configURL)) as! [String: Any]
+        let builtin = (object["alertRules"] as! [String: Any])["builtin"] as! [String: Any]
+        let before = try Data(contentsOf: model.configURL)
+        var invalid = loaded.config.alertRules
+        invalid.builtin["system.disk"] = .init(threshold: 99)
+        do { try ConfigStore.saveAlertRules(invalid, changedBuiltin: [.disk], to: model.configURL); return false }
+        catch {}
+        guard try Data(contentsOf: model.configURL) == before else { return false }
+        return loaded.error == nil && loaded.config.alertRules.diagnostics.isEmpty
+            && model.value(.disk).threshold == 10 && model.value(.source).threshold == 2
+            && object["diskRemainingWarn"] == nil && object["sourceFailureCount"] == nil
+            && object["keep"] as? Int == 7 && builtin["future.rule"] != nil
+    }
+    static func failedValidationKeepsNotifications() throws -> Bool {
+        let (root, state, model) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try Data("{}".utf8).write(to: model.configURL)
+        model.setNotify("system.disk", false)
+        let notificationURL = NotificationStore(rootURL: root).fileURL
+        let before = try Data(contentsOf: notificationURL)
+        var config = state.configResult.config
+        config.alertRules.custom = [.init(id: "bad", name: "无效身份", metric: "swap.used", threshold: 4)]
+        state.configResult = .init(config: config, error: nil)
+        var attempts = 0
+        let saveNotifications = state.onSetNotificationSettings
+        state.onSetNotificationSettings = { settings in attempts += 1; saveNotifications(settings) }
+        model.beginNew(); model.draft?.name = "新规则"
+        guard !model.saveDraft(), model.draft != nil, model.error != nil, attempts == 0 else { return false }
+        model.confirmation = .defaults; model.confirm()
+        guard model.confirmation == .defaults, model.error != nil, attempts == 0,
+              try Data(contentsOf: notificationURL) == before else { return false }
+        // 完整坏文件同样在通知写入前拒绝，且原文件保留。
+        let broken = Data("broken".utf8); try broken.write(to: model.configURL)
+        state.configResult = ConfigStore.load(from: model.configURL)
+        model.confirm()
+        let configAfter = try Data(contentsOf: model.configURL)
+        let notificationsAfter = try Data(contentsOf: notificationURL)
+        return attempts == 0 && model.confirmation == .defaults && !model.notify("system.disk")
+            && configAfter == broken && notificationsAfter == before
+    }
     static func notificationOrder() throws -> Bool {
         let (root, state, model) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         var notices: [SystemNotice] = []

@@ -130,6 +130,9 @@ enum SelfTestMain {
         ]
         tests.append(("UI.Settings.AlertRules/关闭通知的新规则不会抢先通知", { (try? AlertSettingsTests.notificationOrder()) ?? false }))
         tests.append(("UI.Settings.AlertRules/全部开关、字段和表单写盘", { (try? AlertSettingsTests.controls()) ?? false }))
+        tests.append(("UI.Settings.AlertRules/越界覆盖下保存保留生效值与未知字段", { (try? AlertSettingsTests.invalidOverrides(restoring: false)) ?? false }))
+        tests.append(("UI.Settings.AlertRules/越界覆盖下恢复默认去除坏字段", { (try? AlertSettingsTests.invalidOverrides(restoring: true)) ?? false }))
+        tests.append(("UI.Settings.AlertRules/校验失败不写通知或配置", { (try? AlertSettingsTests.failedValidationKeepsNotifications()) ?? false }))
         tests.append(("UI.Settings.AlertRules/真实数字框、启用和新建入口", { (try? AlertSettingsTests.nativeFields()) ?? false }))
         tests.append(("UI.Settings.AlertRules/上限和坏文件保留", { (try? AlertSettingsTests.limitsAndBroken()) ?? false }))
         tests.append(("UI.Settings.AlertRules/合成真实窗口预览", { await AlertSettingsTests.previews() }))

@@ -85,6 +85,7 @@ public final class AlertRuleSettingsModel: ObservableObject {
             var rules = config.alertRules
             if let index = rules.custom.firstIndex(where: { $0.id == valid.id }) { rules.custom[index] = valid }
             else { guard canAdd else { throw AlertRuleError.invalid("最多 32 条自定义规则") }; rules.custom.append(valid) }
+            _ = try ConfigStore.prepareAlertRules(rules, to: configURL)
             // 先保存通知开关，再让规则参与评估，避免新建“不开通知”的规则先发出一条通知。
             var notifications = state.notificationSettings; notifications.rules[valid.id] = draftNotify
             state.onSetNotificationSettings(notifications)
@@ -102,6 +103,8 @@ public final class AlertRuleSettingsModel: ObservableObject {
             var rules = config.alertRules; rules.custom.removeAll { $0.id == id }
             if save(rules) { self.confirmation = nil; expandedID = nil }
         case .defaults:
+            do { _ = try ConfigStore.prepareAlertRules(config.alertRules, restoringDefaults: true, to: configURL) }
+            catch { fail(error); return }
             var notifications = state.notificationSettings
             for (id, value) in NotificationSettings.defaultRules { notifications.rules[id] = value }
             state.onSetNotificationSettings(notifications)

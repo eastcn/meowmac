@@ -112,13 +112,33 @@ public enum ConfigStore {
         try updateObject(at: url) { $0[key] = value }
     }
 
+    /// 只修正原文件中未编辑的坏覆盖；新提交的越界字段仍按严格校验拒绝。
+    public static func prepareAlertRules(_ rules: AlertRuleSet, changedBuiltin: Set<BuiltinAlertRule> = [],
+                                        restoringDefaults: Bool = false, to url: URL = defaultURL) throws -> AlertRuleSet {
+        let loaded = load(from: url)
+        guard loaded.error == nil else { throw AlertRuleError.invalid("配置文件无效，未覆盖原文件") }
+        var next = rules
+        if restoringDefaults {
+            for rule in BuiltinAlertRule.allCases { next.builtin.removeValue(forKey: rule.id) }
+        } else {
+            for (id, value) in rules.builtin {
+                guard let rule = BuiltinAlertRule(rawValue: id), !changedBuiltin.contains(rule),
+                      loaded.config.alertRules.builtin[id] == value else { continue }
+                do { _ = try AlertRuleSet(builtin: [id: value]).validated() }
+                catch { next.builtin[id] = loaded.config.alertRules.effective(rule, config: loaded.config) }
+            }
+        }
+        return try next.validated()
+    }
+
     public static func saveAlertRules(_ rules: AlertRuleSet, changedBuiltin: Set<BuiltinAlertRule> = [],
                                       restoringDefaults: Bool = false, to url: URL = defaultURL) throws {
-        let valid = try rules.validated()
+        let valid = try prepareAlertRules(rules, changedBuiltin: changedBuiltin, restoringDefaults: restoringDefaults, to: url)
         try updateObject(at: url) { object in
             var root = object["alertRules"] as? [String: Any] ?? [:]
             var builtin = root["builtin"] as? [String: Any] ?? [:]
-            let targets = restoringDefaults ? Set(BuiltinAlertRule.allCases) : changedBuiltin
+            let repaired = Set(BuiltinAlertRule.allCases.filter { valid.builtin[$0.id] != rules.builtin[$0.id] })
+            let targets = restoringDefaults ? Set(BuiltinAlertRule.allCases) : changedBuiltin.union(repaired)
             for rule in targets {
                 for key in rule.legacyKeys { object.removeValue(forKey: key) }
                 if restoringDefaults { builtin.removeValue(forKey: rule.id); continue }
