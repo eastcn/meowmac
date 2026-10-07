@@ -31,11 +31,13 @@ public extension PanelState {
 }
 
 public enum CatRenderer {
-    public static func image(cat: LoadedCat?, display: CatDisplay, frame: Int, size: CGSize = CGSize(width: 50, height: 18)) -> NSImage {
-        guard let cat else { return image(frame: frame, level: display.level, load: display.load, reducedMotion: display.reducedMotion, size: size) }
+    public static func image(cat: LoadedCat?, display: CatDisplay, frame: Int, size: CGSize = CGSize(width: 50, height: 18), observeDraw: ((TimeInterval) -> Void)? = nil) -> NSImage {
+        guard let cat else { return image(frame: frame, level: display.level, load: display.load, reducedMotion: display.reducedMotion, size: size, observeDraw: observeDraw) }
         let package = cat.package
         let level = display.level
         let image = NSImage(size: size, flipped: false) { _ in
+            let started = observeDraw == nil ? nil : ProcessInfo.processInfo.systemUptime
+            defer { if let started { observeDraw?(ProcessInfo.processInfo.systemUptime - started) } }
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
             context.saveGState()
             defer { context.restoreGState() }
@@ -128,10 +130,12 @@ public enum CatRenderer {
         }
         return path
     }
-    public static func image(frame: Int, level: HealthLevel, load: Double = 0, reducedMotion: Bool = false, size: CGSize = CGSize(width: 28, height: 18)) -> NSImage {
+    public static func image(frame: Int, level: HealthLevel, load: Double = 0, reducedMotion: Bool = false, size: CGSize = CGSize(width: 28, height: 18), observeDraw: ((TimeInterval) -> Void)? = nil) -> NSImage {
         let color: NSColor = level == .normal ? .black : level == .warn ? .systemOrange : .systemRed
         let index = reducedMotion ? 0 : (frame % 5 + 5) % 5
         let image = NSImage(size: size, flipped: false) { _ in
+            let started = observeDraw == nil ? nil : ProcessInfo.processInfo.systemUptime
+            defer { if let started { observeDraw?(ProcessInfo.processInfo.systemUptime - started) } }
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
             context.translateBy(x: 0, y: size.height)
             context.scaleBy(x: size.width / 44, y: -size.height / 28)

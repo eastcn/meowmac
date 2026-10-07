@@ -33,12 +33,11 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private var energyTracker = EnergyTracker()
     private var snapshot: SystemSnapshot?
     private var hasSystemBaseline = false
-    private var frame = 0
-    private var frameInterval = 0.5
-    private var sampleTimer: Timer?
     private var energyLoop: EnergyLoopControl?
-    private var frameTimer: Timer?
-    private var screenSleeping = false
+    private lazy var cadence = ApplicationCadence(
+        display: { [weak self] in self?.panelState.catDisplay() ?? PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil)).catDisplay() },
+        updateImage: { [weak self] _ in self?.updateCatImage() },
+        sample: { [weak self] in self?.sample() })
     private var observers: [NSObjectProtocol] = []
     private let configResult = ConfigStore.load()
     private let loginItem = MainAppLoginItemController()
@@ -137,9 +136,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
                 self.panelState.loginEnabled = self.loginItem.status == .enabled
             } catch { self.logger.error("开机启动设置失败：\(error.localizedDescription, privacy: .private)") }
         }
-        sampleTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.sample() }
-        }
+        cadence.startSampling()
         observers.append(NotificationCenter.default.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification,
                                                                object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in self?.sample(thermalChanged: true) }
@@ -151,12 +148,12 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         scheduleFrame()
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.screenSleeping = true }
+            Task { @MainActor [weak self] in self?.cadence.screenSleeping = true }
         })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.screenSleeping = false
+                self?.cadence.screenSleeping = false
                 self?.panelState.refreshReminders()
             }
         })
@@ -173,28 +170,15 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private func sample(thermalChanged: Bool = false) {
         let latest = collector.sample()
         snapshot = latest
-        panelState.snapshot = latest
-        if hasSystemBaseline {
-            for (source, failed) in [("CPU", latest.cpuUsage == nil),
-                                     ("内存压力", latest.memoryPressure == .unavailable),
-                                     ("磁盘", latest.diskAvailableBytes == nil),
-                                     ("电池", latest.battery.temperatureCelsius == nil)] {
-                panelState.failures[source] = failed ? (panelState.failures[source] ?? 0) + 1 : 0
-                if panelState.failures[source] == configResult.config.sourceFailureCount {
-                    logger.error("系统数据源连续采集失败：\(source, privacy: .public)")
-                }
-            }
-        }
+        SystemUpdatePath.apply(latest, state: panelState, hasBaseline: hasSystemBaseline,
+            thermalChanged: thermalChanged, sourceFailureCount: configResult.config.sourceFailureCount,
+            sourceFailed: { [self] source in logger.error("系统数据源连续采集失败：\(source, privacy: .public)") },
+            recordNetwork: { [self] latest in
+                networkRecorder?.record(received: latest.networkReceivedBytesPerSecond,
+                    sent: latest.networkSentBytesPerSecond, at: latest.timestamp)
+            })
         hasSystemBaseline = true
-        panelState.chartHistory.append(latest, force: thermalChanged)
-        networkRecorder?.record(received: latest.networkReceivedBytesPerSecond, sent: latest.networkSentBytesPerSecond, at: latest.timestamp)
-        panelState.lastRefreshedAt = latest.timestamp
-        if latest.thermal == .fair {
-            if panelState.fairSince == nil { panelState.fairSince = latest.timestamp }
-        } else { panelState.fairSince = nil }
-        let fanHighSince = FanHighTracker.next(since: panelState.fanHighSince, readings: latest.sensors, at: latest.timestamp, config: panelState.configResult.config.alertRules.detectorConfig(panelState.configResult.config))
-        if fanHighSince != panelState.fanHighSince { panelState.fanHighSince = fanHighSince }
-        frameInterval = panelState.catDisplay().frameInterval
+        cadence.frameInterval = panelState.catDisplay().frameInterval
     }
 
     /// 立即采样一次，窗口只有 1 秒，只刷新排行，不计入持续时长。
@@ -378,13 +362,13 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     }
 
     private func updateCatImage() {
-        statusItem?.button?.image = CatRenderer.image(cat: panelState.selectedCat, display: panelState.catDisplay(), frame: frame)
+        statusItem?.button?.image = CatRenderer.image(cat: panelState.selectedCat, display: panelState.catDisplay(), frame: cadence.frame)
     }
 
     private func selectCat(_ id: String) {
         do {
             try catStore.select(id, state: panelState)
-            frame = 0
+            cadence.frame = 0
             updateCatImage()
             scheduleFrame()
         } catch {
@@ -403,7 +387,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         guard panel.runModal() == .OK, let source = panel.url else { return }
         do {
             try catStore.importCat(from: source, state: panelState)
-            frame = 0
+            cadence.frame = 0
             updateCatImage()
             scheduleFrame()
         } catch {
@@ -412,27 +396,15 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func scheduleFrame() {
-        frameTimer?.invalidate()
-        frameTimer = Timer.scheduledTimer(withTimeInterval: frameInterval, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                let display = self.panelState.catDisplay()
-                self.frame = display.nextFrame(self.frame, sleeping: self.screenSleeping)
-                self.updateCatImage()
-                self.scheduleFrame()
-            }
-        }
-    }
+    private func scheduleFrame() { cadence.scheduleFrame() }
 
     public func applicationWillTerminate(_ notification: Notification) {
         settingsWindow?.removeShortcutMonitor()
-        sampleTimer?.invalidate()
+        cadence.stop()
         energyLoop?.cancel()
         networkBridge?.stop()
         quotaCoordinator?.stop()
         resetCoordinator?.stop()
-        frameTimer?.invalidate()
         observers.forEach {
             NSWorkspace.shared.notificationCenter.removeObserver($0)
             NotificationCenter.default.removeObserver($0)

@@ -10,6 +10,13 @@ import AppKit
 enum SelfTestMain {
     @MainActor static func main() {
         if let status = AIAgentTerminalLauncher.handleCommandLine(Array(CommandLine.arguments.dropFirst())) { exit(status) }
+        if CommandLine.arguments.count > 1, CommandLine.arguments[1] == "--profile" {
+            let arguments = Array(CommandLine.arguments.dropFirst(2))
+            NSApplication.shared.setActivationPolicy(arguments.first == "live" ? .prohibited : .accessory)
+            Task { @MainActor in exit(await SelfPerformanceRunner.run(arguments)) }
+            NSApplication.shared.run()
+            return
+        }
         // 原生控件会泵送 RunLoop；由 AppKit 托管主循环，避免 async-main 提前结束。
         NSApplication.shared.setActivationPolicy(TestPresentationPolicy.allowsForeground(environment: ProcessInfo.processInfo.environment) ? .accessory : .prohibited)
         Task { @MainActor in await runTests() }
@@ -18,6 +25,10 @@ enum SelfTestMain {
     @MainActor static func runTests() async {
         var tests: [(String, @MainActor () async -> Bool)] = [
             ("Core.TestRunner/前台验收必须显式开启", { TestPresentationPolicy.regression() }),
+            ("UI.Performance/生产定时器生命周期", { await ApplicationCadenceTests.lifecycle() }),
+            ("UI.Performance/系统更新与失败语义", { ApplicationCadenceTests.systemUpdate() }),
+            ("Core.Performance/固定比较门槛与负控", { SelfPerformanceMetricsTests.comparator() }),
+            ("Core.Performance/差分与缺测拒绝", { SelfPerformanceMetricsTests.readings() }),
             ("Core.Smoke/版本号", { AppIdentity.version == "0.1.0" }),
             ("Core.Config/文件不存在", { SelfTestMain.missingConfig() }),
             ("Core.Config/部分字段", { SelfTestMain.partialConfig() }),
