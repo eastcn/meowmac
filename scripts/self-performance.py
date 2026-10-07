@@ -54,7 +54,77 @@ def capture(args):
          'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()})
     print('release 测量产物和资源已留存：' + str(directory / source.name))
 
+def finite_number(value, positive=False):
+    return (not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+            and (value > 0 if positive else value >= 0))
+
+def nonempty_string(value):
+    return isinstance(value, str) and bool(value.strip())
+
+def valid_hash(value):
+    return isinstance(value, str) and re.fullmatch(r'[0-9a-fA-F]{64}', value) is not None
+
+def validate_metadata(record, scene):
+    mode = record['mode']
+    if mode not in ['matrix', 'probe', 'live']:
+        raise ValueError('测量模式无效')
+    if record['configuration'] != ('installed' if mode == 'live' else 'release'):
+        raise ValueError('编译配置与模式不一致')
+    if not nonempty_string(record['version']) or not valid_hash(record['binarySHA256']):
+        raise ValueError('版本或二进制哈希缺测／无效')
+    if not finite_number(record['requestedSeconds'], positive=True) or record['requestedSeconds'] > 600:
+        raise ValueError('请求窗口无效')
+    conditions = record['conditions']
+    if not isinstance(conditions, dict) or not conditions:
+        raise ValueError('条件元数据缺测')
+    experiment = record.get('experiment', {})
+    if not isinstance(experiment, dict) or any(key not in ['omitImageAssignment', 'omitSystemUpdate', 'notificationProbe', 'omitNotificationProcess'] or type(value) is not bool for key, value in experiment.items()):
+        raise ValueError('诊断条件无效')
+    if (mode != 'probe' and any(experiment.values())) or (experiment.get('omitNotificationProcess') and not experiment.get('notificationProbe')):
+        raise ValueError('诊断条件与模式不一致')
+    if mode == 'live':
+        if scene not in [None, 'live'] or conditions['scene'] != 'live':
+            raise ValueError('真实常驻场景不一致')
+        if conditions['installedBinarySHA256'] != record['binarySHA256']:
+            raise ValueError('安装版与测量二进制哈希不一致')
+        if conditions['workCounters'] != 'unavailable' or conditions['sampling'] != 'existing-production':
+            raise ValueError('真实常驻计数／采样口径不一致')
+        displays = conditions['display']
+        if not isinstance(displays, list) or not displays:
+            raise ValueError('真实显示条件缺测')
+        for display in displays:
+            if not isinstance(display, dict) or any(not finite_number(display[key], positive=True) for key in ['width', 'height', 'scale']):
+                raise ValueError('显示尺寸或尺度无效')
+        if (type(conditions['reducedMotion']) is not bool or type(record['reducedMotion']) is not bool or conditions['reducedMotion'] != record['reducedMotion']
+                or displays != record['display'] or record['work'] is not None or record['stateChecks'] is not None):
+            raise ValueError('真实条件与实际读回不一致')
+        if record.get('resourceSHA256') is not None and not valid_hash(record['resourceSHA256']):
+            raise ValueError('资源哈希无效')
+        return None  # 历史安装版未注入工作／面板计数，不能伪造这些字段。
+    scene = scene if scene is not None else conditions['scene']
+    allowed = SCENES if mode == 'matrix' else SCENES + ['closed-reduced', 'open-high']
+    if scene not in allowed or conditions['scene'] != scene:
+        raise ValueError('夹具场景与模式不一致')
+    if not valid_hash(record['resourceSHA256']) or not nonempty_string(conditions['cat']):
+        raise ValueError('资源哈希或猫条件缺测／无效')
+    if (conditions['fixture'] != 'self-performance-v1' or not finite_number(conditions['load'])
+            or conditions['load'] != (.9 if scene == 'open-high' else .24)
+            or not finite_number(conditions['warmup']) or conditions['warmup'] > 60):
+        raise ValueError('固定夹具条件无效')
+    if mode == 'matrix' and (conditions['warmup'] != 10 or record['requestedSeconds'] != 30):
+        raise ValueError('正式矩阵窗口不一致')
+    state = record['stateChecks']
+    if (not isinstance(state, dict) or any(type(state[key]) is not bool for key in ['panelShown', 'stopped', 'reducedMotion'])
+            or not finite_number(state['scale'], positive=True) or not finite_number(state['width'])):
+        raise ValueError('实际状态或尺度缺测／无效')
+    if 'frameInterval' in state and not finite_number(state['frameInterval'], positive=True):
+        raise ValueError('实际帧间隔无效')
+    if 'speedLines' in state and (type(state['speedLines']) is not bool or state['speedLines'] != (scene == 'open-high')):
+        raise ValueError('实际速度线与夹具不一致')
+    return scene
+
 def validate(record, scene=None):
+    scene = validate_metadata(record, scene)
     main = record['main']
     for name in ['elapsed', 'cpuSeconds', 'cpuPercent', 'ri_pkg_idle_wkups', 'ri_interrupt_wkups', 'residentBytes', 'footprintBytes']:
         if isinstance(main[name], bool) or not isinstance(main[name], (int, float)) or not math.isfinite(main[name]) or main[name] < 0:
@@ -292,10 +362,23 @@ def selftest():
                           'packageIdleWakeups': 2, 'interruptWakeups': 3},
             'mainEnd': {'pid': 42, 'identity': 10, 'uptime': 35, 'userNS': 300_000_100, 'systemNS': 100,
                         'packageIdleWakeups': 5, 'interruptWakeups': 7}, 'requestedSeconds': 30,
-            'stateChecks': {'panelShown': False, 'stopped': True, 'frameChanges': 0, 'reducedMotion': False},
+            'mode': 'matrix', 'configuration': 'release', 'version': '0.1.0',
+            'binarySHA256': 'a' * 64, 'resourceSHA256': 'b' * 64,
+            'conditions': {'scene': 'closed-stopped', 'cat': 'builtin.fixture', 'load': .24,
+                           'fixture': 'self-performance-v1', 'warmup': 10},
+            'stateChecks': {'panelShown': False, 'stopped': True, 'frameChanges': 0, 'reducedMotion': False, 'width': 0, 'scale': 2},
             'work': {'frameTimer': 80, 'renderDraw': 80, 'sampleTimer': 15},
             'isolation': {key: False for key in ['applicationDelegate', 'networkBridge', 'quotaCLI', 'notifications', 'agent', 'realCollector', 'realConfiguration']}}
     validate(good, 'closed-stopped')
+    probe = json.loads(json.dumps(good)); probe['mode'] = 'probe'; probe['requestedSeconds'] = 5
+    probe['experiment'] = {'notificationProbe': True, 'omitNotificationProcess': True}
+    probe['main']['elapsed'] = 5; probe['main']['cpuPercent'] = 6; probe['mainEnd']['uptime'] = 10
+    validate(probe, 'closed-stopped')
+    live = json.loads(json.dumps(good)); live.update(mode='live', configuration='installed', resourceSHA256=None,
+        work=None, stateChecks=None, reducedMotion=False, display=[{'width': 1440, 'height': 900, 'scale': 2}])
+    live['conditions'] = {'scene': 'live', 'installedBinarySHA256': live['binarySHA256'],
+        'workCounters': 'unavailable', 'sampling': 'existing-production', 'display': live['display'], 'reducedMotion': False}
+    validate(live)
     bad = [{}, {'main': {'elapsed': None}}]
     for key, field, value in [('main', 'cpuSeconds', None), ('mainEnd', 'identity', 11),
                              ('mainEnd', 'userNS', 99), ('stateChecks', 'panelShown', True),
@@ -303,14 +386,28 @@ def selftest():
                              ('main', 'ri_pkg_idle_wkups', 5), ('mainStart', 'userNS', float('nan')),
                              ('mainStart', 'pid', True), ('mainEnd', 'systemNS', -1)]:
         row = json.loads(json.dumps(good)); row[key][field] = value; bad.append(row)
+    for key, value in [('conditions', {}), ('conditions', None), ('configuration', None), ('version', ''),
+                       ('version', None), ('binarySHA256', None), ('binarySHA256', 'z' * 64),
+                       ('resourceSHA256', None), ('resourceSHA256', 'a' * 63), ('requestedSeconds', True)]:
+        row = json.loads(json.dumps(good)); row[key] = value; bad.append(row)
+    for key, field, value in [('stateChecks', 'scale', 0), ('stateChecks', 'scale', None),
+                             ('conditions', 'scene', 'open-stopped'), ('conditions', 'cat', ''),
+                             ('conditions', 'fixture', ''), ('conditions', 'load', .9),
+                             ('conditions', 'warmup', 0), ('stateChecks', 'stopped', 1)]:
+        row = json.loads(json.dumps(good)); row[key][field] = value; bad.append(row)
+    for key, value in [('conditions', {}), ('configuration', 'release'), ('binarySHA256', None), ('version', None)]:
+        row = json.loads(json.dumps(live)); row[key] = value; bad.append(row)
+    for field, value in [('installedBinarySHA256', 'c' * 64), ('display', []), ('sampling', ''), ('reducedMotion', True)]:
+        row = json.loads(json.dumps(live)); row['conditions'][field] = value; bad.append(row)
+    row = json.loads(json.dumps(live)); row['conditions']['display'][0]['scale'] = 0; bad.append(row)
     for record in bad:
         try:
-            validate(record, 'closed-stopped')
+            validate(record, None if record.get('mode') == 'live' else 'closed-stopped')
         except (ValueError, KeyError, TypeError):
             pass
         else:
             raise AssertionError('缺测或违反条件没有失败')
-    print('性能比较器：5组门槛、12组缺测与坏数据负控通过。')
+    print(f'性能比较器：5组门槛、{len(bad)}组缺测与坏数据负控通过；matrix/live/probe合法条件通过。')
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
