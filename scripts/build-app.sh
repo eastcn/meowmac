@@ -7,6 +7,8 @@ version="$(sed -n 's/^[[:space:]]*public static let version = "\([0-9A-Za-z.-]*\
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf '版本号无效\n' >&2; exit 1; }
 
 cd "$repo_dir"
+source "$repo_dir/scripts/sign-identity.sh"
+sign_identity="$(resolve_sign_identity)"
 swift build -c release
 binary="$(swift build -c release --show-bin-path)/MeowMac"
 [[ -x "$binary" ]] || { printf '未找到 MeowMac 可执行文件\n' >&2; exit 1; }
@@ -34,7 +36,7 @@ mkdir -p "$stage/Contents/MacOS" "$stage/Contents/Resources" "$iconset"
 cp "$binary" "$stage/Contents/MacOS/MeowMac"
 # 命令行入口在 AppKit 启动前分流；独立进程名让安装只等待主应用退出。
 cp "$binary" "$stage/Contents/MacOS/MeowMacAgentRunner"
-codesign --force --sign - "$stage/Contents/MacOS/MeowMacAgentRunner"
+codesign --force --sign "$sign_identity" "$stage/Contents/MacOS/MeowMacAgentRunner"
 resource_bundle="$(dirname "$binary")/MeowMac_MeowMacUI.bundle"
 [[ -d "$resource_bundle" ]] || { printf '未找到渠道图标资源包\n' >&2; exit 1; }
 cp -R "$resource_bundle" "$stage/Contents/Resources/"
@@ -60,7 +62,7 @@ EOF
 plutil -lint "$stage/Contents/Info.plist"
 "$binary" --export-icon "$iconset"
 iconutil -c icns -o "$stage/Contents/Resources/MeowMac.icns" "$iconset"
-codesign --force --sign - "$stage"
+codesign --force --sign "$sign_identity" "$stage"
 codesign --verify --deep --strict "$stage"
 if [[ -e "$app_path" ]]; then mv "$app_path" "$work_dir/previous.app"; had_previous=1; fi
 mv "$stage" "$app_path"

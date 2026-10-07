@@ -14,6 +14,22 @@ scripts/install.sh
 
 应用安装到 `~/Applications/MeowMac.app`。安装脚本遇到正在运行的 MeowMac 时会退出；请先自行退出旧实例。
 
+## 本地开发签名
+
+默认用 ad-hoc 签名，任何人克隆后都能构建。ad-hoc 签名的系统授权（文稿、通知等）绑定代码哈希，代码一变就失效，每次安装新版本都会重新弹窗。
+
+本地反复开发时，可以创建一张只存在于本机的自签名证书：
+
+```sh
+scripts/setup-local-signing.sh
+```
+
+脚本会往登录钥匙串导入证书，并把它设为当前用户的代码签名可信，过程中系统会弹出授权框。创建后，`scripts/build-app.sh` 会自动使用它，授权跨版本保留。首次换签名后需要重新点一次系统授权。
+
+- 证书名默认是 `MeowMac Local Development`，可用 `MEOWMAC_LOCAL_IDENTITY_NAME` 改。
+- 用 `MEOWMAC_SIGN_IDENTITY` 指定其他钥匙串身份，设为 `-` 则强制 ad-hoc。
+- 这张证书只用于本机开发，不对外分发，私钥不要提交到仓库。别人下载的构建不会被系统信任。
+
 ## 开发验证
 
 `scripts/test.sh` 和 `scripts/check.sh` 默认在后台运行。纯逻辑、存储、协调器和后台渲染照常验证；会显示窗口、弹出面板或唤起终端的用例输出 `SKIP`，不计为通过。过滤词、实机开关和预览目录都不会自动开启前台验收。

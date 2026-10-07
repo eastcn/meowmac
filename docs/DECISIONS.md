@@ -14,7 +14,7 @@
 - 以 MacTools 为宿主写插件：它的功能覆盖面广，但每项都做得比较浅；编译需要 Xcode；第三方插件只能由同一 Team ID 签名的宿主加载；插件 ABI 从 v2 变到 v7。
 - 合并 Mole 的代码：Mole 是 GPL-3.0，而且它在 M5 上读不到 CPU 温度和风扇转速。
 
-**D2　技术栈。** SwiftPM + Command Line Tools，不安装 Xcode。最低 macOS 14。ad-hoc 签名，安装到 `~/Applications/MeowMac.app`。2026-09-30 补充：Command Line Tools 升级到带 macOS 26 SDK 的版本，以便使用液态玻璃（D33）。升级由用户执行。
+**D2　技术栈。** SwiftPM + Command Line Tools，不安装 Xcode。最低 macOS 14。默认 ad-hoc 签名，安装到 `~/Applications/MeowMac.app`。2026-10-07 补充：ad-hoc 签名的系统授权（文稿等）绑定代码哈希，代码一变就重新弹窗；本地开发可用自签名证书（`scripts/setup-local-signing.sh`），构建脚本检测到就优先使用，没有则退回 ad-hoc。证书只在本机，不进入仓库，不对外分发；对外发布预编译包时再单独决定是否使用 Developer ID。2026-09-30 补充：Command Line Tools 升级到带 macOS 26 SDK 的版本，以便使用液态玻璃（D33）。升级由用户执行。
 
 **D3　仓库与标识。** 仓库在 `~/projects/eastcn/meowmac`，bundle id 为 `io.github.eastcn.meowmac`。先只建本地仓库，推送到 GitHub 的 `eastcn/meowmac` 需要用户单独授权。TunCanary 先移到 `~/projects/eastcn/tuncanary`，MeowMac 用 `.package(path: "../tuncanary")` 依赖它。
 

@@ -28,7 +28,7 @@ relay 目录固定为 `docs/plans/<YYYY-MM-DD>-<slug>/`。
 - 最低系统 macOS 14。
 - 不引入第三方依赖。唯一的外部包是本地的 TunCanary：`.package(path: "../tuncanary")`，即 `~/projects/eastcn/tuncanary`。
 - 测试用自带的测试运行器 `MeowMacSelfTest`，写法参照 TunCanary 的 `TunCanarySelfTest`。CLT 没有 XCTest。
-- 应用用 ad-hoc 签名，bundle id 为 `io.github.eastcn.meowmac`，安装到 `~/Applications/MeowMac.app`。
+- 应用默认用 ad-hoc 签名。本地开发可用 `scripts/setup-local-signing.sh` 创建的自签名证书，`scripts/build-app.sh` 检测到就优先使用，授权可跨重建保留。证书和私钥只在本机，不进入仓库，不对外分发。bundle id 为 `io.github.eastcn.meowmac`，安装到 `~/Applications/MeowMac.app`。
 
 分层（`import` 方向只能从上往下）：
 
