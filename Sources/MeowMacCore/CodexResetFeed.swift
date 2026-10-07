@@ -128,6 +128,16 @@ public struct CodexResetDisplay: Codable {
     public let cacheError: String?
     public static let sourceURL = URL(string: "https://aihot.news/codex-reset")!
 
+    public func details(for row: CodexResetRow?, timezone: TimeZone = .current) -> String {
+        let context = (row?.confirmation == nil ? "AIHOT 估算，非官方承诺。" : "")
+            + "公开消息不代表当前账号已到账。"
+        return ([context, row?.preview, row?.status, row?.scope,
+                 row?.announcement, row?.estimate, row?.confirmation, siteStatus, error, cacheError]
+            + [fetchedAt.map { "获取：" + ResetDate.text($0, timezone: timezone) },
+               verifiedAt.map { "站点核验：" + ResetDate.text($0, timezone: timezone) }])
+            .compactMap { $0 }.joined(separator: "\n")
+    }
+
     public init(feed: CodexResetFeed?, fetchedAt: Date?, error: String?, cacheError: String? = nil,
                 timezone: TimeZone = .current) {
         self.fetchedAt = fetchedAt; self.error = error; self.cacheError = cacheError

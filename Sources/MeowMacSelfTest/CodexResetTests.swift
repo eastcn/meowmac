@@ -35,6 +35,7 @@ enum CodexResetTests {
         ("Core.Reset/字段版本时间与未知状态", { parsing() }),
         ("Core.Reset/预告估算与确认日期排序", { presentation() }),
         ("Core.Reset/最近确认时间不使用过期估算", { confirmedPreview() }),
+        ("Core.Reset/确认与预告悬停语义", { detailSemantics() }),
         ("Quota.Reset/200 ETag 304 与重启限频", { await conditional() }),
         ("Quota.Reset/旧缓存切换6小时并保留ETag", { await longerInterval() }),
         ("Quota.Reset/空缓存 304 坏响应与撤回", { await replacement() }),
@@ -125,6 +126,19 @@ enum CodexResetTests {
                       display.latest?.confirmation != nil, display.latest?.estimate == nil else { return false }
             }
             return true
+        } catch { return false }
+    }
+    static func detailSemantics() -> Bool {
+        do {
+            let feed = try CodexResetFeed.parse(data([event(), event(id: "example-confirmed", status: "confirmed", confirmed: "2026-10-07T03:35:00Z")]))
+            let zone = TimeZone(secondsFromGMT: 28800)!
+            let display = CodexResetDisplay(feed: feed, fetchedAt: clock, error: nil, timezone: zone)
+            let confirmed = display.details(for: display.latest, timezone: zone)
+            let pending = display.details(for: display.pending.first, timezone: zone)
+            return !confirmed.contains("估算") && !confirmed.contains("非官方承诺")
+                && confirmed.contains("公开消息不代表当前账号已到账")
+                && confirmed.contains("确认消息：10/7 11:35") && confirmed.contains("已确认")
+                && pending.contains("AIHOT 估算，非官方承诺") && pending.contains("尚未确认")
         } catch { return false }
     }
     static func session() -> URLSession {

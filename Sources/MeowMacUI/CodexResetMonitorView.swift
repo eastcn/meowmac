@@ -46,17 +46,10 @@ struct CodexResetMonitorView: View {
             }
             .foregroundStyle(display.error == nil && display.cacheError == nil ? Design.label : Design.stateText(.warn))
             .frame(maxWidth: .infinity, alignment: .leading)
-            .help(details(row))
+            .help(display.details(for: row))
             Button { NSWorkspace.shared.open(CodexResetDisplay.sourceURL) } label: {
                 Text("查看来源 ↗").font(Design.caption).foregroundStyle(Design.blue)
             }.buttonStyle(.plain).fixedSize()
         }
-    }
-    private func details(_ row: CodexResetRow?) -> String {
-        (["AIHOT 估算，非官方承诺。公开消息不代表当前账号已到账。", row?.preview, row?.status, row?.scope,
-          row?.announcement, row?.estimate, row?.confirmation, display.siteStatus, display.error, display.cacheError]
-            + [display.fetchedAt.map { "获取：" + DisplayDate.format($0, pattern: "M/d HH:mm") },
-               display.verifiedAt.map { "站点核验：" + DisplayDate.format($0, pattern: "M/d HH:mm") }])
-            .compactMap { $0 }.joined(separator: "\n")
     }
 }
