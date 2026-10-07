@@ -172,7 +172,10 @@ public struct CodexResetDisplay: Codable {
                 announcement: event.schedule.map { "公告时间：" + range($0) + (event.presentation?.timeInferred == true ? "（时间为推断）" : "") },
                 estimate: event.isConfirmed ? nil : event.estimate.map { "AIHOT 估算：" + range($0) + "（非官方承诺）" },
                 confirmation: event.isConfirmed ? confirmation ?? "确认时间未说明" : nil,
-                previewTime: event.estimate.map { "估算 " + previewRange($0) } ?? "时间待估算")
+                previewTime: event.isConfirmed
+                    ? event.confirmedAt.map { ResetDate.text($0, timezone: timezone) }
+                        ?? event.occurredOn.map { $0 + "（北京时间）" } ?? "确认时间未说明"
+                    : event.estimate.map { "估算 " + previewRange($0) } ?? "时间待估算")
         }
         pending = (feed?.events ?? []).filter { !$0.isConfirmed }.sorted { $0.updatedAt > $1.updatedAt }.map(row)
         latest = (feed?.events ?? []).filter(\.isConfirmed).sorted {

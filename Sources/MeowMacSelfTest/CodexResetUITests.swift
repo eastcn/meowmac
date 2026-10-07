@@ -8,6 +8,7 @@ import MeowMacUI
 enum CodexResetUITests {
     static var tests: [(String, @MainActor () async -> Bool)] { [
         ("UI.Reset/独立快照与四渠道归属", { snapshots() }),
+        ("UI.Reset/后台渲染最近确认与紧凑行", { confirmedRendering() }),
         ("UI.Reset/独立提醒暂缓重启到期与恢复", { reminders() }),
         ("UI.Reset/真实360pt弹出容器与浅深色分节", { await containers() }),
         ("UI.Reset/启停休眠唤醒和手动刷新限频", { await lifecycle() }),
@@ -95,10 +96,12 @@ enum CodexResetUITests {
                           hosting.measurements.contentHeight > hosting.measurements.viewportHeight else { return false }
                     guard let image = PanelPreviewRenderer.resetMonitorPNG(state: state, dark: dark),
                           let bitmap = NSBitmapImageRep(data: image) else { return false }
-                    // 设计约定：单条预告最多两行，分节本体不超过 40pt；预览另有上下各 16pt。
-                    let rowHeight = CGFloat(bitmap.pixelsHigh) / 2 - 32
-                    guard rowHeight <= 40 else {
-                        print("重置预告占用 \(rowHeight)pt，超过紧凑设计的 40pt")
+                    // 每条消息仍最多两行、40pt；获取时间和新增加的确认行单独计入。
+                    let rowCount = max(1, state.codexResetState.display.pending.count) + (state.codexResetState.display.latest == nil ? 0 : 1)
+                    let maximum = CGFloat(rowCount * 40 + (rowCount - 1) * 6 + 18)
+                    let sectionHeight = CGFloat(bitmap.pixelsHigh) / 2 - 32
+                    guard sectionHeight <= maximum else {
+                        print("重置消息占用 \(sectionHeight)pt，超过 \(maximum)pt")
                         return false
                     }
                     try image.write(to: output.appendingPathComponent(name + (dark ? "-dark.png" : "-light.png")))
@@ -107,6 +110,35 @@ enum CodexResetUITests {
             print("重置监控：真实 NSPopover 宽 360pt，最大高 820pt；20 张紧凑预告补充预览已生成")
             return true
         } catch { print("重置容器测试：\(error)"); return false }
+    }
+    static func confirmedRendering() -> Bool {
+        do {
+            let state = PanelPreviewRenderer.syntheticState()
+            let output = URL(fileURLWithPath: "build/acceptance/reset-and-background-validation/previews")
+            try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+            for dark in [false, true] {
+                state.codexResetState = CodexResetState(feed: try CodexResetFeed.parse(CodexResetTests.data([])), fetchedAt: CodexResetTests.clock)
+                guard let empty = PanelPreviewRenderer.resetMonitorPNG(state: state, dark: dark),
+                      let emptyImage = NSBitmapImageRep(data: empty) else { return false }
+                var long = CodexResetTests.event(id: "example-long", status: "confirmed", day: "2026-10-07")
+                long["displayLabel"] = String(repeating: "合成类型", count: 200)
+                let cases: [(String, [[String: Any]], String?)] = [
+                    ("confirmed", [CodexResetTests.event(status: "confirmed", confirmed: "2026-10-07T03:35:00Z")], nil),
+                    ("both", [CodexResetTests.event(), long], nil),
+                    ("cached-long-date", [long], "合成采集失败"),
+                    ("missing-time", [CodexResetTests.event(status: "confirmed")], nil)
+                ]
+                for (name, events, error) in cases {
+                    state.codexResetState = CodexResetState(feed: try CodexResetFeed.parse(CodexResetTests.data(events)), fetchedAt: CodexResetTests.clock, error: error)
+                    guard let png = PanelPreviewRenderer.resetMonitorPNG(state: state, dark: dark),
+                          let image = NSBitmapImageRep(data: png), image.pixelsWide == 720,
+                          image.pixelsHigh > emptyImage.pixelsHigh,
+                          CGFloat(image.pixelsHigh) / 2 - 32 <= 104 else { return false }
+                    try png.write(to: output.appendingPathComponent(name + (dark ? "-dark.png" : "-light.png")))
+                }
+            }
+            return true
+        } catch { print("重置消息后台渲染失败：\(error)"); return false }
     }
     static func lifecycle() async -> Bool {
         do {

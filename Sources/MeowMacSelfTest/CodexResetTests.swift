@@ -34,6 +34,7 @@ enum CodexResetTests {
     static var tests: [(String, @MainActor () async -> Bool)] { [
         ("Core.Reset/字段版本时间与未知状态", { parsing() }),
         ("Core.Reset/预告估算与确认日期排序", { presentation() }),
+        ("Core.Reset/最近确认时间不使用过期估算", { confirmedPreview() }),
         ("Quota.Reset/200 ETag 304 与重启限频", { await conditional() }),
         ("Quota.Reset/旧缓存切换6小时并保留ETag", { await longerInterval() }),
         ("Quota.Reset/空缓存 304 坏响应与撤回", { await replacement() }),
@@ -110,6 +111,21 @@ enum CodexResetTests {
         let parent = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/acceptance/codex-reset-monitor/tests")
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         return parent.appendingPathComponent(name + "-" + UUID().uuidString)
+    }
+    static func confirmedPreview() -> Bool {
+        do {
+            let zone = TimeZone(secondsFromGMT: 28800)!
+            for (event, expected) in [
+                (event(status: "confirmed", confirmed: "2026-10-07T03:35:00Z"), "10/7 11:35"),
+                (event(status: "confirmed", day: "2026-10-07"), "2026-10-07（北京时间）"),
+                (event(status: "confirmed"), "确认时间未说明")
+            ] {
+                let display = CodexResetDisplay(feed: try CodexResetFeed.parse(data([event])), fetchedAt: clock, error: nil, timezone: zone)
+                guard display.pending.isEmpty, display.latest?.previewTime == expected,
+                      display.latest?.confirmation != nil, display.latest?.estimate == nil else { return false }
+            }
+            return true
+        } catch { return false }
     }
     static func session() -> URLSession {
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [ResetTestProtocol.self]

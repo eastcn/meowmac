@@ -13,21 +13,28 @@ struct CodexResetMonitorView: View {
                     previewRow(row)
                 }
             }
+            if let latest = display.latest {
+                previewRow(latest, title: "最近确认：")
+            }
+            if let fetchedAt = display.fetchedAt {
+                Text("获取于 " + DisplayDate.format(fetchedAt, pattern: "M/d HH:mm") + " · 每 6 小时更新")
+                    .font(Design.tiny).foregroundStyle(.secondary)
+            }
         }.fixedSize(horizontal: false, vertical: true).monospacedDigit()
     }
     private var emptyText: String {
         if display.error != nil { return display.fetchedAt == nil ? "获取失败" : "获取失败 · 暂无预告（缓存）" }
         return display.fetchedAt == nil ? "等待采集" : "暂无"
     }
-    private func previewRow(_ row: CodexResetRow?) -> some View {
+    private func previewRow(_ row: CodexResetRow?, title: String = "重置预告：") -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Design.gap) {
             ViewThatFits(in: .horizontal) {
                 if let row {
-                    (Text("重置预告：").font(Design.title)
+                    (Text(title).font(Design.title)
                      + Text((display.error != nil ? "缓存 · " : "") + row.preview).font(Design.caption))
                         .fixedSize()
                     VStack(alignment: .leading, spacing: Design.smallGap) {
-                        (Text("重置预告：").font(Design.title)
+                        (Text(title).font(Design.title)
                          + Text((display.error != nil ? "缓存 · " : "") + row.previewTime).font(Design.caption))
                             .lineLimit(1)
                         Text(row.label).font(Design.caption).lineLimit(1)
@@ -47,7 +54,7 @@ struct CodexResetMonitorView: View {
     }
     private func details(_ row: CodexResetRow?) -> String {
         (["AIHOT 估算，非官方承诺。公开消息不代表当前账号已到账。", row?.preview, row?.status, row?.scope,
-          row?.announcement, row?.estimate, display.siteStatus, display.error, display.cacheError]
+          row?.announcement, row?.estimate, row?.confirmation, display.siteStatus, display.error, display.cacheError]
             + [display.fetchedAt.map { "获取：" + DisplayDate.format($0, pattern: "M/d HH:mm") },
                display.verifiedAt.map { "站点核验：" + DisplayDate.format($0, pattern: "M/d HH:mm") }])
             .compactMap { $0 }.joined(separator: "\n")
