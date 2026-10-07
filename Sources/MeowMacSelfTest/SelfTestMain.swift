@@ -11,12 +11,13 @@ enum SelfTestMain {
     @MainActor static func main() {
         if let status = AIAgentTerminalLauncher.handleCommandLine(Array(CommandLine.arguments.dropFirst())) { exit(status) }
         // 原生控件会泵送 RunLoop；由 AppKit 托管主循环，避免 async-main 提前结束。
-        NSApplication.shared.setActivationPolicy(.accessory)
+        NSApplication.shared.setActivationPolicy(TestPresentationPolicy.allowsForeground(environment: ProcessInfo.processInfo.environment) ? .accessory : .prohibited)
         Task { @MainActor in await runTests() }
         NSApplication.shared.run()
     }
     @MainActor static func runTests() async {
         var tests: [(String, @MainActor () async -> Bool)] = [
+            ("Core.TestRunner/前台验收必须显式开启", { TestPresentationPolicy.regression() }),
             ("Core.Smoke/版本号", { AppIdentity.version == "0.1.0" }),
             ("Core.Config/文件不存在", { SelfTestMain.missingConfig() }),
             ("Core.Config/部分字段", { SelfTestMain.partialConfig() }),
@@ -322,17 +323,27 @@ enum SelfTestMain {
         }
         let filters = CommandLine.arguments.dropFirst().map { $0.lowercased() }
         if filters.contains("--list") {
-            tests.forEach { print($0.0) }
+            tests.forEach { print($0.0 + (TestPresentationPolicy.requiresForeground($0.0) ? " [需 MEOWMAC_UI_TESTS=1]" : "")) }
             exit(0)
         }
-        var failed = 0, executed = 0
+        let foregroundAllowed = TestPresentationPolicy.allowsForeground(environment: ProcessInfo.processInfo.environment)
+        var failed = 0, executed = 0, skipped = 0
         for (name, run) in tests where (filters.isEmpty || filters.contains(where: { name.lowercased().contains($0) })) && (!name.contains(".Live") || ProcessInfo.processInfo.environment["MEOWMAC_LIVE"] == "1") {
+            if !foregroundAllowed && TestPresentationPolicy.requiresForeground(name) {
+                print("SKIP \(name)（可见 UI 验收需 MEOWMAC_UI_TESTS=1）"); skipped += 1; continue
+            }
             if ProcessInfo.processInfo.environment["MEOWMAC_TEST_TRACE"] == "1" { print("START \(name)"); fflush(stdout) }
             executed += 1
             if await run() { print("PASS \(name)") }
             else { print("FAIL \(name)"); failed += 1 }
+            if !foregroundAllowed && NSApplication.shared.windows.contains(where: \.isVisible) {
+                print("FAIL 后台测试出现可见窗口：\(name)"); failed += 1
+            }
         }
-        print("自测完成：\(executed) 项，\(failed) 项失败")
+        if !foregroundAllowed && NSApplication.shared.isActive {
+            print("FAIL 后台测试激活了自测应用"); failed += 1
+        }
+        print("自测完成：\(executed) 项，\(failed) 项失败，\(skipped) 项前台验收未执行")
         exit(failed > 0 ? 1 : 0)
     }
 

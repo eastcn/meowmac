@@ -45,6 +45,6 @@ ditto "$source_app" "$work_dir/MeowMac.app"
 codesign --verify --deep --strict "$work_dir/MeowMac.app"
 if [[ -e "$target_app" ]]; then mv "$target_app" "$work_dir/previous.app"; old_moved=1; fi
 mv "$work_dir/MeowMac.app" "$target_app"; new_moved=1
-open -a "$target_app"
+open -g -a "$target_app"
 committed=1
 printf '已安装并启动：%s\n' "$target_app"

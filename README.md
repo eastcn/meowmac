@@ -14,6 +14,20 @@ scripts/install.sh
 
 应用安装到 `~/Applications/MeowMac.app`。安装脚本遇到正在运行的 MeowMac 时会退出；请先自行退出旧实例。
 
+## 开发验证
+
+`scripts/test.sh` 和 `scripts/check.sh` 默认在后台运行。纯逻辑、存储、协调器和后台渲染照常验证；会显示窗口、弹出面板或唤起终端的用例输出 `SKIP`，不计为通过。过滤词、实机开关和预览目录都不会自动开启前台验收。
+
+需要操作原生窗口或核对真实材质时，选择不影响前台使用的时机，显式开启：
+
+```sh
+scripts/test.sh --list                         # 标出需要前台的用例
+MEOWMAC_UI_TESTS=1 scripts/test.sh UI.Reset     # 可见原生容器验收
+MEOWMAC_UI_TESTS=1 scripts/check.sh             # 完整离线验收，包含可见 UI
+```
+
+完整离线验收仍是交付检查的一部分。后台检查通过时，应同时记录未执行的前台用例。安装脚本使用后台启动，不自动展示验证窗口。
+
 ## 数据来源
 
 - 系统状态来自 macOS 公开接口。清理记录来自 Mole 的 `mo history --json`。
