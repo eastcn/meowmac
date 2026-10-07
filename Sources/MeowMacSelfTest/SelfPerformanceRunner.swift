@@ -99,6 +99,7 @@ final class SelfPerformanceRunner {
             cadence.observe = { [weak self] event in self?.count(event) }
             if notificationProbe {
                 let store = NotificationStore(rootURL: URL(fileURLWithPath: output).deletingPathExtension().appendingPathComponent("notification-fixture"))
+                store.observeSave = { [weak self] in self?.count("notificationFileReplacement") }
                 notificationStore = store
                 notificationCoordinator = NotificationCoordinator(store: store, startedAt: epoch.addingTimeInterval(-3600)) { [weak self] _ in self?.count("syntheticNotice") }
             }
@@ -186,16 +187,15 @@ final class SelfPerformanceRunner {
         guard let state, let cadence else { return }
         if omitSystem { count("omittedSystemUpdate"); return }
         let started = ProcessInfo.processInfo.systemUptime
-        SystemUpdatePath.apply(fixture(at: state.now(), load: load), state: state, hasBaseline: counters["systemUpdate", default: 0] > 0)
+        SystemUpdatePath.apply(fixture(at: state.now(), load: load), state: state, hasBaseline: counters["systemUpdate", default: 0] > 0, notifications: notificationCoordinator)
         cadence.frameInterval = state.catDisplay().frameInterval
         count("systemUpdate")
         durations["systemUpdate", default: 0] += ProcessInfo.processInfo.systemUptime - started
     }
     private func processNotifications(_ tracker: ReminderTracker, batch: ReminderBatch) {
-        guard let coordinator = notificationCoordinator, let store = notificationStore, let state else { return }
+        guard let coordinator = notificationCoordinator, let state else { return }
         count("notificationProcess")
         let before = coordinator.records
-        let priorInode = (try? FileManager.default.attributesOfItem(atPath: store.fileURL.path)[.systemFileNumber]) as? NSNumber
         let started = ProcessInfo.processInfo.systemUptime
         let reading = try? PerformanceReading.read(getpid())
         if !omitNotificationProcess { coordinator.process(tracker, batch: batch, now: state.now()) }
@@ -209,8 +209,6 @@ final class SelfPerformanceRunner {
             for (key, next) in coordinator.records where normalized[key] != nil { normalized[key]?.lastSeenAt = next.lastSeenAt }
             if normalized == coordinator.records { count("notificationOnlyLastSeenChange") }
         }
-        let nextInode = (try? FileManager.default.attributesOfItem(atPath: store.fileURL.path)[.systemFileNumber]) as? NSNumber
-        if let nextInode, priorInode != nextInode { count("notificationFileReplacement") }
     }
     private func fixture(at date: Date, load: Double) -> SystemSnapshot {
         SystemSnapshot(timestamp: date, cpuUsage: load, memoryPressure: .normal, swapUsedBytes: 1_000_000_000,

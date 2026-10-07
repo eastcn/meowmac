@@ -172,6 +172,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         snapshot = latest
         SystemUpdatePath.apply(latest, state: panelState, hasBaseline: hasSystemBaseline,
             thermalChanged: thermalChanged, sourceFailureCount: configResult.config.sourceFailureCount,
+            notifications: notificationCoordinator,
             sourceFailed: { [self] source in logger.error("系统数据源连续采集失败：\(source, privacy: .public)") },
             recordNetwork: { [self] latest in
                 networkRecorder?.record(received: latest.networkReceivedBytesPerSecond,

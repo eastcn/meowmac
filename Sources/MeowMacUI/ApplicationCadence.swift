@@ -47,8 +47,11 @@ public final class ApplicationCadence {
 public enum SystemUpdatePath {
     public static func apply(_ latest: SystemSnapshot, state: PanelState, hasBaseline: Bool,
                              thermalChanged: Bool = false, sourceFailureCount: Int? = nil,
+                             notifications: NotificationCoordinator? = nil,
                              sourceFailed: (String) -> Void = { _ in },
                              recordNetwork: (SystemSnapshot) -> Void = { _ in }) {
+        notifications?.beginTransaction()
+        defer { notifications?.endTransaction() }
         state.snapshot = latest
         if hasBaseline {
             for (source, failed) in [("CPU", latest.cpuUsage == nil),

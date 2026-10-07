@@ -186,6 +186,7 @@ enum SelfTestMain {
         tests.append(contentsOf: NotificationTests.tests)
         tests.append(contentsOf: BalanceAlertTests.tests)
         tests.append(contentsOf: NotificationUITests.tests)
+        tests.append(contentsOf: NotificationTransactionTests.tests)
         tests.append(contentsOf: CodexResetTests.tests)
         tests.append(contentsOf: CodexResetUITests.tests)
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }

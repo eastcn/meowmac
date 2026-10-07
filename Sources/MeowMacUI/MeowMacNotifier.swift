@@ -92,6 +92,21 @@ public final class NotificationCoordinator {
         settings = loaded.settings; records = loaded.records; recoveryReason = loaded.recoveryReason
     }
 
+    private var transactionDepth = 0
+    private var pendingSave = false
+
+    /// 纯时间更新只在同步事务内合并；离开最外层时完整落盘。
+    public func withTransaction<T>(_ body: () throws -> T) rethrows -> T {
+        beginTransaction()
+        defer { endTransaction() }
+        return try body()
+    }
+    func beginTransaction() { transactionDepth += 1 }
+    func endTransaction() {
+        transactionDepth -= 1
+        if transactionDepth == 0 && pendingSave { persist() }
+    }
+
     /// 每次提醒 reconcile 之后调用。记录有变化才写盘。
     /// `batch` 是这一轮的检测结果：只有它确认过的键才算恢复，刚启动没有数据时不会把记录误判为恢复。
     public func process(_ tracker: ReminderTracker, batch: ReminderBatch?, now: Date, redact: (String) -> String = { $0 }) {
@@ -103,7 +118,15 @@ public final class NotificationCoordinator {
             return batch.confirms(key, kind: kind)
         }, observingSince: startedAt)
         if decision.records != records {
+            var normalized = records
+            for (key, record) in decision.records where normalized[key] != nil {
+                normalized[key]?.lastSeenAt = record.lastSeenAt
+            }
+            let timeOnly = normalized == decision.records
             records = decision.records
+            pendingSave = true
+            if transactionDepth == 0 || !timeOnly { persist() }
+        } else if pendingSave && transactionDepth == 0 {
             persist()
         }
         for notice in NotificationContent.notices(for: decision.reminders, now: now, redact: redact) { send(notice) }
@@ -137,6 +160,7 @@ public final class NotificationCoordinator {
         do {
             try store.save(settings: next, records: records)
             settings = next
+            pendingSave = false
             return true
         } catch {
             logger.error("通知设置保存失败：\(error.localizedDescription, privacy: .public)")
@@ -145,7 +169,11 @@ public final class NotificationCoordinator {
     }
 
     private func persist() {
-        do { try store.save(settings: settings, records: records) }
+        pendingSave = true
+        do {
+            try store.save(settings: settings, records: records)
+            pendingSave = false
+        }
         catch { logger.error("通知记录保存失败：\(error.localizedDescription, privacy: .public)") }
     }
 }

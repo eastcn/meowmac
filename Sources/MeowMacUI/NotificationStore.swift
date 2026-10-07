@@ -15,6 +15,7 @@ public final class NotificationStore {
     public static let filename = "notifications.json"
     static let maxBytes = 262_144
     public let rootURL: URL
+    public var observeSave: (() -> Void)?
     private let logger = Logger(subsystem: AppIdentity.bundleID, category: "notifications")
     public init(rootURL: URL = CatStore.defaultRoot) { self.rootURL = rootURL }
     public var fileURL: URL { rootURL.appendingPathComponent(Self.filename) }
@@ -57,5 +58,6 @@ public final class NotificationStore {
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         try data.write(to: fileURL, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+        observeSave?()
     }
 }
