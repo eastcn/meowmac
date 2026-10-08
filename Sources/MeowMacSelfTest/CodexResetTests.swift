@@ -3,20 +3,27 @@ import MeowMacCore
 import MeowMacQuota
 
 final class ResetTestProtocol: URLProtocol {
-    struct Reply { let status: Int; var headers: [String: String] = [:]; var data = Data(); var delay: TimeInterval = 0 }
+    struct Reply { let status: Int; var headers: [String: String] = [:]; var data = Data(); var delay: TimeInterval = 0; var error: NSError? }
     private static let lock = NSLock()
     private static var replies: [Reply] = []
     private static var recorded: [URLRequest] = []
-    static func prepare(_ values: [Reply]) { lock.lock(); defer { lock.unlock() }; replies = values; recorded = [] }
+    private static var recordedTaskIDs: [Int?] = []
+    private var stopped = false
+    static func prepare(_ values: [Reply]) { lock.lock(); defer { lock.unlock() }; replies = values; recorded = []; recordedTaskIDs = [] }
     static var requests: [URLRequest] { lock.lock(); defer { lock.unlock() }; return recorded }
+    static var taskIDs: [Int?] { lock.lock(); defer { lock.unlock() }; return recordedTaskIDs }
     override class func canInit(with request: URLRequest) -> Bool { request.url == CodexResetClient.endpoint }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         Self.lock.lock()
         Self.recorded.append(request)
+        Self.recordedTaskIDs.append(task?.taskIdentifier)
         let reply = Self.replies.isEmpty ? Reply(status: 500) : Self.replies.removeFirst()
         Self.lock.unlock()
         func deliver() {
+            Self.lock.lock(); let cancelled = stopped; Self.lock.unlock()
+            guard !cancelled else { return }
+            if let error = reply.error { client?.urlProtocol(self, didFailWithError: error); return }
             let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: "HTTP/1.1", headerFields: reply.headers)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: reply.data)
@@ -25,7 +32,7 @@ final class ResetTestProtocol: URLProtocol {
         if reply.delay > 0 { DispatchQueue.global().asyncAfter(deadline: .now() + reply.delay) { deliver() } }
         else { deliver() }
     }
-    override func stopLoading() {}
+    override func stopLoading() { Self.lock.lock(); stopped = true; Self.lock.unlock() }
 }
 
 @MainActor
@@ -42,6 +49,11 @@ enum CodexResetTests {
         ("Quota.Reset/手动并发合并与6小时边界", { await coalescing() }),
         ("Quota.Reset/429 Retry-After 与5xx退避", { await backoff() }),
         ("Quota.Reset/慢失败从返回时起至少等待6小时", { await slowFailure() }),
+        ("Quota.Reset/TLS意外断开新会话重试并保留ETag", { await tlsRecovery() }),
+        ("Quota.Reset/TLS连续失败只重试一次且保持限频", { await tlsRetryLimit() }),
+        ("Quota.Reset/证书与其他连接错误不重试", { await tlsNoRetry() }),
+        ("Quota.Reset/TLS重试后保留HTTP退避与坏响应", { await tlsRetryOutcomes() }),
+        ("Quota.Reset/TLS重试遵守任务取消", { await tlsCancellation() }),
         ("Quota.Reset/缓存损坏符号链接与写入失败", { await damagedCache() })
     ] }
     static func event(id: String = "example-pending", status: String = "announced", phase: String = "announced",
@@ -144,6 +156,113 @@ enum CodexResetTests {
     static func session() -> URLSession {
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [ResetTestProtocol.self]
         return URLSession(configuration: config)
+    }
+    static func tlsError(_ code: Int = -9816, streamDomain: Int = 3) -> NSError {
+        NSError(domain: NSURLErrorDomain, code: NSURLErrorSecureConnectionFailed, userInfo: [
+            NSUnderlyingErrorKey: NSError(domain: "kCFErrorDomainCFNetwork", code: NSURLErrorSecureConnectionFailed,
+                userInfo: ["_kCFStreamErrorDomainKey": streamDomain, "_kCFStreamErrorCodeKey": code])])
+    }
+    static func tlsRecovery() async -> Bool {
+        do {
+            let root = try root("tls-recovery"), session = session(); var time = clock
+            defer { session.invalidateAndCancel(); try? FileManager.default.removeItem(at: root) }
+            ResetTestProtocol.prepare([.init(status: 200, headers: ["ETag": "W/\"example-tls\""], data: data()),
+                .init(status: 0, error: tlsError()), .init(status: 304, delay: 0.1)])
+            let client = CodexResetClient(root: root, session: session, now: { time })
+            guard await client.refresh(), client.state.feed != nil else { return false }
+            time.addTimeInterval(21_600)
+            let refresh = Task { await client.refresh() }
+            for _ in 0..<100 {
+                if ResetTestProtocol.requests.count == 3 { break }
+                try await Task.sleep(nanoseconds: 1_000_000)
+            }
+            guard ResetTestProtocol.requests.count == 3, client.requesting, !(await client.refresh()) else { return false }
+            guard await refresh.value, client.state.feed != nil, client.state.error == nil,
+                  client.state.failures == 0, client.state.fetchedAt == time,
+                  client.state.nextAttemptAt == time.addingTimeInterval(21_600) else { return false }
+            let requests = ResetTestProtocol.requests
+            // taskIdentifier 在同一 session 内唯一；新会话的首次任务重新从 1 开始。
+            guard ResetTestProtocol.taskIDs == [1, 2, 1],
+                  requests[1].value(forHTTPHeaderField: "If-None-Match") == "W/\"example-tls\"",
+                  requests[2].allHTTPHeaderFields == requests[1].allHTTPHeaderFields else { return false }
+            let restart = CodexResetClient(root: root, session: session, now: { time })
+            guard restart.state.error == nil, restart.state.failures == 0, !(await restart.refresh()) else { return false }
+            return ResetTestProtocol.requests.count == 3
+        } catch { print("TLS恢复测试：\(error)"); return false }
+    }
+    static func tlsRetryLimit() async -> Bool {
+        do {
+            let root = try root("tls-limit"), session = session(); var time = clock
+            defer { session.invalidateAndCancel(); try? FileManager.default.removeItem(at: root) }
+            ResetTestProtocol.prepare([.init(status: 0, error: tlsError()), .init(status: 0, error: tlsError()),
+                .init(status: 200, data: data())])
+            let client = CodexResetClient(root: root, session: session, now: { time })
+            guard await client.refresh(), ResetTestProtocol.requests.count == 2,
+                  client.state.error != nil, client.state.failures == 1,
+                  client.state.nextAttemptAt == time.addingTimeInterval(21_600) else { return false }
+            let restart = CodexResetClient(root: root, session: session, now: { time })
+            time.addTimeInterval(21_599)
+            guard restart.state.failures == 1, !(await restart.refresh()), ResetTestProtocol.requests.count == 2 else { return false }
+            time.addTimeInterval(1)
+            return await restart.refresh() && restart.state.error == nil && restart.state.failures == 0
+                && ResetTestProtocol.requests.count == 3
+        } catch { return false }
+    }
+    static func tlsNoRetry() async -> Bool {
+        for error in [tlsError(-9802), tlsError(streamDomain: 1),
+                      NSError(domain: NSURLErrorDomain, code: NSURLErrorSecureConnectionFailed),
+                      NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted),
+                      NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut),
+                      NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)] {
+            do {
+                let root = try root("tls-no-retry"), session = session()
+                defer { session.invalidateAndCancel(); try? FileManager.default.removeItem(at: root) }
+                ResetTestProtocol.prepare([.init(status: 0, error: error), .init(status: 200, data: data())])
+                let client = CodexResetClient(root: root, session: session, now: { clock })
+                guard await client.refresh(), ResetTestProtocol.requests.count == 1,
+                      client.state.error != nil, client.state.failures == 1 else { return false }
+            } catch { return false }
+        }
+        return true
+    }
+    static func tlsRetryOutcomes() async -> Bool {
+        for (reply, wait) in [(ResetTestProtocol.Reply(status: 429, headers: ["Retry-After": "172800"]), 172_800.0),
+                              (.init(status: 503), 43_200.0),
+                              (.init(status: 200, data: Data("broken".utf8)), 21_600.0),
+                              (.init(status: 0, error: tlsError(-9802)), 21_600.0)] {
+            do {
+                let root = try root("tls-outcome"), session = session()
+                defer { session.invalidateAndCancel(); try? FileManager.default.removeItem(at: root) }
+                ResetTestProtocol.prepare([.init(status: 0, error: tlsError()), reply, .init(status: 200, data: data())])
+                let client = CodexResetClient(root: root, session: session, now: { clock })
+                guard await client.refresh(), ResetTestProtocol.requests.count == 2,
+                      client.state.failures == 1, client.state.error != nil,
+                      client.state.nextAttemptAt == clock.addingTimeInterval(wait) else { return false }
+            } catch { return false }
+        }
+        return true
+    }
+    static func tlsCancellation() async -> Bool {
+        for count in [1, 2] {
+            do {
+                let root = try root("tls-cancel"), session = session()
+                defer { session.invalidateAndCancel(); try? FileManager.default.removeItem(at: root) }
+                let delayed = ResetTestProtocol.Reply(status: 0, delay: 0.2, error: tlsError())
+                ResetTestProtocol.prepare(count == 1 ? [delayed] : [.init(status: 0, error: tlsError()), delayed])
+                let client = CodexResetClient(root: root, session: session, now: { clock })
+                let refresh = Task { await client.refresh() }
+                for _ in 0..<100 {
+                    if ResetTestProtocol.requests.count == count { break }
+                    try await Task.sleep(nanoseconds: 1_000_000)
+                }
+                let reached = ResetTestProtocol.requests.count == count && client.requesting
+                refresh.cancel()
+                guard await refresh.value, reached, ResetTestProtocol.requests.count == count,
+                      !client.requesting, client.state.failures == 0, client.state.error == nil,
+                      client.state.nextAttemptAt == clock.addingTimeInterval(21_600) else { return false }
+            } catch { return false }
+        }
+        return true
     }
     static func conditional() async -> Bool {
         do {

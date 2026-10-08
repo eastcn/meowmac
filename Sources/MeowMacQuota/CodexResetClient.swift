@@ -1,5 +1,6 @@
 import Foundation
 import MeowMacCore
+import Security
 import os
 
 private final class ResetSessionPolicy: NSObject, URLSessionTaskDelegate {
@@ -73,7 +74,25 @@ public final class CodexResetClient {
     }
     private func setNext(_ date: Date) { cache.nextAttemptAt = date; state.nextAttemptAt = date }
 
-    /// 所有入口共用 6 小时下限，包含手动刷新与重启后的首次刷新。
+    private func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        do { return try await session.data(for: request) }
+        catch {
+            try Task.checkCancellation()
+            let failure = error as NSError
+            guard failure.domain == NSURLErrorDomain, failure.code == NSURLErrorSecureConnectionFailed else { throw error }
+            let details = [failure, failure.userInfo[NSUnderlyingErrorKey] as? NSError].compactMap { $0 }
+            guard details.contains(where: {
+                ($0.userInfo["_kCFStreamErrorDomainKey"] as? Int) == 3
+                    && ($0.userInfo["_kCFStreamErrorCodeKey"] as? Int) == Int(errSSLClosedNoNotify)
+            }) else { throw error }
+            // 只恢复未正常关闭的 TLS 连接；证书校验仍由系统处理，不放宽信任。
+            let retry = URLSession(configuration: session.configuration, delegate: ResetSessionPolicy(), delegateQueue: nil)
+            defer { retry.invalidateAndCancel() }
+            return try await retry.data(for: request)
+        }
+    }
+
+    /// 每轮采集共用 6 小时下限；TLS 意外断开时，同一轮内最多用新会话重试一次。
     @discardableResult public func refresh() async -> Bool {
         guard !requesting, cache.nextAttemptAt.map({ now() >= $0 }) ?? true else { return false }
         requesting = true
@@ -89,7 +108,7 @@ public final class CodexResetClient {
         var retryAfter: Date?
         var serverFailure = false
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await data(for: request)
             try Task.checkCancellation()
             guard let response = response as? HTTPURLResponse,
                   response.url?.scheme == "https", response.url?.host == Self.endpoint.host else {
