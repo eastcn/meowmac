@@ -31,15 +31,18 @@ public final class CodexBarClient {
     private let executable: URL
     private let environment: [String: String]
     private let executor: Executor?
+    private let deadlineSeconds: TimeInterval
     public typealias Executor = (URL, [String], [String: String], Data?) throws -> CLIOutput
     private let logger = Logger(subsystem: AppIdentity.bundleID, category: "quota")
     private let lock = NSLock()
     private var running = false
 
     public init(path: String, environment: [String: String] = [:], executor: Executor? = nil,
-                rawOutput: (([String], Data, Data) -> Void)? = nil) {
+                deadlineSeconds: TimeInterval = 60, rawOutput: (([String], Data, Data) -> Void)? = nil) {
+        precondition(deadlineSeconds.isFinite && deadlineSeconds > 0)
         self.executable = URL(fileURLWithPath: path); self.environment = environment
         self.executor = executor; self.rawOutput = rawOutput
+        self.deadlineSeconds = deadlineSeconds
     }
 
     public func providers() throws -> [QuotaCatalogEntry] {
@@ -94,8 +97,15 @@ public final class CodexBarClient {
         let stdout = Pipe(), stderr = Pipe()
         process.standardOutput = stdout
         process.standardError = stderr
+        let output = OutputBox()
+        let group = DispatchGroup()
+        // 启动前登记退出通知，避免跨线程 waitUntilExit 错过退出后永久等待。
+        group.enter()
+        process.terminationHandler = { _ in group.leave() }
         do { try process.run() }
         catch {
+            process.terminationHandler = nil
+            group.leave()
             lock.lock(); running = false; lock.unlock()
             throw error
         }
@@ -108,8 +118,6 @@ public final class CodexBarClient {
                 }
             }
         }
-        let output = OutputBox()
-        let group = DispatchGroup()
         group.enter()
         DispatchQueue.global(qos: .utility).async {
             output.set(stdout.fileHandleForReading.readDataToEndOfFile(), stderr: false)
@@ -120,19 +128,17 @@ public final class CodexBarClient {
             output.set(stderr.fileHandleForReading.readDataToEndOfFile(), stderr: true)
             group.leave()
         }
-        group.enter()
-        DispatchQueue.global(qos: .utility).async {
-            process.waitUntilExit()
-            group.leave()
-        }
-        guard group.wait(timeout: .now() + 60) == .success else {
-            group.notify(queue: .global(qos: .utility)) { [weak self] in
+        guard group.wait(timeout: .now() + deadlineSeconds) == .success else {
+            group.notify(queue: .global(qos: .utility)) { [weak self, process] in
+                // 超时不结束进程；保留 Process，直到退出通知和两个管道均完成。
+                process.terminationHandler = nil
                 guard let self else { return }
                 self.lock.lock(); self.running = false; self.lock.unlock()
             }
             logger.error("CLI 命令超过 60 秒：\(arguments.first ?? "未知", privacy: .public)")
             throw CodexBarError.exceededDeadline
         }
+        process.terminationHandler = nil
         lock.lock(); running = false; lock.unlock()
         let (data, errors) = output.read()
         return try finish(arguments, output: CLIOutput(status: process.terminationStatus, stdout: data, stderr: errors))

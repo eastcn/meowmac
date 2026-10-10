@@ -215,6 +215,7 @@ public final class QuotaCoordinator {
             state.quotaErrors.removeValue(forKey: provider)
             state.failures["quota." + provider.rawValue] = 0
             state.quotaAttempts[provider] = QuotaAttempt(at: now, success: true, message: "采集成功")
+            logger.info("额度采集成功：\(provider.rawValue, privacy: .public)")
             do { try history.append(snapshot); state.quotaHistory[provider] = try history.read(provider) }
             catch { logger.error("额度历史存取失败：\(error.localizedDescription, privacy: .private)") }
         case .failure(let error):
