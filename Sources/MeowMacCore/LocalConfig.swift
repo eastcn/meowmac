@@ -119,6 +119,7 @@ public enum ConfigStore {
         guard loaded.error == nil else { throw AlertRuleError.invalid("配置文件无效，未覆盖原文件") }
         var next = rules
         if restoringDefaults {
+            next.quotaProviders = [:]
             for rule in BuiltinAlertRule.allCases { next.builtin.removeValue(forKey: rule.id) }
         } else {
             for (id, value) in rules.builtin {
@@ -153,6 +154,18 @@ public enum ConfigStore {
                 }
                 if fields.isEmpty { builtin.removeValue(forKey: rule.id) } else { builtin[rule.id] = fields }
             }
+            var providers = root["quotaProviders"] as? [String: Any] ?? [:]
+            for provider in Set(providers.keys).union(valid.quotaProviders.keys) {
+                var fields = providers[provider] as? [String: Any] ?? [:]
+                let value = valid.quotaProviders[provider] ?? QuotaAlertProviderOverride()
+                let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as! [String: Any]
+                for key in ["remainingEnabled", "paceEnabled", "balanceEnabled", "remainingThreshold"] {
+                    fields.removeValue(forKey: key)
+                    if let item = encoded[key] { fields[key] = item }
+                }
+                if fields.isEmpty { providers.removeValue(forKey: provider) } else { providers[provider] = fields }
+            }
+            if providers.isEmpty { root.removeValue(forKey: "quotaProviders") } else { root["quotaProviders"] = providers }
             root["builtin"] = builtin
             root["custom"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(valid.custom))
             object["alertRules"] = root

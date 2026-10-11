@@ -254,11 +254,12 @@ public enum BuiltinAlertRule: String, CaseIterable, Codable, Identifiable {
 public struct AlertRuleSet: Codable, Equatable {
     public var builtin: [String: AlertRuleOverride]
     public var custom: [CustomAlertRule]
+    public var quotaProviders: [String: QuotaAlertProviderOverride]
     public private(set) var diagnostics: [String] = []
-    public init(builtin: [String: AlertRuleOverride] = [:], custom: [CustomAlertRule] = [], diagnostics: [String] = []) {
-        self.builtin = builtin; self.custom = custom; self.diagnostics = diagnostics
+    public init(builtin: [String: AlertRuleOverride] = [:], custom: [CustomAlertRule] = [], quotaProviders: [String: QuotaAlertProviderOverride] = [:], diagnostics: [String] = []) {
+        self.builtin = builtin; self.custom = custom; self.quotaProviders = quotaProviders; self.diagnostics = diagnostics
     }
-    private enum CodingKeys: String, CodingKey { case builtin, custom }
+    private enum CodingKeys: String, CodingKey { case builtin, custom, quotaProviders }
     private struct Key: CodingKey {
         let stringValue: String
         var intValue: Int? { nil }
@@ -266,7 +267,7 @@ public struct AlertRuleSet: Codable, Equatable {
         init(stringValue: String) { self.stringValue = stringValue }
     }
     public init(from decoder: Decoder) throws {
-        builtin = [:]; custom = []
+        builtin = [:]; custom = []; quotaProviders = [:]
         let c = try decoder.container(keyedBy: CodingKeys.self)
         if c.contains(.builtin) {
             do {
@@ -281,6 +282,22 @@ public struct AlertRuleSet: Codable, Equatable {
                     catch { diagnostics.append("内置规则 \(key.stringValue) 无效，已丢弃") }
                 }
             } catch { diagnostics.append("内置规则列表无效，已回退默认值") }
+        }
+        if c.contains(.quotaProviders) {
+            do {
+                let values = try c.nestedContainer(keyedBy: Key.self, forKey: .quotaProviders)
+                for key in values.allKeys {
+                    do {
+                        guard QuotaProvider(rawValue: key.stringValue) != nil else { throw AlertRuleError.invalid("渠道标识无效") }
+                        var value = try values.decode(QuotaAlertProviderOverride.self, forKey: key)
+                        if let threshold = value.remainingThreshold, !threshold.isFinite || !(1...90).contains(threshold) {
+                            value.remainingThreshold = nil
+                            diagnostics.append("渠道 \(key.stringValue) 额度阈值越界，已沿用默认阈值")
+                        }
+                        quotaProviders[key.stringValue] = value
+                    } catch { diagnostics.append("渠道 \(key.stringValue) 提醒设置无效，已沿用默认规则") }
+                }
+            } catch { diagnostics.append("渠道提醒设置无效，已沿用默认规则") }
         }
         if c.contains(.custom) {
             do {
@@ -320,7 +337,20 @@ public struct AlertRuleSet: Codable, Equatable {
         return rule.sanitized(fresh, fallback: legacy)
     }
     public func enabled(_ rule: BuiltinAlertRule, config: LocalConfig) -> Bool { effective(rule, config: config).enabled != false }
+    public func quotaEnabled(_ rule: BuiltinAlertRule, provider: QuotaProvider, config: LocalConfig) -> Bool {
+        enabled(rule, config: config) && quotaProviders[provider.rawValue]?.enabled(rule) != false
+    }
+    public func quotaRemainingThreshold(_ provider: QuotaProvider, config: LocalConfig) -> Double {
+        if let threshold = quotaProviders[provider.rawValue]?.remainingThreshold, threshold.isFinite, (1...90).contains(threshold) { return threshold }
+        return effective(.quotaLow, config: config).threshold!
+    }
     public func validated() throws -> Self {
+        for (provider, value) in quotaProviders {
+            guard QuotaProvider(rawValue: provider) != nil else { throw AlertRuleError.invalid("渠道标识无效") }
+            if let threshold = value.remainingThreshold, !threshold.isFinite || !(1...90).contains(threshold) {
+                throw AlertRuleError.invalid("渠道额度阈值范围为 1～90%")
+            }
+        }
         guard custom.count <= 32, Set(custom.map(\.id)).count == custom.count else { throw AlertRuleError.invalid("规则超过 32 条或身份重复") }
         var result = self
         result.custom = try custom.map { try $0.validated() }

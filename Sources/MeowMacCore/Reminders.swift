@@ -78,11 +78,14 @@ public struct ReminderBatch {
     public var confirmedKeys: Set<String>
     public var disabledQuotaRules: Set<String> = []
     public var disabledRuleIDs: Set<String> = []
+    public var disabledQuotaProviders: [String: Set<String>] = [:]
     public var activeCustomRuleIDs: Set<String>? = nil
     public var customRuleScopes: [String: AlertScope] = [:]
     public var resetRuleIDs: Set<String> = []
     public func forgets(_ key: String) -> Bool {
         guard let id = ruleID(forKey: key) else { return false }
+        if let providers = disabledQuotaProviders[id], let provider = key.split(separator: ".").dropFirst().first,
+           providers.contains(String(provider)) { return true }
         if let scope = customRuleScopes[id], !scope.contains(object: String(key.dropFirst("custom.".count + id.count + 1))) { return true }
         return disabledRuleIDs.contains(id) || resetRuleIDs.contains(id)
             || (id.hasPrefix("u-") && activeCustomRuleIDs.map { !$0.contains(id) } == true)
@@ -143,7 +146,7 @@ public enum ReminderCollector {
                 let reset = valid ? window.resetsAt : nil
                 let subject = snapshot.provider.displayName + " " + window.displayName
                 if valid { batch.confirmedKeys.insert(ReminderKind.quotaLow.rawValue + "." + object) }
-                if window.remainingPercent / 100 < config.quotaRemainingWarn {
+                if window.remainingPercent < rules.quotaRemainingThreshold(snapshot.provider, config: originalConfig) {
                     add(Reminder(kind: .quotaLow, object: object, tab: .quota, title: prefix + "额度剩余不足",
                                  detail: "剩余 \(Int(window.remainingPercent.rounded()))%", sampledAt: snapshot.updatedAt,
                                  resetAt: reset, confirmed: valid, provider: snapshot.provider,
@@ -254,6 +257,10 @@ public enum ReminderCollector {
                     provider: reading.provider))
             }
         }
+        for rule in [BuiltinAlertRule.quotaLow, .pace, .balance] {
+            batch.disabledQuotaProviders[rule.id] = Set(rules.quotaProviders.compactMap { provider, value in value.enabled(rule) == false ? provider : nil })
+        }
+        batch.reminders = batch.reminders.filter { !batch.forgets($0.id) }
         batch.activeCustomRuleIDs = Set(rules.custom.filter(\.enabled).map(\.id))
         batch.customRuleScopes = Dictionary(rules.custom.compactMap { rule in rule.scope.map { (rule.id, $0) } }, uniquingKeysWith: { first, _ in first })
         batch.disabledRuleIDs = Set(BuiltinAlertRule.allCases.filter { !rules.enabled($0, config: originalConfig) }.map(\.id))

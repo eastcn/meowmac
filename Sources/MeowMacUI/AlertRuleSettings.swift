@@ -40,6 +40,45 @@ public final class AlertRuleSettingsModel: ObservableObject {
             rules.custom[index].enabled = enabled; save(rules)
         }
     }
+    public func quotaEnabled(_ rule: BuiltinAlertRule, provider: QuotaProvider) -> Bool {
+        config.alertRules.quotaProviders[provider.rawValue]?.enabled(rule) != false
+    }
+    public func setQuotaEnabled(_ rule: BuiltinAlertRule, provider: QuotaProvider, enabled: Bool) {
+        guard [.quotaLow, .pace, .balance].contains(rule) else { return }
+        var rules = config.alertRules
+        var value = rules.quotaProviders[provider.rawValue] ?? .init()
+        value.setEnabled(rule, enabled); rules.quotaProviders[provider.rawValue] = value
+        save(rules)
+    }
+    public func quotaThresholdText(_ provider: QuotaProvider) -> String {
+        config.alertRules.quotaProviders[provider.rawValue]?.remainingThreshold.map(alertNumber) ?? ""
+    }
+    @discardableResult public func setQuotaThreshold(_ provider: QuotaProvider, text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        let number = Double(trimmed)
+        guard trimmed.isEmpty || number.map({ $0.isFinite && (1...90).contains($0) }) == true else {
+            error = "范围 1～90%，留空沿用默认阈值，已保留原值"; return false
+        }
+        var rules = config.alertRules
+        var value = rules.quotaProviders[provider.rawValue] ?? .init()
+        value.remainingThreshold = number; rules.quotaProviders[provider.rawValue] = value
+        return save(rules)
+    }
+    public func quotaStateText(_ rule: BuiltinAlertRule, provider: QuotaProvider) -> String {
+        guard config.alertRules.quotaEnabled(rule, provider: provider, config: config) else { return "已停用" }
+        let matching = state.allReminders.filter { ruleID(for: $0) == rule.id && $0.provider == provider }
+        if matching.contains(where: { state.projectedReminders.isSnoozed($0, now: state.now()) }) { return "已暂缓" }
+        if matching.contains(where: { !$0.confirmed }) { return "读不到" }
+        if !matching.isEmpty { return "触发中" }
+        guard let snapshot = state.quotas[provider], snapshot.updatedAt <= state.now(), state.failures["quota", default: 0] == 0,
+              state.failures["quota." + provider.rawValue, default: 0] == 0 else { return "读不到" }
+        if rule == .balance { return snapshot.balance?.value == nil ? "无余额数据" : "正常" }
+        guard !snapshot.windows.isEmpty else { return "无窗口数据" }
+        return snapshot.windows.contains { window in
+            window.usedPercent.isFinite && (window.resetsAt.map { $0 > state.now() } ?? true)
+                && (rule != .pace || QuotaPace.calculate(window: window, now: state.now()) != nil)
+        } ? "正常" : "读不到"
+    }
     public enum Field: String { case threshold, durationSeconds, fairThermalSeconds, fanHighSeconds }
     @discardableResult public func setField(_ rule: BuiltinAlertRule, field: Field, text: String) -> Bool {
         guard let number = Double(text.trimmingCharacters(in: .whitespaces)), number.isFinite else { error = "请输入有限数值，已保留原值"; return false }
@@ -166,13 +205,20 @@ public final class AlertRuleSettingsModel: ObservableObject {
         case .process: return "单个进程 ≥ \(alertNumber(v.threshold!))%，持续 \(alertNumber(v.durationSeconds! / 60)) 分钟"
         case .thermal: return "thermalState 达到 serious 或以上"
         case .cooling: return "fair 持续 \(alertNumber(v.fairThermalSeconds! / 60)) 分钟，或风扇 ≥ \(alertNumber(v.threshold!))% 持续 \(alertNumber(v.fanHighSeconds! / 60)) 分钟"
-        case .quotaLow: return "任一窗口剩余 < \(alertNumber(v.threshold!))%"
-        case .balance: return "每个渠道单独设阈值"
-        case .pace: return "按当前速度会在重置前用完"
+        case .quotaLow: return "默认窗口剩余 < \(alertNumber(v.threshold!))%" + quotaOverrideSummary(rule)
+        case .balance: return "每个渠道单独设阈值" + quotaOverrideSummary(rule)
+        case .pace: return "按当前速度会在重置前用完" + quotaOverrideSummary(rule)
         case .network: return "DNS 泄漏、TUN 失效、站点探测失败等"
         case .egress: return "只通知，不进提醒列表"
         case .source: return "连续 \(alertNumber(v.threshold!)) 次采集失败"
         }
+    }
+    private func quotaOverrideSummary(_ rule: BuiltinAlertRule) -> String {
+        let count = state.quotaProviders.filter { provider in
+            guard let value = config.alertRules.quotaProviders[provider.rawValue] else { return false }
+            return value.enabled(rule) == false || (rule == .quotaLow && value.remainingThreshold != nil)
+        }.count
+        return count == 0 ? "" : " · \(count) 个渠道已单独设置"
     }
     public func summary(_ rule: AlertRule) -> String {
         guard let metric = AlertMetric(rawValue: rule.metric) else { return "指标不可用（\(rule.metric)）" }
@@ -242,7 +288,7 @@ struct AlertRuleSettingsView: View {
         .alert(model.confirmation == .defaults ? "恢复内置规则的默认设置？" : "删除这条规则？", isPresented: Binding(get: { model.confirmation != nil }, set: { if !$0 { model.confirmation = nil } })) {
             Button("取消", role: .cancel) { model.confirmation = nil }
             Button(model.confirmation == .defaults ? "恢复默认" : "删除", role: .destructive, action: model.confirm)
-        } message: { Text(model.confirmation == .defaults ? "阈值、持续时长、启用和通知开关回到默认。自定义规则保留。" : "同时清除这条规则的暂缓与已通知记录。") }
+        } message: { Text(model.confirmation == .defaults ? "阈值、持续时长、启用、渠道设置和通知开关回到默认。自定义规则保留。" : "同时清除这条规则的暂缓与已通知记录。") }
     }
     private func row(id: String, name: String, summary: String, level: String, custom: Bool = false) -> some View {
         HStack(spacing: 8) {
@@ -263,14 +309,14 @@ struct AlertRuleSettingsView: View {
             else { AlertBell(id: "alerts.notify." + id, value: Binding(get: { model.notify(id) }, set: { model.setNotify(id, $0) }), enabled: state.notificationSettings.enabled && model.isEnabled(id)).frame(width: 25, height: 24) }
         }.font(.system(size: 12)).padding(.vertical, 10).padding(.horizontal, 8).opacity(model.isEnabled(id) ? 1 : 0.5)
     }
-    private func builtinRow(_ rule: BuiltinAlertRule) -> some View {
+    fileprivate func builtinRow(_ rule: BuiltinAlertRule) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             row(id: rule.id, name: rule.name, summary: model.summary(rule), level: rule == .network ? "严重" : [.cooling, .egress].contains(rule) ? "标记" : "提醒")
             if model.expandedID == rule.id {
                 let v = model.value(rule)
                 VStack(alignment: .leading, spacing: 10) {
                     if let threshold = v.threshold {
-                        field(rule, .threshold, label: rule == .memory ? "压力 ≥" : rule == .quotaLow ? "任一窗口剩余 <" : rule == .disk ? "剩余 <" : rule == .process ? "单进程 ≥" : rule == .cooling ? "风扇 ≥" : "连续失败", value: threshold, unit: rule == .source ? "次" : rule == .process ? "% 单核" : rule == .cooling ? "% 最大值" : "%")
+                        field(rule, .threshold, label: rule == .memory ? "压力 ≥" : rule == .quotaLow ? "默认窗口剩余 <" : rule == .disk ? "剩余 <" : rule == .process ? "单进程 ≥" : rule == .cooling ? "风扇 ≥" : "连续失败", value: threshold, unit: rule == .source ? "次" : rule == .process ? "% 单核" : rule == .cooling ? "% 最大值" : "%")
                     }
                     if let duration = v.durationSeconds { field(rule, .durationSeconds, label: "持续", value: duration / 60, unit: "分钟") }
                     if let duration = v.fairThermalSeconds { field(rule, .fairThermalSeconds, label: "fair 持续", value: duration / 60, unit: "分钟") }
@@ -279,10 +325,40 @@ struct AlertRuleSettingsView: View {
                     if rule == .thermal { Text("系统判定，没有可调阈值") }
                     if rule == .cooling { Text("只在总览条加标记，不影响猫，不发通知") }
                     if rule == .balance { HStack { Text("阈值在“额度源”栏按渠道修改"); Button("前往“额度源”") { state.onOpenSettings(.quotaSources) }.buttonStyle(.link) } }
-                    if rule == .pace { Text("计算方法见 SPEC“节奏的计算”") }
+                    if rule == .pace {
+                        Text("按本轮开始以来的平均用量预测：已用比例超过已过时间比例，就可能在重置前用完。5 小时窗口开始 1 分钟已用 1%，也会触发。")
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if [.quotaLow, .pace, .balance].contains(rule) { quotaChannels(rule) }
                     if rule == .network || rule == .egress { Text("由 TunCanary 判定，只能开关") }
                     Text("档位：" + (rule == .cooling || rule == .egress ? "标记" : rule == .network ? "严重或提醒" : "提醒") + ([.memory, .process, .thermal].contains(rule) ? " · 不可暂缓，恢复后消除" : [.network, .cooling, .egress].contains(rule) ? "" : " · 可限时暂缓"))
                 }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.bottom, 12)
+            }
+        }
+    }
+    private func quotaChannels(_ rule: BuiltinAlertRule) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            Text("按渠道设置").fontWeight(.semibold)
+            Text("关闭后，这个渠道不再产生此类提醒，也不影响猫或发通知；原始用量与风险色保留。总规则关闭时，所有渠道都停用。")
+                .fixedSize(horizontal: false, vertical: true)
+            if rule == .quotaLow { Text("阈值留空沿用默认 \(alertNumber(model.value(.quotaLow).threshold!))%，范围 1～90%。") }
+            ForEach(state.quotaProviders, id: \.self) { provider in
+                HStack(spacing: 8) {
+                    NativeSettingsSwitch(id: "alerts.channel." + rule.id + "." + provider.rawValue,
+                        value: Binding(get: { model.quotaEnabled(rule, provider: provider) }, set: { model.setQuotaEnabled(rule, provider: provider, enabled: $0) }),
+                        enabled: model.isEnabled(rule.id)).frame(width: 38, height: 24)
+                    Text(provider.displayName)
+                    Spacer()
+                    if rule == .quotaLow {
+                        Text("剩余 <")
+                        AlertNumberField(id: "alerts.channel.threshold." + provider.rawValue, text: model.quotaThresholdText(provider)) {
+                            model.setQuotaThreshold(provider, text: $0)
+                        }.frame(width: 54, height: 24)
+                        Text("%")
+                    }
+                    Text(model.quotaStateText(rule, provider: provider)).frame(width: 60, alignment: .trailing)
+                }
             }
         }
     }
@@ -377,5 +453,21 @@ struct AlertNumberField: NSViewRepresentable {
     func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.text = text; context.coordinator.commit = commit
         if field.currentEditor() == nil { field.stringValue = text }
+    }
+}
+
+
+@MainActor
+public extension PanelPreviewRenderer {
+    /// 复用实际展开块检查文案与布局；原生控件和系统材质仍以真实窗口为准。
+    static func quotaRulePNG(state: PanelState, rule: BuiltinAlertRule, dark: Bool) -> Data? {
+        guard [.quotaLow, .pace, .balance].contains(rule) else { return nil }
+        let model = AlertRuleSettingsModel(state: state)
+        model.expandedID = rule.id
+        let view = AlertRuleSettingsView(model: model, state: state).builtinRow(rule)
+            .padding(16).frame(width: 520)
+        let measure = NSHostingView(rootView: view)
+        let height = ceil(measure.fittingSize.height)
+        return renderPNG(view, width: 520, height: height, dark: dark)
     }
 }
