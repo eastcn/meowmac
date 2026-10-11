@@ -155,6 +155,7 @@ enum SelfTestMain {
         tests.append(("UI.Settings.AlertRules/上限和坏文件保留", { (try? AlertSettingsTests.limitsAndBroken()) ?? false }))
         tests.append(("UI.Settings.AlertRules/合成真实窗口预览", { await AlertSettingsTests.previews() }))
         for test in CustomRuleTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
+        tests += NetworkPowerBacklogTests.tests
         for test in RuleClockTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         for test in AlertRuleTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }

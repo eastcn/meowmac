@@ -116,6 +116,9 @@ public extension PanelState {
             trend("power", "整机功耗", 0, powerMax, String(format: "0–%.0f W", powerMax), snapshot?.battery.systemPowerWatts.map { String(format: "%.1f W", $0) } ?? "—",
                   String(format: "0–%.0f W", powerMax), { $0.systemPowerWatts }),
             temperature]
+        if snapshot?.battery.systemPowerWatts == nil {
+            rows[2].help += "\n未读到有效功耗。缺失或负数读数显示为“—”，曲线在该处断开。"
+        }
         // 本机报告没有风扇时不画风扇行；读不到时保留这一行，显示“—”。
         if snapshot?.sensors?.fans != [] {
             let knownMax = snapshot?.sensors?.leadingFan?.maxRPM ?? points.compactMap(\.fanMaxRPM).max()

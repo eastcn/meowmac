@@ -64,7 +64,8 @@ public struct BatteryMetrics: Equatable, Codable {
 
     public static func parse(temperature: Int?, systemLoad: Int?) -> BatteryMetrics {
         let temperature = temperature.map { Double($0) / 100 }
-        let power = systemLoad.map { Double($0) / 1000 }
+        // SystemLoad 表示整机消耗的毫瓦数。负数不能作为有效功耗，也不能取绝对值冒充读数。
+        let power = systemLoad.flatMap { $0 >= 0 ? Double($0) / 1000 : nil }
         return BatteryMetrics(temperatureCelsius: temperature, systemPowerWatts: power)
     }
 }
