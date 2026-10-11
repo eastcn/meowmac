@@ -158,6 +158,7 @@ enum SelfTestMain {
         for test in QuotaAlertChannelTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         tests += NetworkPowerBacklogTests.tests
         tests += CodexResetRecoveryTests.tests
+        tests.append(("UI.AppIcon/年糕图标尺寸透明边界与对比度", { AppIconTests.sizes() }))
         for test in RuleClockTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         for test in AlertRuleTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }
         for test in DataTests.tests { tests.append((test.0, { test.1() })) }

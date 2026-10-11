@@ -1,0 +1,14 @@
+工具：内置 tools.image_gen__imagegen；transparent_background: false；全新生成，无参考图参数；未使用 CLI。
+用途：复古像素候选。按主控调整采用完整不透明方形，解决 v1 透明底板破洞。
+
+Use case: logo-brand
+Asset type: One original retro pixel-art MeowMac app logo candidate, square raster image.
+Primary request: A compact rounded warm-ivory cat named Nian Gao running to the right in side profile, centered on a COMPLETELY SOLID, FULLY OPAQUE, FLAT TEAL SQUARE CANVAS.
+Background: The entire square image from edge to edge is one uniform teal color. Every pixel is opaque. No transparent pixels, no empty regions, no outer background, no rounded-square tile, no holes, no cutouts, no border, no frame, no bevel, no drop shadow.
+Subject: One plump compact cat with a rounded oval body, rounded head, two small pointed ears, short muzzle, four simplified running paws, and thick tail curling upward behind it. The body is suspended in a dynamic bounding stride; the front legs extend forward and hind paws extend backward. Charming rounded rice-cake proportions, agile but not skinny. Cat occupies around 72 percent of image width with all ears, tail, and paws fully inside the square.
+Style: Refined vintage desktop pixel art. Drawn on one consistent large-pixel grid of roughly 48 logical pixels across the image. Clean, intentional stair-step silhouette edges and large square pixel clusters. Hard sharp color boundaries. No antialiasing or blur. Restrained and polished, not random mosaic noise.
+Palette: Exactly a muted blue-green teal background, warm ivory cat main shape, one flat muted taupe shadow shade for the cat, and tiny dark teal facial pixels. Few discrete solid colors only.
+Composition: One icon in one square image, front-facing and orthographic, no perspective, no presentation board or multiple variants. Focus on immediately recognizable running cat silhouette at small sizes.
+Avoid: Any transparency, alpha holes, black areas, background spots, texture, gradients, dithering, glow, blur, shading on the background, rainbow, CRT screen, computer, text, letters, numbers, symbols, gauges, meters, graphs, extra animals, stars, watermarks. Background must be perfectly uninterrupted teal edge to edge.
+
+检查：青绿背景完整，无内部破洞或透明边界；暖白奔跑猫、小尖耳、翘尾和阶梯像素边缘可见。无文字、边框、计量器或额外角色。生成器保留轻微底纹与明暗变化，未达到数学意义的纯色及严格离散调色板。

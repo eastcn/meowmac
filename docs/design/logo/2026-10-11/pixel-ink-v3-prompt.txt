@@ -1,0 +1,13 @@
+工具：内置 tools.image_gen__imagegen；transparent_background: false。
+输入：docs/design/logo/2026-10-11/pixel-v2.png；通过 referenced_image_paths 指定精确编辑目标。
+用途：像素候选的墨蓝配色编辑。原 v2 保留。
+
+Use case: precise-object-edit
+Asset type: Precise palette-only edit of the supplied MeowMac retro pixel-art running-cat logo.
+Input image: The supplied image is the exact edit target. Do not redraw or redesign it.
+Primary request: Change only the colors. Replace the teal background with sophisticated low-saturation deep ink navy / blue-black, approximately #19243A. Keep the cat warm ivory, coordinate its existing shadow pixels to a restrained warm gray-beige, and change the existing dark facial pixels to deep ink navy that reads clearly on the ivory.
+Background treatment: Clean, flat, finely matte, nearly uniform deep ink navy across the entire square. Remove the original teal background's mottled dirty texture and cheap bright gradient. No glow, no spotlight, no added material, no metallic effects.
+Absolute invariants: Preserve the exact same pixel grid, stepped pixel silhouette, outline, running pose, ear and tail shapes, four paw shapes, facial feature shapes, body proportions, position, scale, dimensions, square framing and composition of the source. Preserve every color-region shape. This is a recoloring pass, not new art. Keep all edges crisp and pixelated. Do not change cat anatomy or turn it into 3D.
+Constraints: Entire square remains fully opaque; no transparency, no rounded tile, no added margins, no alpha cutouts, no holes. No additional objects, text, decorations, stars, outline stroke, borders, or shadows beyond the cat's existing shadow regions. Only replace existing palette and clean the flat background.
+
+检查：与原图视觉对比，猫的像素轮廓、奔跑姿势、尖耳、翘尾、五官、阴影区域、位置和构图保持一致。背景改为墨蓝，面部深色像素清楚。无文字、额外角色、装饰或透明破洞。背景比原稿均匀，仍有极轻微的生成纹理。

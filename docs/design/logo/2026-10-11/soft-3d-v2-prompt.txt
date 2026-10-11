@@ -1,0 +1,17 @@
+工具：内置 image_gen__imagegen；全新生成，未传入参考图片参数。
+参数：transparent_background=false。采用不透明满幅方形画布，避免透明边界瑕疵。
+实际工具输出：~/.codex/generated_images/01a12949-ed21-7bb2-a77d-d77a07092349/exec-84424227-1258-408b-8e5d-0b78998cc580.png
+最终候选：soft-3d-v2.png，原样复制，无缩放或代码加工。目视确认完整青绿满幅背景、暖白立体奔跑猫、细腻阴影，无文字、道具、透明洞或外沿噪点。v1仅保留为过程对比。
+
+Use case: logo-brand
+Asset type: MeowMac macOS application icon concept, soft sculptural ceramic style.
+Primary request: A sophisticated warm ivory ceramic running cat in subtle raised relief on a complete opaque jade-teal square image.
+Scene/backdrop: The entire square canvas is solid opaque teal extending cleanly all the way to every edge and corner. Full-bleed square composition. No transparency, no cutout, no rounded tile floating in space, no outside background, no floor.
+Subject: Exactly one compact rounded adult-proportioned cat shown in side profile running toward the right. Sharp triangular ears, small naturally proportioned head and nose, rounded belly and oval torso, four readable legs in a running stride, long tail sweeping leftward and curling upward at its tip. Preserve a strong continuous running-cat silhouette. No large eyes or expressive face.
+Style/medium: Refined soft sculptural 3D relief with smooth matte porcelain surfaces, organic rounded contours, restrained depth, delicate rounded bevels and a tactile ceramic finish. Premium calm macOS icon concept. Adult cat proportions, not a kitten or toy.
+Composition/framing: Orthographic front view of the complete square image. Center the cat with balanced breathing room, approximately 76% of canvas width. No perspective tilt or framed product mockup. Image content reaches all four edges without borders, corner cutouts, halos or stray pixels.
+Lighting/mood: Broad soft upper-left light, gentle porcelain highlights, subtle ambient occlusion beneath the raised cat and at overlapping limbs. Fine diffused shadow on the teal surface. Restrained tonal layering.
+Color palette: Muted jade-teal approximately #279A96 filling the canvas; warm ivory cat approximately #F8F3E8. Quiet teal shading, no additional accent colors.
+Materials/textures: Clean smooth satin-matte ceramic, no fur and no grainy clay.
+Constraints: Exactly one ivory running cat on one full-bleed opaque teal square canvas, 1:1 square high-resolution image, approximately 1024x1024. Clean complete corners and edges, all pixels opaque.
+Avoid: Transparency, alpha holes, cutouts, checkerboard, floating rounded-square tile, exterior backdrop, border, frame, text, letters, watermark, symbols, other characters, speedometer, gauges, props, photorealistic fur, oversized eyes, chibi head, sitting pose, harsh glossy reflection, metallic shine.

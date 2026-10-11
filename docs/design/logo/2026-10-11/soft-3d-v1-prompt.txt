@@ -1,0 +1,23 @@
+工具：内置 image_gen__imagegen；全新生成，未传入参考图片参数。
+参数：transparent_background=true。
+实际工具输出：~/.codex/generated_images/01a12949-ed21-7bb2-a77d-d77a07092349/exec-a4c079a9-3576-4a55-896b-3985e1e4e151.png
+验证：1254×1254，RGBA，alpha范围0～255，四角alpha均为0，完全透明像素524801。工具输出原样复制，未缩放或加工。目视确认侧面奔跑猫、上扬尾巴、青绿基底、暖白哑光立体材质，无文字或其他角色。
+
+Use case: logo-brand
+Asset type: MeowMac macOS application icon, new soft 3D candidate.
+Primary request: Create a premium, restrained, soft sculptural macOS app icon: a single warm ivory running cat mounted in subtle raised relief on a teal rounded-square tile.
+Scene/backdrop: The tile is shown exactly front-on, square to the viewer, with a real transparent alpha background outside the rounded tile. No scene, floor or studio backdrop. 1:1 square composition, 1024x1024 target.
+Subject: A compact, rounded yet adult-proportioned cat in clean side profile running toward the right. Recognizable sharp triangular ears, small naturally proportioned head, subtly rounded belly and solid oval torso, four short but readable legs extended in a running stride, long tail sweeping leftward and curling upward at its tip. Keep the cat's profile unmistakable and continuous. A minimal small nose contour is enough; no large eyes or expressive face.
+Style/medium: Soft 3D sculptural relief, matte porcelain or smooth fine ceramic. Rounded organic contours, refined edge bevels and restrained depth. The cat has gentle volume while preserving the readable logo silhouette. Elegant contemporary macOS icon, calm and tactile, not a plush toy.
+Composition/framing: Entire rounded-square teal tile centered with a narrow transparent margin. Cat centered inside the tile with balanced breathing room, roughly 76% of tile width. View is orthographic straight-on; the tile is never tilted or presented as a perspective mockup.
+Lighting/mood: Broad soft light from upper left; delicate ambient occlusion beneath the cat and at limb overlaps, subtle ceramic highlights, fine diffused contact shadow contained inside the tile. Low-contrast sophisticated tonal layering; no harsh glossy reflections.
+Color palette: Muted jade-teal tile approximately #279A96 with modest light-to-dark teal shading. Warm ivory cat approximately #F8F3E8. No additional accent colors.
+Materials/textures: Satin-matte ceramic, perfectly smooth and clean, no fur texture, no gritty clay texture. Teal tile has a gently rounded face and quiet edge shading.
+Constraints: Exactly one cat, exactly one teal rounded-square tile. True transparent pixels outside the tile; never depict a checkerboard. Readable running-cat silhouette even at small icon sizes. Adult cat proportions, compact and rounded rather than kitten-headed.
+Avoid: Any text, letters, wordmarks, watermark, symbols, speedometer, gauges, extra characters, realistic fur, oversized eyes, chibi proportions, upright sitting pose, flat vector-only appearance, dramatic glass effects, metallic shine, angled tile, floor, backdrop, checkerboard.
+
+唯一一次针对性编辑：使用内置 image_gen__imagegen，referenced_image_paths 指向工作区 soft-3d-v1.png，transparent_background=true。
+编辑输出：~/.codex/generated_images/01a12949-ed21-7bb2-a77d-d77a07092349/exec-351c699f-b99e-451f-96b3-bd6b76797bad.png
+编辑结果：未采用。目视复查仍有左侧青色边缘与上沿孤立像素，上沿部分散点更明显；未达到清理目标。工作区最终候选保留首次生成版本及其原始来源，不再循环。
+
+Use case: precise-object-edit. Edit the supplied MeowMac icon. Make only one change: clean the outer alpha boundary of the teal rounded-square tile. Remove all turquoise stray speckles, isolated pixels, rough protrusions, fringing and halos OUTSIDE the tile, particularly along the left edge and above the top edge. The tile should have a perfectly clean smooth rounded-square contour with natural antialiasing and fully transparent pixels immediately outside it. Preserve the entire interior design exactly: same warm ivory ceramic cat, its shape, pose, running silhouette, scale and position, same teal colors, shading, ceramic surface, soft lighting, tile geometry and composition. Do not redraw or restyle the cat. Keep transparent background, do not add a checkerboard, text, backdrop or floor. Maintain the original square canvas.

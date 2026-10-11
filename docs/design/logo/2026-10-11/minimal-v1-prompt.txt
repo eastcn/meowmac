@@ -1,0 +1,15 @@
+工具：内置 image_gen.imagegen
+模式：全新生成；未传参考图参数
+参数：transparent_background=true
+生成源：~/.codex/generated_images/01a12949-afdd-7830-9bc2-96c07fe03373/exec-2348d15a-ea93-44b3-bf1e-93039412dc60.png
+完整实际 prompt：
+
+Use case: logo-brand
+Asset type: fresh MeowMac macOS application icon candidate, minimal graphic style, square 1:1 raster artwork.
+Primary request: create one refined flat graphic logo of a compact, plump, nimble cat in a side-on running leap. A round compact body, recognizable pointed ears, small rounded muzzle, flowing lifted curved tail, and a few short rounded legs form one strong memorable silhouette. Reduce anatomy to clean large shapes with intelligent negative space between the legs and beneath the tail. Convey friendly energy and quiet confidence.
+Scene/backdrop: a single warm ivory rounded-square macOS icon tile, straight-on orthographic view, with real transparent alpha outside the tile. The full rounded square is visible with generous small transparent margins.
+Style/medium: polished minimalist flat logo design, crisp vector-like curves and solid fills, strong balanced negative space, deliberately simple at small icon sizes. No gradients, no shading, no 3D, no texture.
+Composition/framing: one large centered teal cat mark occupies the main region of the warm ivory tile, balanced optical spacing, entire ears, legs and tail fully visible. Cat faces right with the tail rising and curling at the left. The cat is the only symbol.
+Color palette: deep green-teal cat (#297E78) on warm ivory tile (#F6F2E9); only these two solid colors.
+Text: none.
+Constraints: actual transparent background outside the rounded tile; never draw a checkerboard. No letters, no wordmark, no tiny decorative details, no chart, no gauge, no computer, no sticker outline, no other characters, no watermark, no perspective mockup, no shadow outside the tile.
