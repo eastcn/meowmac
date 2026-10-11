@@ -126,21 +126,34 @@ public struct CodexResetDisplay: Codable {
     public let siteStatus: String?
     public let error: String?
     public let cacheError: String?
+    public let nextAttemptAt: Date?
+    public let manualAvailableAt: Date?
     public static let sourceURL = URL(string: "https://aihot.news/codex-reset")!
+
+    public func timingSummary(timezone: TimeZone = .current) -> String? {
+        let parts = [fetchedAt.map { "检查 " + ResetDate.text($0, timezone: timezone) },
+                     nextAttemptAt.map { "下次 " + ResetDate.text($0, timezone: timezone) }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
 
     public func details(for row: CodexResetRow?, timezone: TimeZone = .current) -> String {
         let context = (row?.confirmation == nil ? "AIHOT 估算，非官方承诺。" : "")
             + "公开消息不代表当前账号已到账。"
         return ([context, row?.preview, row?.status, row?.scope,
                  row?.announcement, row?.estimate, row?.confirmation, siteStatus, error, cacheError]
-            + [fetchedAt.map { "获取：" + ResetDate.text($0, timezone: timezone) },
-               verifiedAt.map { "站点核验：" + ResetDate.text($0, timezone: timezone) }])
+            + [fetchedAt.map { "本机检查：" + ResetDate.text($0, timezone: timezone) },
+               verifiedAt.map { "站点核验：" + ResetDate.text($0, timezone: timezone) },
+               nextAttemptAt.map { "下次自动检查：" + ResetDate.text($0, timezone: timezone) },
+               manualAvailableAt.map { "最早手动检查：" + ResetDate.text($0, timezone: timezone) },
+               "正常每 6 小时检查；失败从 15 分钟指数退避，最长 6 小时。手动至少间隔 10 分钟，均遵守服务端等待时间。",
+               "检查成功或 304 只表示本机已核对接口，不代表站点有新消息。"])
             .compactMap { $0 }.joined(separator: "\n")
     }
 
     public init(feed: CodexResetFeed?, fetchedAt: Date?, error: String?, cacheError: String? = nil,
-                timezone: TimeZone = .current) {
+                nextAttemptAt: Date? = nil, manualAvailableAt: Date? = nil, timezone: TimeZone = .current) {
         self.fetchedAt = fetchedAt; self.error = error; self.cacheError = cacheError
+        self.nextAttemptAt = nextAttemptAt; self.manualAvailableAt = manualAvailableAt
         verifiedAt = feed?.monitor?.lastVerifiedAt ?? feed?.checkedAt
         siteStatus = feed?.monitor.map {
             switch $0.status {

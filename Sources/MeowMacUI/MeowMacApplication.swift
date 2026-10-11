@@ -98,7 +98,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         reset.start()
         panelState.onRefresh = { [weak self] in
             self?.sample(); self?.networkBridge?.recheck(); self?.quotaCoordinator?.manualRefresh()
-            self?.resetCoordinator?.refresh()
+            self?.resetCoordinator?.refresh(manual: true)
         }
         panelState.onShowStorage = { provider in
             let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".\(provider.rawValue)")

@@ -17,14 +17,16 @@ public struct CodexResetState {
     public var cacheError: String?
     public var failures: Int
     public var nextAttemptAt: Date?
+    public var manualAvailableAt: Date?
     public var hasResult: Bool { fetchedAt != nil || failures > 0 }
     public var display: CodexResetDisplay {
-        CodexResetDisplay(feed: feed, fetchedAt: fetchedAt, error: error, cacheError: cacheError)
+        CodexResetDisplay(feed: feed, fetchedAt: fetchedAt, error: error, cacheError: cacheError,
+            nextAttemptAt: nextAttemptAt, manualAvailableAt: manualAvailableAt)
     }
     public init(feed: CodexResetFeed? = nil, fetchedAt: Date? = nil, error: String? = nil,
-                cacheError: String? = nil, failures: Int = 0, nextAttemptAt: Date? = nil) {
+                cacheError: String? = nil, failures: Int = 0, nextAttemptAt: Date? = nil, manualAvailableAt: Date? = nil) {
         self.feed = feed; self.fetchedAt = fetchedAt; self.error = error; self.cacheError = cacheError
-        self.failures = failures; self.nextAttemptAt = nextAttemptAt
+        self.failures = failures; self.nextAttemptAt = nextAttemptAt; self.manualAvailableAt = manualAvailableAt
     }
 }
 
@@ -32,6 +34,8 @@ public struct CodexResetState {
 public final class CodexResetClient {
     public nonisolated static let endpoint = URL(string: "https://aihot.news/api/v1/codex-resets/recent")!
     public nonisolated static let interval: TimeInterval = 6 * 60 * 60
+    public nonisolated static let failureInterval: TimeInterval = 15 * 60
+    public nonisolated static let manualInterval: TimeInterval = 10 * 60
     public private(set) var state = CodexResetState()
     public private(set) var requesting = false
     private let session: URLSession
@@ -54,12 +58,22 @@ public final class CodexResetClient {
         }
         do {
             if let saved = try store.load() { cache = saved }
-            // 旧版成功缓存也遵守新的采集间隔，保留更长的服务端退避。
-            if let fetchedAt = cache.fetchedAt {
-                cache.nextAttemptAt = max(cache.nextAttemptAt ?? .distantPast, fetchedAt.addingTimeInterval(Self.interval))
+            if cache.schedulingVersion == nil {
+                // 旧失败缓存没有记录退避来源，原截止时间作为服务端限制保留一次。
+                let previousNext = cache.nextAttemptAt
+                if cache.failures > 0 || cache.fetchedAt == nil {
+                    cache.serverNotBeforeAt = previousNext
+                } else if let fetchedAt = cache.fetchedAt {
+                    let regularNext = fetchedAt.addingTimeInterval(Self.interval)
+                    if let previousNext, previousNext > regularNext { cache.serverNotBeforeAt = previousNext }
+                    cache.nextAttemptAt = max(previousNext ?? .distantPast, regularNext)
+                    cache.manualNotBeforeAt = fetchedAt.addingTimeInterval(Self.manualInterval)
+                }
+                cache.schedulingVersion = 2
             }
             state = CodexResetState(feed: try cache.body.map(CodexResetFeed.parse), fetchedAt: cache.fetchedAt,
-                error: cache.error, failures: cache.failures, nextAttemptAt: cache.nextAttemptAt)
+                error: cache.error, failures: cache.failures, nextAttemptAt: cache.nextAttemptAt,
+                manualAvailableAt: manualAvailableAt)
         } catch {
             state.cacheError = "缓存未恢复：" + error.localizedDescription
             logger.error("重置缓存恢复失败：\(error.localizedDescription, privacy: .private)")
@@ -72,7 +86,14 @@ public final class CodexResetClient {
             logger.error("重置缓存保存失败：\(error.localizedDescription, privacy: .private)")
         }
     }
-    private func setNext(_ date: Date) { cache.nextAttemptAt = date; state.nextAttemptAt = date }
+    private var manualAvailableAt: Date? {
+        [cache.manualNotBeforeAt, cache.serverNotBeforeAt].compactMap { $0 }.max()
+    }
+    private func setNext(_ date: Date) {
+        cache.nextAttemptAt = max(date, cache.serverNotBeforeAt ?? .distantPast)
+        state.nextAttemptAt = cache.nextAttemptAt
+        state.manualAvailableAt = manualAvailableAt
+    }
 
     private func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         do { return try await session.data(for: request) }
@@ -92,13 +113,18 @@ public final class CodexResetClient {
         }
     }
 
-    /// 每轮采集共用 6 小时下限；TLS 意外断开时，同一轮内最多用新会话重试一次。
-    @discardableResult public func refresh() async -> Bool {
-        guard !requesting, cache.nextAttemptAt.map({ now() >= $0 }) ?? true else { return false }
+    /// 自动成功后等 6 小时；失败从 15 分钟退避，手动至少等 10 分钟，均尊重服务端限制。
+    @discardableResult public func refresh(manual: Bool = false) async -> Bool {
+        let deadline = manual ? manualAvailableAt : cache.nextAttemptAt
+        guard !Task.isCancelled, !requesting, deadline.map({ now() >= $0 }) ?? true else { return false }
         requesting = true
         defer { requesting = false }
         let started = now()
-        setNext(started.addingTimeInterval(Self.interval))
+        cache.schedulingVersion = 2
+        cache.serverNotBeforeAt = nil
+        cache.manualNotBeforeAt = started.addingTimeInterval(Self.manualInterval)
+        // 请求中退出或休眠仍有限频记录，但不会把尚未成功的采集推迟 6 小时。
+        setNext(started.addingTimeInterval(Self.failureInterval))
         persist()
         var request = URLRequest(url: Self.endpoint, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
         request.setValue("aihot-api/2.0.0 aihot-actor/" + cache.actorID.uuidString.lowercased(), forHTTPHeaderField: "User-Agent")
@@ -106,7 +132,6 @@ public final class CodexResetClient {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if cache.body != nil, let etag = cache.etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
         var retryAfter: Date?
-        var serverFailure = false
         do {
             let (data, response) = try await data(for: request)
             try Task.checkCancellation()
@@ -115,7 +140,6 @@ public final class CodexResetClient {
                 throw CodexResetError.invalid("重置接口响应来源无效")
             }
             retryAfter = Self.retryDate(response.value(forHTTPHeaderField: "Retry-After"), now: now())
-            serverFailure = response.statusCode >= 500
             if response.statusCode == 304 {
                 guard cache.body != nil, state.feed != nil else { throw CodexResetError.invalid("接口返回 304，但没有有效缓存") }
             } else if response.statusCode == 200 {
@@ -126,13 +150,21 @@ public final class CodexResetClient {
             if let etag = response.value(forHTTPHeaderField: "ETag"), CodexResetCacheStore.validETag(etag) { cache.etag = etag }
             cache.fetchedAt = now(); cache.failures = 0; cache.error = nil
             state.fetchedAt = cache.fetchedAt; state.failures = 0; state.error = nil
+            cache.serverNotBeforeAt = retryAfter
+            cache.manualNotBeforeAt = now().addingTimeInterval(Self.manualInterval)
+            setNext(now().addingTimeInterval(Self.interval))
         } catch {
-            if Task.isCancelled { persist(); return true }
+            cache.serverNotBeforeAt = retryAfter
+            cache.manualNotBeforeAt = now().addingTimeInterval(Self.manualInterval)
+            if Task.isCancelled {
+                setNext(now().addingTimeInterval(Self.failureInterval))
+                persist(); return true
+            }
             cache.failures = min(cache.failures + 1, 1_000_000)
             cache.error = error.localizedDescription
             state.failures = cache.failures; state.error = cache.error
-            let backoff = serverFailure ? min(Self.interval * pow(2, Double(min(cache.failures, 3))), 24 * 60 * 60) : Self.interval
-            setNext(max(now().addingTimeInterval(backoff), retryAfter ?? .distantPast))
+            let backoff = min(Self.failureInterval * pow(2, Double(min(cache.failures - 1, 5))), Self.interval)
+            setNext(now().addingTimeInterval(backoff))
             logger.error("重置监控采集失败：\(error.localizedDescription, privacy: .private)")
         }
         persist()

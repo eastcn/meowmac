@@ -48,7 +48,7 @@ enum CodexResetTests {
         ("Quota.Reset/空缓存 304 坏响应与撤回", { await replacement() }),
         ("Quota.Reset/手动并发合并与6小时边界", { await coalescing() }),
         ("Quota.Reset/429 Retry-After 与5xx退避", { await backoff() }),
-        ("Quota.Reset/慢失败从返回时起至少等待6小时", { await slowFailure() }),
+        ("Quota.Reset/慢失败从返回时起至少等待15分钟", { await slowFailure() }),
         ("Quota.Reset/TLS意外断开新会话重试并保留ETag", { await tlsRecovery() }),
         ("Quota.Reset/TLS连续失败只重试一次且保持限频", { await tlsRetryLimit() }),
         ("Quota.Reset/证书与其他连接错误不重试", { await tlsNoRetry() }),
@@ -199,9 +199,9 @@ enum CodexResetTests {
             let client = CodexResetClient(root: root, session: session, now: { time })
             guard await client.refresh(), ResetTestProtocol.requests.count == 2,
                   client.state.error != nil, client.state.failures == 1,
-                  client.state.nextAttemptAt == time.addingTimeInterval(21_600) else { return false }
+                  client.state.nextAttemptAt == time.addingTimeInterval(900) else { return false }
             let restart = CodexResetClient(root: root, session: session, now: { time })
-            time.addTimeInterval(21_599)
+            time.addTimeInterval(899)
             guard restart.state.failures == 1, !(await restart.refresh()), ResetTestProtocol.requests.count == 2 else { return false }
             time.addTimeInterval(1)
             return await restart.refresh() && restart.state.error == nil && restart.state.failures == 0
@@ -227,9 +227,9 @@ enum CodexResetTests {
     }
     static func tlsRetryOutcomes() async -> Bool {
         for (reply, wait) in [(ResetTestProtocol.Reply(status: 429, headers: ["Retry-After": "172800"]), 172_800.0),
-                              (.init(status: 503), 43_200.0),
-                              (.init(status: 200, data: Data("broken".utf8)), 21_600.0),
-                              (.init(status: 0, error: tlsError(-9802)), 21_600.0)] {
+                              (.init(status: 503), 900.0),
+                              (.init(status: 200, data: Data("broken".utf8)), 900.0),
+                              (.init(status: 0, error: tlsError(-9802)), 900.0)] {
             do {
                 let root = try root("tls-outcome"), session = session()
                 defer { session.invalidateAndCancel(); try? FileManager.default.removeItem(at: root) }
@@ -259,7 +259,7 @@ enum CodexResetTests {
                 refresh.cancel()
                 guard await refresh.value, reached, ResetTestProtocol.requests.count == count,
                       !client.requesting, client.state.failures == 0, client.state.error == nil,
-                      client.state.nextAttemptAt == clock.addingTimeInterval(21_600) else { return false }
+                      client.state.nextAttemptAt == clock.addingTimeInterval(900) else { return false }
             } catch { return false }
         }
         return true
@@ -324,15 +324,15 @@ enum CodexResetTests {
             ResetTestProtocol.prepare([.init(status: 429, headers: ["Retry-After": "1800"]), .init(status: 503),
                 .init(status: 503), .init(status: 429, headers: ["Retry-After": "172800"]), .init(status: 200, data: data())])
             let client = CodexResetClient(root: root, session: session, now: { time })
-            _ = await client.refresh(); guard client.state.nextAttemptAt == clock.addingTimeInterval(21_600) else { return false }
-            time.addTimeInterval(21_599); guard !(await client.refresh()) else { return false }
+            _ = await client.refresh(); guard client.state.nextAttemptAt == clock.addingTimeInterval(1800) else { return false }
+            time.addTimeInterval(1799); guard !(await client.refresh()) else { return false }
             time.addTimeInterval(1); _ = await client.refresh()
-            guard client.state.nextAttemptAt == time.addingTimeInterval(86_400) else { return false }
-            time.addTimeInterval(86_400); _ = await client.refresh()
-            guard client.state.nextAttemptAt == time.addingTimeInterval(86_400) else { return false }
+            guard client.state.nextAttemptAt == time.addingTimeInterval(1800) else { return false }
+            time.addTimeInterval(1800); _ = await client.refresh()
+            guard client.state.nextAttemptAt == time.addingTimeInterval(3600) else { return false }
             let restart = CodexResetClient(root: root, session: session, now: { time })
             guard !(await restart.refresh()), restart.state.failures == 3 else { return false }
-            time.addTimeInterval(86_400); _ = await restart.refresh()
+            time.addTimeInterval(3600); _ = await restart.refresh()
             guard restart.state.nextAttemptAt == time.addingTimeInterval(172_800) else { return false }
             time.addTimeInterval(172_799); guard !(await restart.refresh()) else { return false }
             time.addTimeInterval(1); _ = await restart.refresh()
@@ -349,6 +349,9 @@ enum CodexResetTests {
             guard await client.refresh() else { return false }
             let file = root.appendingPathComponent("codex-reset-monitor.json")
             var saved = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as! [String: Any]
+            saved.removeValue(forKey: "schedulingVersion")
+            saved.removeValue(forKey: "manualNotBeforeAt")
+            saved.removeValue(forKey: "serverNotBeforeAt")
             saved["nextAttemptAt"] = clock.addingTimeInterval(600).timeIntervalSince1970 * 1000
             try JSONSerialization.data(withJSONObject: saved).write(to: file)
             time.addTimeInterval(600)
@@ -395,8 +398,8 @@ enum CodexResetTests {
             guard client.requesting else { return false }
             time.addTimeInterval(30)
             _ = await request.value
-            guard client.state.failures == 1, client.state.nextAttemptAt == time.addingTimeInterval(21_600) else { return false }
-            time.addTimeInterval(21_599)
+            guard client.state.failures == 1, client.state.nextAttemptAt == time.addingTimeInterval(900) else { return false }
+            time.addTimeInterval(899)
             guard !(await client.refresh()), ResetTestProtocol.requests.count == 1 else { return false }
             time.addTimeInterval(1)
             return await client.refresh() && ResetTestProtocol.requests.count == 2

@@ -9,6 +9,9 @@ struct CodexResetCache: Codable {
     var etag: String?
     var fetchedAt: Date?
     var nextAttemptAt: Date?
+    var schedulingVersion: Int?
+    var manualNotBeforeAt: Date?
+    var serverNotBeforeAt: Date?
     var failures = 0
     var error: String?
 }
@@ -57,7 +60,8 @@ final class CodexResetCacheStore {
         guard count == bytes.count else { throw CodexResetError.invalid("重置缓存读取不完整") }
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .millisecondsSince1970
         let value = try decoder.decode(CodexResetCache.self, from: Data(bytes))
-        guard value.schemaVersion == 1, (0...1_000_000).contains(value.failures),
+        guard value.schemaVersion == 1, value.schedulingVersion == nil || value.schedulingVersion == 2,
+              (0...1_000_000).contains(value.failures),
               value.etag.map({ Self.validETag($0) }) ?? true,
               value.body != nil || value.etag == nil,
               value.body != nil || value.fetchedAt == nil else {

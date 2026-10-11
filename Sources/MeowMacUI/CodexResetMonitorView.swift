@@ -16,9 +16,13 @@ struct CodexResetMonitorView: View {
             if let latest = display.latest {
                 previewRow(latest, title: "最近确认：")
             }
-            if let fetchedAt = display.fetchedAt {
-                Text("获取于 " + DisplayDate.format(fetchedAt, pattern: "M/d HH:mm") + " · 每 6 小时更新")
-                    .font(Design.tiny).foregroundStyle(.secondary)
+            if let timing = display.timingSummary() {
+                Text(timing).font(Design.tiny).foregroundStyle(.secondary)
+                    .help(display.details(for: nil))
+            }
+            if let status = display.siteStatus, status != "站点采集正常" {
+                Text(status).font(Design.tiny).foregroundStyle(Design.stateText(.warn))
+                    .help(display.details(for: nil))
             }
         }.fixedSize(horizontal: false, vertical: true).monospacedDigit()
     }

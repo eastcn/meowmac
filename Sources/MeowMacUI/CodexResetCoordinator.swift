@@ -30,12 +30,12 @@ public final class CodexResetCoordinator {
         })
         refresh()
     }
-    public func refresh() {
+    public func refresh(manual: Bool = false) {
         guard running, !sleeping, task == nil else { return }
         task = Task { [weak self] in
             guard let self else { return }
-            let attempted = await self.client.refresh()
-            if !Task.isCancelled && attempted { self.publish(confirmed: true) }
+            let attempted = await self.client.refresh(manual: manual)
+            if attempted { self.publish(confirmed: !Task.isCancelled) }
             self.task = nil
         }
     }
