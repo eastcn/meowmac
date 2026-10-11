@@ -11,6 +11,7 @@ enum TestPresentationPolicy {
         "UI.AIDiagnosis/", "UI.AIAgentSettings/", "UI.AIAgent.Live/", "UI.Cleaning.Live/"
     ]
     static let foregroundCases: Set<String> = [
+        "Backlog.Network/真实入口展开收起与隐藏卡片",
         "UI.Settings/即时设置回调与条件", "UI.Settings/六栏合成窗口预览",
         "UI.SettingsWindow/单例定位与记忆", "UI.SettingsWindow/固定侧栏与移除切换按钮",
         "UI.Settings.AlertRules/真实数字框、启用和新建入口", "UI.Settings.AlertRules/合成真实窗口预览",
@@ -29,6 +30,8 @@ enum TestPresentationPolicy {
             && !allowsForeground(environment: ["MEOWMAC_RENDER_DIR": "example", "MEOWMAC_LIVE": "1"])
             && !allowsForeground(environment: ["MEOWMAC_UI_TESTS": "0"])
             && allowsForeground(environment: ["MEOWMAC_UI_TESTS": "1"])
+            && requiresForeground("Backlog.Network/真实入口展开收起与隐藏卡片")
+            && !requiresForeground("Backlog.Network/失败域名与原因进入展示模型")
             && requiresForeground("UI.SettingsWindow/单例定位与记忆")
             && requiresForeground("UI.Reset/真实360pt弹出容器与浅深色分节")
             && !requiresForeground("UI.Reset/独立快照与四渠道归属")

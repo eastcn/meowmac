@@ -66,6 +66,8 @@ public struct NetworkDisplay: Codable {
     public let samplingInterval: TimeInterval
     public let isChecking: Bool
     public var trends: NetworkTrendsDisplay? = nil
+    /// 每个目标最近一次结果。旧快照缺少此字段时仍可解码。
+    public var siteResults: [NetworkSiteDisplay]? = nil
     public var passed: Int { checks.filter { $0.tone == .green }.count }
 }
 
@@ -131,9 +133,15 @@ public extension AppModel {
             return count > 0 ? "\(count) 项\(word)" : nil
         }.joined(separator: " · ")
         let detail = tone != .green && worst == nil ? overall.primaryReason : countText
-        return NetworkDisplay(tone: tone, conclusion: conclusion, detail: detail,
+        var display = NetworkDisplay(tone: tone, conclusion: conclusion, detail: detail,
             checkedAt: lastCheckedAt, checks: checks, groups: groups, egress: egress,
             samplingInterval: settings.egressMonitoring.effectiveInterval, isChecking: checkProgress != nil)
+        display.siteResults = siteHistory.results.values.compactMap(\.last).map(NetworkSiteDisplay.init).sorted {
+            if $0.failed != $1.failed { return $0.failed }
+            if $0.target != $1.target { return $0.target < $1.target }
+            return $0.id < $1.id
+        }
+        return display
     }
 
     /// 某个故障键当前这次异常的开始时刻：从最新事件往回找，遇到“消失”就停。
@@ -283,6 +291,7 @@ struct NetworkPage: View {
                     CapsuleAction(title: value.isChecking ? "正在检测…" : "复测", action: model.recheck).disabled(value.isChecking)
                 }
             }
+            NetworkProbeResultsView(rows: value.siteResults ?? [], isChecking: value.isChecking)
             ForEach(state.renderedCardIDs(for: .network), id: \.self) { id in
                 SectionRule()
                 PanelCardRegistry.cards[id]?.makeView(state: state).measureCardBottom(id)
