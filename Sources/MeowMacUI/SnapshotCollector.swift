@@ -47,16 +47,7 @@ public enum SnapshotCollector {
         }.value
         state.energyUpdatedAt = Date()
         state.energy = energy
-        for provider in state.quotaProviders {
-            do {
-                state.quotas[provider] = try await Task.detached { try client.usage(provider) }.value
-                state.quotaHistory[provider] = try QuotaHistoryStore().read(provider)
-            } catch {
-                state.quotaErrors[provider] = error.localizedDescription
-                state.failures["quota.\(provider.rawValue)"] = config.sourceFailureCount
-                logger.error("快照额度采集失败：\(provider.rawValue, privacy: .public) \(error.localizedDescription, privacy: .private)")
-            }
-        }
+        await collectQuotas(state: state, client: client)
         for provider in [QuotaProvider.codex, .claude] where state.quotaProviders.contains(provider) {
             do { state.costs[provider] = try await Task.detached { try client.cost(provider) }.value }
             catch { logger.error("快照花费采集失败：\(provider.rawValue, privacy: .public) \(error.localizedDescription, privacy: .private)") }
@@ -102,4 +93,29 @@ public enum SnapshotCollector {
         state.selectedTab = last
         return state
     }
+
+    /// 快照与菜单栏共用同一保护条件；拆出额度阶段供离线假 CLI 验证。
+    @MainActor public static func collectQuotas(state: PanelState, client: CodexBarClient,
+        history: QuotaHistoryStore = QuotaHistoryStore(),
+        proxyCheck: @escaping @Sendable () async -> QuotaProxyStatus = { await QuotaProxyProtection.check() }) async {
+        let logger = Logger(subsystem: AppIdentity.bundleID, category: "snapshot")
+        for provider in state.quotaProviders {
+            if QuotaProxyProtection.protects(provider) {
+                state.quotaProxyStatus = await proxyCheck()
+                if state.quotaProxyStatus != .ready {
+                    state.quotaHistory[provider] = try? history.read(provider)
+                    continue
+                }
+            }
+            do {
+                state.quotas[provider] = try await Task.detached { try client.usage(provider) }.value
+                state.quotaHistory[provider] = try history.read(provider)
+            } catch {
+                state.quotaErrors[provider] = error.localizedDescription
+                state.failures["quota.\(provider.rawValue)"] = state.configResult.config.sourceFailureCount
+                logger.error("快照额度采集失败：\(provider.rawValue, privacy: .public) \(error.localizedDescription, privacy: .private)")
+            }
+        }
+    }
+
 }

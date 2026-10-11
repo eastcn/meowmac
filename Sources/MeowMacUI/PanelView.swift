@@ -108,6 +108,7 @@ public final class PanelState: ObservableObject {
     @Published public var quotaHistory: [QuotaProvider: [QuotaHistoryLine]] = [:]
     @Published public var quotaAttempts: [QuotaProvider: QuotaAttempt] = [:]
     @Published public var quotaErrors: [QuotaProvider: String] = [:]
+    @Published public var quotaProxyStatus: QuotaProxyStatus = .checking
     @Published public var codexResetState = CodexResetState()
     @Published public var localStorage: [QuotaProvider: LocalStorageSnapshot] = [:]
     private var storageLoading: Set<QuotaProvider> = []

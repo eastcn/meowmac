@@ -68,6 +68,7 @@ public struct NetworkDisplay: Codable {
     public var trends: NetworkTrendsDisplay? = nil
     /// 每个目标最近一次结果。旧快照缺少此字段时仍可解码。
     public var siteResults: [NetworkSiteDisplay]? = nil
+    public var quotaProtectionWarning: String? = nil
     public var passed: Int { checks.filter { $0.tone == .green }.count }
 }
 
@@ -274,23 +275,26 @@ struct NetworkPage: View {
     @ObservedObject var state: PanelState
     var body: some View {
         let value = model.meowMacDisplay
+        let protection = state.quotaProxyWarning
+        let tone = protection == nil ? value.tone : NetworkTone.red
         VStack(alignment: .leading, spacing: Design.sectionGap) {
             HStack(alignment: .center, spacing: Design.footerInset) {
                 ZStack {
-                    Circle().fill(Design.networkColor(value.tone))
-                    Image(systemName: value.tone == .green ? "checkmark" : value.tone == .red ? "xmark" : value.tone == .yellow ? "exclamationmark" : "questionmark")
+                    Circle().fill(Design.networkColor(tone))
+                    Image(systemName: tone == .green ? "checkmark" : tone == .red ? "xmark" : tone == .yellow ? "exclamationmark" : "questionmark")
                         .font(.system(size: Design.verdictIcon * 0.5, weight: .bold)).foregroundStyle(Design.iconInk)
                 }.frame(width: Design.verdictIcon, height: Design.verdictIcon)
                 VStack(alignment: .leading, spacing: Design.tightGap) {
-                    Text(value.conclusion).font(Design.status).fixedSize(horizontal: false, vertical: true)
-                    Text(value.detail).font(Design.caption).foregroundStyle(Design.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(protection == nil ? value.conclusion : "额度查询保护 · 严重警告").font(Design.status)
+                        .foregroundStyle(protection == nil ? Design.label : Design.stateText(.severe)).fixedSize(horizontal: false, vertical: true)
+                    Text(protection ?? value.detail).font(Design.caption).foregroundStyle(Design.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Design.gap)
                 VStack(alignment: .trailing, spacing: Design.smallGap) {
                     Text(DisplayDate.age(value.checkedAt, now: model.now()) + "检测").font(Design.tiny).foregroundStyle(Design.secondary).fixedSize()
                     CapsuleAction(title: value.isChecking ? "正在检测…" : "复测", action: model.recheck).disabled(value.isChecking)
                 }
-            }
+            }.accessibilityIdentifier(protection == nil ? "network.verdict" : "network.quota-protection")
             NetworkProbeResultsView(rows: value.siteResults ?? [], isChecking: value.isChecking)
             ForEach(state.renderedCardIDs(for: .network), id: \.self) { id in
                 SectionRule()

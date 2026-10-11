@@ -140,7 +140,14 @@ struct QuotaPage: View {
                     }.buttonStyle(.plain)
                 }
             }
-            if let error = state.quotaErrors[provider] {
+            if let pause = state.quotaPauseMessage(provider) {
+                GlassCard(warning: true) {
+                    VStack(alignment: .leading, spacing: Design.gap) {
+                        Text("\(provider.displayName) 查询已暂停").font(Design.title)
+                        Text(pause).font(Design.caption).foregroundStyle(Design.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }.accessibilityIdentifier("quota.proxy-paused")
+            } else if let error = state.quotaErrors[provider] {
                 GlassCard(warning: true) { VStack(alignment: .leading, spacing: Design.gap) { Text("\(provider.displayName) 采集失败").font(Design.title); Text(error).font(Design.caption).foregroundStyle(Design.secondary) } }
             }
             if let quota = state.quotas[provider] {

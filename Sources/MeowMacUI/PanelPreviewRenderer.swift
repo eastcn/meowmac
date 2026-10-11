@@ -7,6 +7,7 @@ import TunCanaryUI
 public enum PanelPreviewRenderer {
     public static func syntheticState(alert: Bool = false, quotaAlert: Bool = false) -> PanelState {
         let state = PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil))
+        state.quotaProxyStatus = .ready
         let now = ISO8601DateFormatter().date(from: "2026-09-30T06:35:00Z")!
         state.now = { now }
         state.chartMinutes = 15

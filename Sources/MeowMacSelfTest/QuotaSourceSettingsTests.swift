@@ -13,7 +13,7 @@ enum QuotaSourceSettingsTests {
         if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
         let state = PanelPreviewRenderer.syntheticState()
         let client = CodexBarClient(path: "/synthetic/cli", environment: environment, executor: executor)
-        let coordinator = QuotaCoordinator(state: state, config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: client, sourceStore: QuotaSourceStore(root: root))
+        let coordinator = QuotaCoordinator(state: state, config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: client, sourceStore: QuotaSourceStore(root: root), proxyCheck: { .ready })
         let controller = SettingsWindowController(state: state, quotaCoordinator: coordinator, quotaCatalog: all)
         controller.open(section: .quotaSources, load: false)
         guard let model = controller.quotaSources else { throw QuotaSourceError.invalid }
@@ -107,7 +107,7 @@ enum QuotaSourceSettingsTests {
             model.setEnabled(false, provider: .claude); await model.save()
             guard await wait(first), !enabled else { return false }
             usages = []; events = []
-            let restarted = QuotaCoordinator(state: PanelState(), config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: first.client, sourceStore: first.sourceStore)
+            let restarted = QuotaCoordinator(state: PanelState(), config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: first.client, sourceStore: first.sourceStore, proxyCheck: { .ready })
             restarted.start(); defer { restarted.stop() }
             guard await wait(restarted) else { return false }
             return restarted.sourceEnabled[.claude] == false && usages == ["openrouter"] && events.first == "providers"
@@ -124,7 +124,7 @@ enum QuotaSourceSettingsTests {
             defer { controller.closeWithoutConfirmation(); try? FileManager.default.removeItem(at: root) }
             try first.replaceSources(QuotaSourceList(providers: [QuotaSourceTests.router]))
             let state = PanelState()
-            let restarted = QuotaCoordinator(state: state, config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: first.client, sourceStore: first.sourceStore)
+            let restarted = QuotaCoordinator(state: state, config: LocalConfig(), history: QuotaHistoryStore(directory: root.appendingPathComponent("history")), client: first.client, sourceStore: first.sourceStore, proxyCheck: { .ready })
             restarted.start(); defer { restarted.stop() }
             return await wait(restarted) && calls == 0 && restarted.lastActualCalls.isEmpty
                 && state.quotaErrors[QuotaSourceTests.router]?.contains("启停状态") == true

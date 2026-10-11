@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Combine
 import MeowMacCore
 import MeowMacQuota
 import os
@@ -23,20 +24,36 @@ public final class QuotaCoordinator {
     private var startupTask: Task<Void, Never>?
     private var sleeping = false
     private var observers: [NSObjectProtocol] = []
+    private let proxyCheck: @Sendable () async -> QuotaProxyStatus
+    private var proxySubscriptions = Set<AnyCancellable>()
+    private var proxyGeneration = 0
 
     public init(state: PanelState, config: LocalConfig, history: QuotaHistoryStore = QuotaHistoryStore(),
                 importSource: URL = CodexBarHistoryImport.defaultSource, scanner: AgentActivityScanner = AgentActivityScanner(),
-                client: CodexBarClient? = nil, sourceStore: QuotaSourceStore = QuotaSourceStore()) {
+                client: CodexBarClient? = nil, sourceStore: QuotaSourceStore = QuotaSourceStore(),
+                proxyCheck: @escaping @Sendable () async -> QuotaProxyStatus = { await QuotaProxyProtection.check() }) {
         self.state = state; self.config = config; self.history = history; self.importSource = importSource
         self.scanner = scanner
         self.client = client ?? CodexBarClient(path: config.codexBarCLIPath)
         self.sourceStore = sourceStore
+        self.proxyCheck = proxyCheck
         let loaded = sourceStore.load()
         state.applyQuotaSources(loaded.list); state.quotaSourceRecoveryReason = loaded.recoveryReason
+        if let model = state.networkModel {
+            model.$local.sink { [weak self] local in
+                self?.proxyEvidenceChanged(QuotaProxyProtection.status(local, at: Date()))
+            }.store(in: &proxySubscriptions)
+            model.$graceEndsAt.sink { [weak self] end in
+                guard let self else { return }
+                self.proxyGeneration += 1
+                if end != nil { self.setProxyStatus(.switching) }
+            }.store(in: &proxySubscriptions)
+        }
     }
 
     public func start() {
         guard startupTask == nil else { return }
+        sleeping = false
         starting = true
         state.showsCodexBarImport = !codexBarImportDone
         do { try history.prune(before: Date().addingTimeInterval(Double(-config.quotaHistoryDays) * 86400)); lastPrunedAt = Date() }
@@ -53,13 +70,18 @@ public final class QuotaCoordinator {
         }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.sleeping = true; self?.schedule.sleep() }
+            Task { @MainActor [weak self] in
+                self?.sleeping = true; self?.schedule.sleep()
+                self?.proxyEvidenceChanged(.checking)
+            }
         })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.sleeping = false
+                self.proxyEvidenceChanged(.checking)
+                self.drain()
                 if self.schedule.wake(at: Date(), config: self.config) { self.refreshAll() }
             }
         })
@@ -85,6 +107,8 @@ public final class QuotaCoordinator {
     }
 
     public func stop() {
+        proxyGeneration += 1
+        sleeping = true
         startupTask?.cancel(); startupTask = nil; starting = false
         refreshTimer?.invalidate(); sessionTimer?.invalidate()
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
@@ -179,17 +203,46 @@ public final class QuotaCoordinator {
         guard let provider = state.quotaProviders.first(where: { (pending[$0].map { $0 <= state.now() } ?? false) && (sourceEnabled[$0] != false || explicitRequests.contains($0)) }) else { return }
         let remaining = cooldownRemaining(provider)
         if remaining > 0 { pending[provider] = state.now().addingTimeInterval(remaining); return }
-        pending.removeValue(forKey: provider)
-        explicitRequests.remove(provider)
         refreshing = true
-        lastActualCalls[provider] = state.now()
         let generation = generations[provider, default: 0]
         let client = self.client
         Task { [weak self] in
+            guard let self else { return }
+            if QuotaProxyProtection.protects(provider) {
+                let version = self.proxyGeneration
+                let status = await self.proxyCheck()
+                let switched = self.state.networkModel?.graceEndsAt != nil
+                let current: QuotaProxyStatus
+                if switched { current = .switching }
+                else if version != self.proxyGeneration { current = self.state.quotaProxyStatus == .ready ? .checking : self.state.quotaProxyStatus }
+                else { current = status }
+                self.setProxyStatus(current)
+                guard current == .ready else {
+                    self.logger.warning("额度查询前代理检查阻断：\(provider.rawValue, privacy: .public)，\(current.reason ?? "状态未确认", privacy: .public)")
+                    // 保留每个渠道的一次请求，暂缓重查，继续处理其他渠道。
+                    for item in Array(self.pending.keys) where QuotaProxyProtection.protects(item) {
+                        self.pending[item] = self.state.now().addingTimeInterval(max(30, self.cooldownRemaining(item)))
+                    }
+                    self.refreshing = false
+                    self.drain()
+                    return
+                }
+            }
+            // 检查期间可能休眠、停用或移除渠道；此时不能启动 CLI。
+            guard !self.sleeping, self.state.quotaProviders.contains(provider),
+                  self.generations[provider, default: 0] == generation,
+                  self.sourceEnabled[provider] != false || self.explicitRequests.contains(provider) else {
+                self.refreshing = false; self.drain(); return
+            }
+            self.pending.removeValue(forKey: provider)
+            self.explicitRequests.remove(provider)
+            if QuotaProxyProtection.protects(provider) {
+                self.logger.info("额度查询前代理检查放行：\(provider.rawValue, privacy: .public)，Clash 核心和 TUN 正常")
+            }
+            self.lastActualCalls[provider] = self.state.now()
             let result = await Task.detached { () -> Result<QuotaSnapshot, Error> in
                 Result { try client.usage(provider) }
             }.value
-            guard let self else { return }
             if self.state.quotaProviders.contains(provider), self.generations[provider, default: 0] == generation {
                 self.apply(result, provider: provider)
                 if [.claude, .codex].contains(provider) {
@@ -205,6 +258,26 @@ public final class QuotaCoordinator {
             self.refreshing = false
             self.drain()
         }
+    }
+
+    /// 网络检测结果用于立即展示及恢复排队；真正放行仍需调用前重新采集。
+    public func proxyEvidenceChanged(_ status: QuotaProxyStatus) {
+        if status != .ready { proxyGeneration += 1 }
+        let wasBlocked = state.quotaProxyStatus != .ready
+        setProxyStatus(status)
+        if status == .ready && wasBlocked {
+            for provider in Array(pending.keys) where QuotaProxyProtection.protects(provider) {
+                pending[provider] = state.now().addingTimeInterval(cooldownRemaining(provider))
+            }
+            drain()
+        }
+    }
+
+    private func setProxyStatus(_ status: QuotaProxyStatus) {
+        guard state.quotaProxyStatus != status else { return }
+        state.quotaProxyStatus = status
+        if let reason = status.reason { logger.warning("额度代理保护：\(reason, privacy: .public)，暂停 GPT/Codex 和 Claude 查询") }
+        else { logger.info("额度代理保护：TUN 已就绪") }
     }
 
     private func apply(_ result: Result<QuotaSnapshot, Error>, provider: QuotaProvider) {

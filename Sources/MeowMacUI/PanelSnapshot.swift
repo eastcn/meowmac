@@ -57,6 +57,7 @@ public struct QuotaChannelDisplay: Codable {
     public let selectedCostDay: CostDayDisplay?
     public let storage: LocalStorageSnapshot?
     public let error: String?
+    public var pauseMessage: String? = nil
 }
 public struct PanelSnapshot: Codable {
     public let overview: OverviewSnapshot
@@ -77,6 +78,7 @@ public struct PanelSnapshot: Codable {
         var networkDisplay = state.networkModel?.meowMacDisplay
         networkDisplay?.capture = state.networkCapture
         networkDisplay?.trends = state.networkTrends
+        networkDisplay?.quotaProtectionWarning = state.quotaProxyWarning
         network = networkDisplay
         cat = state.catDisplay()
         layout = PanelLayoutSnapshot(effective: state.panelLayout, fallback: state.layoutRecoveryReason != nil || state.selectedCat == nil)
@@ -102,6 +104,6 @@ public extension PanelState {
             cycles: quotaCycles(provider), peaks: quotaPeaks(provider), cost: costDisplay(provider),
             costDays: costDisplay(provider) == nil ? [] : costChartDates.map { costDayDisplay(provider, date: $0) },
             selectedCostDay: costDisplay(provider) == nil ? nil : costDayDisplay(provider, date: displayedCostDate),
-            storage: localStorage[provider], error: quotaErrors[provider])
+            storage: localStorage[provider], error: quotaErrors[provider], pauseMessage: quotaPauseMessage(provider))
     }
 }

@@ -138,6 +138,7 @@ public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSess
         return "登录凭据由 CodexBar 管理"
     }
     public func collectionText(_ provider: QuotaProvider) -> String {
+        if let pause = state.quotaPauseMessage(provider) { return pause }
         if let attempt = state.quotaAttempts[provider] {
             return (attempt.success ? "最近采集成功 " : "最近采集失败 ") + DisplayDate.format(attempt.at, pattern: "HH:mm") + (attempt.success ? "" : "：" + attempt.message)
         }
@@ -159,6 +160,7 @@ public final class QuotaSourceSettingsModel: ObservableObject, SettingsDraftSess
         if completed.count == refreshedProviders.count {
             return "已保存，刷新完成：\(completed.filter(\.success).count) 个成功，\(completed.filter { !$0.success }.count) 个失败"
         }
+        if refreshedProviders.contains(where: { state.quotaPauseMessage($0) != nil }) { return "已保存，GPT/Codex 和 Claude 刷新等待代理保护就绪" }
         let remaining = refreshedProviders.map(coordinator.cooldownRemaining).max() ?? 0
         return "已保存，正在刷新 \(refreshedProviders.count) 个渠道…" + (remaining > 0 ? "（合并请求，约 \(Int(ceil(remaining))) 秒后继续）" : "")
     }
@@ -334,7 +336,7 @@ struct QuotaSourceSettingsView: View {
                     Button("取消") { model.cancelKey(provider) }
                 }.disabled(model.busy)
             }
-            if let message = model.testing[provider], state.quotaAttempts[provider] == nil || message.contains("秒后") { Text(message).font(.caption).foregroundStyle(.secondary) }
+            if state.quotaPauseMessage(provider) == nil, let message = model.testing[provider], state.quotaAttempts[provider] == nil || message.contains("秒后") { Text(message).font(.caption).foregroundStyle(.secondary) }
             if let error = model.errors[provider] { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
         }.padding(12)
     }
