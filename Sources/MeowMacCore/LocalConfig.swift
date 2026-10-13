@@ -25,6 +25,7 @@ public struct LocalConfig: Codable, Equatable {
     public var costRefreshSeconds = 1800.0
     public var processSampleSeconds = 60.0
     public var proxyTrafficEnabled = true
+    public var proxyTrafficExportDirectory = ""
     public var quotaHistoryDays = 90
     public var codexBarCLIPath = "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI"
     public var cleanTerminal = CleanTerminal.automatic
@@ -39,7 +40,7 @@ public struct LocalConfig: Codable, Equatable {
         case sleepAssertionSeconds, memoryPressureSeconds, fairThermalSeconds, fanHighFraction, fanHighSeconds, sourceFailureCount
         case memoryNormalLoad, memoryWarnLoad, memoryCriticalLoad, idleFrameSeconds, fullFrameSeconds
         case quotaRefreshSeconds, sessionPollSeconds, sessionFinishDelaySeconds, manualMergeSeconds
-        case proxyTrafficEnabled
+        case proxyTrafficEnabled, proxyTrafficExportDirectory
         case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath, cleanTerminal, aiAgent, aiDiagnosisEntry
     }
 
@@ -73,6 +74,7 @@ public struct LocalConfig: Codable, Equatable {
         let sampleSeconds = try fields.decodeIfPresent(Double.self, forKey: .processSampleSeconds) ?? defaults.processSampleSeconds
         processSampleSeconds = (10...600).contains(sampleSeconds) ? sampleSeconds : defaults.processSampleSeconds
         proxyTrafficEnabled = try fields.decodeIfPresent(Bool.self, forKey: .proxyTrafficEnabled) ?? defaults.proxyTrafficEnabled
+        proxyTrafficExportDirectory = try fields.decodeIfPresent(String.self, forKey: .proxyTrafficExportDirectory) ?? defaults.proxyTrafficExportDirectory
         quotaHistoryDays = try fields.decodeIfPresent(Int.self, forKey: .quotaHistoryDays) ?? defaults.quotaHistoryDays
         codexBarCLIPath = try fields.decodeIfPresent(String.self, forKey: .codexBarCLIPath) ?? defaults.codexBarCLIPath
         cleanTerminal = try fields.decodeIfPresent(CleanTerminal.self, forKey: .cleanTerminal) ?? defaults.cleanTerminal

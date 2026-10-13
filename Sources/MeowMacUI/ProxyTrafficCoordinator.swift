@@ -18,6 +18,7 @@ public struct ProxyTrafficViewData: Sendable {
 public final class ProxyTrafficSession {
     private let store: ProxyTrafficStoring
     private let client: ProxyTrafficFetching
+    private let exporter: ProxyTrafficExporter?
     private let clock: () -> Date
     private let timeZone: TimeZone
     private let report: (String) -> Void
@@ -30,14 +31,16 @@ public final class ProxyTrafficSession {
     public private(set) var readFailures = 0
 
     public init(store: ProxyTrafficStoring, client: ProxyTrafficFetching, enabled: Bool = true,
+                exporter: ProxyTrafficExporter? = nil,
                 timeZone: TimeZone = .current, clock: @escaping () -> Date = Date.init,
                 report: @escaping (String) -> Void = { _ in }) throws {
-        self.store = store; self.client = client; self.enabled = enabled
+        self.store = store; self.client = client; self.enabled = enabled; self.exporter = exporter
         self.timeZone = timeZone; self.clock = clock; self.report = report
         if let checkpoint = try store.loadCheckpoint() {
             accumulator = try ProxyTrafficAccumulator(checkpoint: checkpoint, timeZone: timeZone)
         } else { accumulator = ProxyTrafficAccumulator(timeZone: timeZone) }
         history = try store.loadRows(now: clock())
+        synchronizeExport(at: clock())
         // 即使控制接口尚未恢复，已结束的检查点小时仍可结算。
         settle(at: clock())
     }
@@ -91,7 +94,13 @@ public final class ProxyTrafficSession {
             }
             let cutoff = now.addingTimeInterval(-31 * 86400)
             history.removeAll { ($0.date ?? .distantPast) < cutoff }
+            synchronizeExport(at: now)
         } catch { report("settlement_checkpoint_failed") }
+    }
+    private func synchronizeExport(at now: Date) {
+        guard let exporter else { return }
+        do { try exporter.synchronize(rows: history, now: now) }
+        catch { report("export_failed") }
     }
     public func viewData() throws -> ProxyTrafficViewData {
         let now = clock()
@@ -124,7 +133,7 @@ public final class ProxyTrafficCoordinator {
         self.config = config; self.update = update
     }
     public func start() {
-        let worker = worker, enabled = config.proxyTrafficEnabled, logger = logger, update = update, queue = queue
+        let worker = worker, enabled = config.proxyTrafficEnabled, exportPath = config.proxyTrafficExportDirectory, logger = logger, update = update, queue = queue
         queue.async {
             guard worker.timer == nil else { return }
             do {
@@ -132,8 +141,17 @@ public final class ProxyTrafficCoordinator {
                 let store = ProxyTrafficStore(report: { event, count in
                     logger.error("代理流量历史：\(event, privacy: .public)，行数 \(count)")
                 })
+                let exporter: ProxyTrafficExporter?
+                if exportPath.isEmpty { exporter = nil }
+                else if NSString(string: exportPath).isAbsolutePath {
+                    exporter = ProxyTrafficExporter(root: URL(fileURLWithPath: exportPath)) { event, count in
+                        logger.error("代理流量导出：\(event, privacy: .public)，条数 \(count)")
+                    }
+                } else {
+                    exporter = nil; logger.error("代理流量导出目录必须是绝对路径")
+                }
                 worker.session = try ProxyTrafficSession(store: store, client: ProxyTrafficClient(),
-                    enabled: enabled, report: report)
+                    enabled: enabled, exporter: exporter, report: report)
             } catch {
                 logger.error("代理流量初始化失败，保留原历史和检查点")
                 DispatchQueue.main.async { update(ProxyTrafficViewData(enabled: enabled)) }
