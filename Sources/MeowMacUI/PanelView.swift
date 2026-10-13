@@ -57,6 +57,7 @@ public enum PanelCardRegistry {
                 case "network.checks": return AnyView(state.networkModel.map { NetworkChecks(model: $0, state: state) })
                 case "network.sites": return AnyView(state.networkModel.map { NetworkSites(model: $0, state: state) })
                 case "network.traffic": return AnyView(NetworkTraffic(state: state))
+                case "network.proxy": return AnyView(ProxyTrafficCard(state: state))
                 case "network.egress": return AnyView(state.networkModel.map { NetworkEgress(model: $0) })
                 default: return AnyView(EmptyView())
                 }
@@ -115,6 +116,8 @@ public final class PanelState: ObservableObject {
     public var now: () -> Date = Date.init
     @Published public var costs: [QuotaProvider: [DailyCost]] = [:]
     @Published public var proxyTraffic = ProxyTrafficViewData()
+    @Published public var proxyTrafficRange: ProxyTrafficRange = .today
+    @Published public var expandedProxyProcesses: Set<String> = []
     @Published public var networkTone: NetworkTone = .gray { didSet { refreshReminders() } }
     @Published public var failures: [String: Int] = [:] { didSet { refreshReminders() } }
     @Published public var fairSince: Date? { didSet { refreshReminders() } }
@@ -410,7 +413,12 @@ public struct PanelView: View {
                 QuotaPage(state: state)
             case .network:
                 if let model = state.networkModel { NetworkPage(model: model, state: state) }
-                else { Text("网络检测未启动").font(Design.caption).foregroundStyle(Design.secondary) }
+                else {
+                    Text("网络检测未启动").font(Design.caption).foregroundStyle(Design.secondary)
+                    ForEach(state.renderedCardIDs(for: .network), id: \.self) { id in
+                        PanelCardRegistry.cards[id]?.makeView(state: state).measureCardBottom(id)
+                    }
+                }
             }
         }.padding(.horizontal, Design.inset).padding(.vertical, Design.sectionGap)
     }

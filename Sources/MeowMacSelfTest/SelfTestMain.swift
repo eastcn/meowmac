@@ -358,6 +358,9 @@ enum SelfTestMain {
             tests.append(("UI.RenderOverview/总览与设置", { SelfTestMain.renderOverview() }))
         }
         tests.append(contentsOf: ProxyTrafficCoreTests.tests())
+        tests.append(contentsOf: ProxyTrafficSummaryTests.tests.map { name, run in (name, { @MainActor in run() }) })
+        tests.append(("ProxyTraffic.Preview/补充全页浅深合成布局", { ProxyTrafficNativeTests.supplementalPreviews() }))
+        tests.append(("ProxyTraffic.Native/真实面板浅深六种状态", { await ProxyTrafficNativeTests.previews() }))
         tests.append(contentsOf: proxyTrafficClientTests().map { name, run in (name, { @MainActor in run() }) })
         tests.append(contentsOf: ProxyTrafficStoreTests.tests.map { name, run in (name, { @MainActor in run() }) })
         tests.append(contentsOf: ProxyTrafficSessionTests.tests.map { name, run in (name, { @MainActor in run() }) })

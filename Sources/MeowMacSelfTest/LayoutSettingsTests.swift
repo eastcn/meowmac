@@ -232,7 +232,7 @@ enum LayoutSettingsTests {
             let network = point(checks()[4])
             click(window, x: handleCenter, fromBottom: network.y)
             optionArrow(window, code: 125, character: "\u{F701}")
-            guard model.draft.placements(for: .network).map(\.id) == ["network.sites", "network.checks", "network.traffic", "network.egress"] else { print("布局真实控件：网络卡片快捷键未排序：\(model.draft.placements(for: .network).map(\.id))"); return false }
+            guard model.draft.placements(for: .network).map(\.id) == ["network.sites", "network.checks", "network.traffic", "network.proxy", "network.egress"] else { print("布局真实控件：网络卡片快捷键未排序：\(model.draft.placements(for: .network).map(\.id))"); return false }
             guard await controller.appearance.save() else { print("布局真实控件：外观保存失败：\(controller.appearance.statusText)"); return false }
             guard controller.window != nil, state.panelLayout.overview.order == [.memory, .cpu, .quota, .network],
                   !state.panelLayout.placements(for: .network)[1].visible else { print("布局真实控件：保存后业务布局与草稿不一致"); return false }

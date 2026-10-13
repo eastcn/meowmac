@@ -20,7 +20,7 @@ enum TestPresentationPolicy {
         "UI.AIAgent/CLI 启动失败与复制入口", "UI.Cleaning/原生缺失状态容器",
         "UI.SystemTrend/真实弹出面板鼠标与首屏", "UI.Reset/真实360pt弹出容器与浅深色分节",
         "UI.QuotaSources/真实面板预览", "UI.PanelLayout/隐藏网络检查后点击总览告警",
-        "UI.LayoutAcceptance/真实容器合成对照"
+        "UI.LayoutAcceptance/真实容器合成对照", "ProxyTraffic.Native/真实面板浅深六种状态"
     ]
     static func requiresForeground(_ name: String) -> Bool {
         foregroundCases.contains(name) || foregroundGroups.contains { name.hasPrefix($0) }

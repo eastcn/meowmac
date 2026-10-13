@@ -14,7 +14,7 @@ public enum PanelLayoutCatalog {
         .system: [.init("system.chart", "系统趋势", canHide: false), .init("system.energy", "能耗排行"), .init("system.disk", "磁盘")],
         .quota: [.init("quota.trend", "用量趋势"), .init("quota.cost", "花费"), .init("quota.storage", "本地存储")],
         .network: [.init("network.checks", "连接检查"), .init("network.sites", "站点延迟"),
-                   .init("network.traffic", "上下行速率"), .init("network.egress", "出口 IP")],
+                   .init("network.traffic", "上下行速率"), .init("network.proxy", "代理流量"), .init("network.egress", "出口 IP")],
     ]
 }
 
@@ -172,12 +172,20 @@ public struct PanelLayout: Codable, Equatable {
     static func migrated(_ cards: [String: [PanelCardPlacement]]) -> [String: [PanelCardPlacement]] {
         var result = cards
         result[PanelTab.system.rawValue] = cards[PanelTab.system.rawValue]?.filter { !removedCards.contains($0.id) }
-        // 2026-10-04 新增 `network.traffic`。旧文件网络页恰好只缺这一块时，以可见状态插到站点之后（没有站点时插到出口之前）。
+        // 只接受缺少新增块的完整旧布局；不修复其他缺项、重复或未知 id。
         if var network = cards[PanelTab.network.rawValue] {
             let ids = network.map(\.id), expected = (PanelLayoutCatalog.definitions[.network] ?? []).map(\.id)
-            if !ids.contains(addedNetworkCard), ids.count == Set(ids).count, Set(ids + [addedNetworkCard]) == Set(expected) {
-                let index = ids.firstIndex(of: "network.sites").map { $0 + 1 } ?? ids.firstIndex(of: "network.egress") ?? ids.count
-                network.insert(PanelCardPlacement(id: addedNetworkCard), at: index)
+            let missing = Set(expected).subtracting(ids)
+            if ids.count == Set(ids).count, Set(ids).isSubset(of: Set(expected)),
+               missing.isSubset(of: [addedNetworkCard, "network.proxy"]) {
+                if missing.contains(addedNetworkCard) {
+                    let index = network.firstIndex(where: { $0.id == "network.sites" }).map { $0 + 1 }
+                        ?? network.firstIndex(where: { $0.id == "network.egress" }) ?? network.count
+                    network.insert(PanelCardPlacement(id: addedNetworkCard), at: index)
+                }
+                if missing.contains("network.proxy"), let index = network.firstIndex(where: { $0.id == addedNetworkCard }) {
+                    network.insert(PanelCardPlacement(id: "network.proxy"), at: index + 1)
+                }
                 result[PanelTab.network.rawValue] = network
             }
         }
