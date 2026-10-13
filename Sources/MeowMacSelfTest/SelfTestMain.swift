@@ -357,6 +357,7 @@ enum SelfTestMain {
             tests.append(("UI.RenderComponents/基础组件", { SelfTestMain.renderComponents() }))
             tests.append(("UI.RenderOverview/总览与设置", { SelfTestMain.renderOverview() }))
         }
+        tests.append(contentsOf: ProxyTrafficCoreTests.tests())
         let filters = CommandLine.arguments.dropFirst().map { $0.lowercased() }
         if filters.contains("--list") {
             tests.forEach { print($0.0 + (TestPresentationPolicy.requiresForeground($0.0) ? " [需 MEOWMAC_UI_TESTS=1]" : "")) }
