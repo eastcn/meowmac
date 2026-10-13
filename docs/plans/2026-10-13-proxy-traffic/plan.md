@@ -122,8 +122,8 @@
 | 1 | 采集逻辑（纯逻辑） | 需强模型 | 已交付，待复审 | 2e8c4e7 |
 | 2 | 采集运行、检查点和本地历史 | 需强模型 | 已交付，待复审 | 7d16f3f |
 | 3 | 导出到笔记库目录 | 可交付 | 已交付，待复审 | 本轮提交：feat: export proxy traffic hourly history |
-| 4 | 代理流量卡片和布局迁移 | 需强模型 | 实现已交付，原生图像验收卡住 | 本轮提交：feat: add proxy traffic card and layout migration |
-| 5 | 安装和实机验收 | 可交付 | 进行中（持续采集） | |
+| 4 | 代理流量卡片和布局迁移 | 需强模型 | 实现已交付，原生图像与交互验收卡住 | 6f81c61 |
+| 5 | 安装和实机验收 | 可交付 | 卡住：CPU 增量超限、Computer Use 超时；持续采集与临时导出通过 | 本轮提交：docs: record proxy traffic runtime acceptance |
 
 ## 执行清单
 
