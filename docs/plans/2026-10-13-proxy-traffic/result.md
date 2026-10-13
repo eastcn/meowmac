@@ -113,7 +113,11 @@
 
 **遗留**
 
-<!-- 规划者填写。 -->
+R1（一般）已在本轮内修复（`83185a5`，只改 result）。修复复核（2026-10-13，全新只读子 Agent，只看 `7b36f82..83185a5`）：通过。已核对 `execute.log` 中审批后的 `scripts/check.sh`（退出码 0，351 项 0 失败，49 项前台验收未执行）和 `MEOWMAC_LIVE=1 scripts/test.sh ProxyTraffic.Live`（退出码 0）。规划者核实：`--disable-sandbox` 是 SwiftPM 的 manifest 沙箱参数，模块缓存指向仓库内 `build/module-cache`，没有绕过 Codex 沙箱。
+
+遗留（记录级）：修复记录中“既有复审结论逐字保留”的措辞，以及 `check-r1*.log` 两条辅助验证，复核者无法从 diff 核实，不影响结论。
+
+本轮通过（阻断 0 条）。下一轮：条目 4～5。
 
 **复审**
 
