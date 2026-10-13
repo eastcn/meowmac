@@ -114,6 +114,7 @@ public final class PanelState: ObservableObject {
     private var storageLoading: Set<QuotaProvider> = []
     public var now: () -> Date = Date.init
     @Published public var costs: [QuotaProvider: [DailyCost]] = [:]
+    @Published public var proxyTraffic = ProxyTrafficViewData()
     @Published public var networkTone: NetworkTone = .gray { didSet { refreshReminders() } }
     @Published public var failures: [String: Int] = [:] { didSet { refreshReminders() } }
     @Published public var fairSince: Date? { didSet { refreshReminders() } }

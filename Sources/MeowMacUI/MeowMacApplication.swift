@@ -8,10 +8,11 @@ import TunCanaryUI
 import TunCanaryCore
 
 @MainActor
-public final class MeowMacApplication: NSObject, NSApplicationDelegate {
+public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var networkBridge: NetworkBridge?
+    private var proxyTrafficCoordinator: ProxyTrafficCoordinator?
     private var networkRecorder: NetworkHistoryRecorder?
     private var siteHistorySubscription: AnyCancellable?
     private var quotaCoordinator: QuotaCoordinator?
@@ -64,6 +65,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         statusItem = item
         let popover = NSPopover()
         popover.behavior = .transient
+        popover.delegate = self
         popover.contentViewController = PanelHosting.make(state: panelState).controller
         self.popover = popover
         let bridge = NetworkBridge(notifier: notifier, root: catStore.rootURL,
@@ -83,6 +85,9 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
             Task { @MainActor in recorder?.record(siteHistory: history, now: Date()) }
         }
         bridge.start()
+        let proxy = ProxyTrafficCoordinator(config: configResult.config) { [weak panelState] value in panelState?.proxyTraffic = value }
+        proxyTrafficCoordinator = proxy
+        proxy.start()
         let quota = QuotaCoordinator(state: panelState, config: configResult.config)
         quotaCoordinator = quota
         let settings = SettingsWindowController(state: panelState, network: bridge.model, quotaCoordinator: quota)
@@ -160,11 +165,11 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.panelState.rulesWillSleep() }
+            Task { @MainActor [weak self] in self?.panelState.rulesWillSleep(); self?.proxyTrafficCoordinator?.sleep() }
         })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.panelState.refreshReminders(); self?.sample(); self?.sampleEnergy(); self?.startEnergyLoop() }
+            Task { @MainActor [weak self] in self?.panelState.refreshReminders(); self?.sample(); self?.sampleEnergy(); self?.startEnergyLoop(); self?.proxyTrafficCoordinator?.wake() }
         })
     }
 
@@ -282,6 +287,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
     private func openPanel(at tab: PanelTab) {
         guard let button = statusItem?.button, let popover else { return }
         if !popover.isShown {
+            proxyTrafficCoordinator?.setPanelVisible(true)
             panelState.open()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
@@ -294,6 +300,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button, let popover else { return }
         if popover.isShown { popover.performClose(nil) }
         else {
+            proxyTrafficCoordinator?.setPanelVisible(true)
             panelState.open()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
@@ -400,7 +407,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate {
 
     private func scheduleFrame() { cadence.scheduleFrame() }
 
+    public func popoverDidClose(_ notification: Notification) { proxyTrafficCoordinator?.setPanelVisible(false) }
+
     public func applicationWillTerminate(_ notification: Notification) {
+        proxyTrafficCoordinator?.stop()
         settingsWindow?.removeShortcutMonitor()
         cadence.stop()
         energyLoop?.cancel()

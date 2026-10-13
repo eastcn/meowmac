@@ -358,6 +358,9 @@ enum SelfTestMain {
             tests.append(("UI.RenderOverview/总览与设置", { SelfTestMain.renderOverview() }))
         }
         tests.append(contentsOf: ProxyTrafficCoreTests.tests())
+        tests.append(contentsOf: proxyTrafficClientTests().map { name, run in (name, { @MainActor in run() }) })
+        tests.append(contentsOf: ProxyTrafficStoreTests.tests.map { name, run in (name, { @MainActor in run() }) })
+        tests.append(contentsOf: ProxyTrafficSessionTests.tests.map { name, run in (name, { @MainActor in run() }) })
         let filters = CommandLine.arguments.dropFirst().map { $0.lowercased() }
         if filters.contains("--list") {
             tests.forEach { print($0.0 + (TestPresentationPolicy.requiresForeground($0.0) ? " [需 MEOWMAC_UI_TESTS=1]" : "")) }

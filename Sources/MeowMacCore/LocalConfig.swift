@@ -24,6 +24,7 @@ public struct LocalConfig: Codable, Equatable {
     public var manualMergeSeconds = 60.0
     public var costRefreshSeconds = 1800.0
     public var processSampleSeconds = 60.0
+    public var proxyTrafficEnabled = true
     public var quotaHistoryDays = 90
     public var codexBarCLIPath = "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI"
     public var cleanTerminal = CleanTerminal.automatic
@@ -38,6 +39,7 @@ public struct LocalConfig: Codable, Equatable {
         case sleepAssertionSeconds, memoryPressureSeconds, fairThermalSeconds, fanHighFraction, fanHighSeconds, sourceFailureCount
         case memoryNormalLoad, memoryWarnLoad, memoryCriticalLoad, idleFrameSeconds, fullFrameSeconds
         case quotaRefreshSeconds, sessionPollSeconds, sessionFinishDelaySeconds, manualMergeSeconds
+        case proxyTrafficEnabled
         case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath, cleanTerminal, aiAgent, aiDiagnosisEntry
     }
 
@@ -70,6 +72,7 @@ public struct LocalConfig: Codable, Equatable {
         // 采样间隔直接传给 `top -s`：负值、0 和极大值会让采样崩溃或空转，越界回退默认值。
         let sampleSeconds = try fields.decodeIfPresent(Double.self, forKey: .processSampleSeconds) ?? defaults.processSampleSeconds
         processSampleSeconds = (10...600).contains(sampleSeconds) ? sampleSeconds : defaults.processSampleSeconds
+        proxyTrafficEnabled = try fields.decodeIfPresent(Bool.self, forKey: .proxyTrafficEnabled) ?? defaults.proxyTrafficEnabled
         quotaHistoryDays = try fields.decodeIfPresent(Int.self, forKey: .quotaHistoryDays) ?? defaults.quotaHistoryDays
         codexBarCLIPath = try fields.decodeIfPresent(String.self, forKey: .codexBarCLIPath) ?? defaults.codexBarCLIPath
         cleanTerminal = try fields.decodeIfPresent(CleanTerminal.self, forKey: .cleanTerminal) ?? defaults.cleanTerminal
