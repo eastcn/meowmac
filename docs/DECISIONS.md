@@ -191,6 +191,14 @@ v0.1 第一轮交付的界面不合格，原因是规划里没有视觉要求。
 - 系统通知的开关由 D41 的固定类别改为每条规则一个开关，加一个总开关。默认值沿用 D41：除数据源失效外全部开启；自定义规则默认开启。开关仍是本机设置，不进猫包，不提供配置文件编辑入口。旧的类别开关按设计文档的映射自动迁移。
 - 规则和通知开关都是本机配置，不写入可分享的猫包（D20）。
 
+**D43　代理流量统计（2026-10-13）。** 本项是 D5 的例外，其余不变。
+
+- 本机经代理流量的统计由 MeowMac 自己实现，不写进 TunCanary，也不修改 TunCanary。只调用 TunCanary 已公开的 `MihomoController.locate()` 取得控制 socket 路径；读取 `/connections` 的客户端由 MeowMac 自己实现，只读，不调用任何写接口。
+- 数据格式遵循 meowkit 仓库的 `mihomo-traffic/SCHEMA.md`（`mihomo-traffic/v1`），来源名 `mac`，不记录来源 IP。
+- 每 5 秒采样一次，结果只在内存中累计；每 5 分钟写一次本地检查点；按小时汇总，写入 `~/Library/Application Support/MeowMac/history/proxy-traffic/`，保留 30 天。
+- 可选导出：`config.json` 的 `proxyTrafficExportDirectory` 不为空时，每个小时结束后把这一小时的汇总行追加到该目录下的 `mac/YYYY-MM-DD.jsonl`。只追加，不重命名，不建临时文件；删除该子目录下超过 30 天、文件名符合 `YYYY-MM-DD.jsonl` 的文件。默认为空，不导出。
+- 网络页新增“代理流量”功能块 `network.proxy`，设计稿见 `docs/plans/2026-10-13-proxy-traffic/design.html`。
+
 ## 附录：已验证的事实
 
 以下事实在 2026-09-29 于作者的 MacBook Pro（Apple M5，16 GB，macOS 26.6.2）上验证。

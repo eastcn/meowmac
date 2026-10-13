@@ -60,7 +60,7 @@ scripts/install.sh    # 安装到 ~/Applications/MeowMac.app 并启动
 - 实现和 `docs/DECISIONS.md` 冲突。
 - 需要引入第三方依赖。
 - 需要修改 TunCanary 仓库，包括把某个类型改成 `public`。
-- 需要 `sudo`、修改系统设置，或者往仓库外写文件。例外：应用运行时写 `~/Library/Application Support/MeowMac/`，以及 `scripts/install.sh` 安装应用。
+- 需要 `sudo`、修改系统设置，或者往仓库外写文件。例外：应用运行时写 `~/Library/Application Support/MeowMac/`；按 D43 向用户在 `config.json` 中配置的代理流量导出目录追加小时汇总；`scripts/install.sh` 安装应用；以及当前 plan 的授权范围中明确列出字段的 `config.json` 临时修改，修改前备份，验收后逐字节恢复。
 - 验收标准达不到。不要降低标准，不要放宽测试断言。
 
 ## 禁止的操作
