@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>代理流量卡片</title>
+<style>
+:root{--text:#1d1d1f;--sub:#6e6e73;--card:rgba(255,255,255,.6);--rule:rgba(0,0,0,.09);--glass:linear-gradient(170deg,#e3e8ee,#efeae4);--group:rgba(255,255,255,.45);
+--blue:#007AFF;--teal:#30B0C7;--purple:#AF52DE;--gray:#8E8E93;--orange:#FF9500;--red:#FF3B30;--green:#34C759;
+--orangeText:#B25000;--track:rgba(0,0,0,.07);--tip:#fff}
+.dark{--text:#f5f5f7;--sub:#98989d;--card:rgba(44,44,46,.6);--rule:rgba(255,255,255,.1);--glass:linear-gradient(170deg,#1c2129,#26221f);--group:rgba(255,255,255,.06);
+--blue:#0A84FF;--teal:#40C8E0;--purple:#BF5AF2;--gray:#98989D;--orange:#FF9F0A;--red:#FF453A;--green:#30D158;
+--orangeText:#FF9F0A;--track:rgba(255,255,255,.1);--tip:#363640}
+*{box-sizing:border-box}
+body{margin:0;padding:32px;background:#d6d6db;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+header,.notes{max-width:1560px;margin:0 auto}
+h1{font-size:22px;margin:0 0 8px}header p,.notes{font-size:13px;color:#55555a;line-height:1.7;margin:4px auto}
+.grid{display:flex;flex-wrap:wrap;gap:24px;max-width:1560px;margin:20px auto}
+.sample h3{font-size:12px;font-weight:600;color:#55555a;margin:0 0 8px;max-width:360px}
+.panel{width:360px;background:var(--glass);color:var(--text);border-radius:16px;overflow:hidden;padding:12px 16px}
+.t{font-size:13px;font-weight:600}.tiny{font-size:10px;color:var(--sub)}.cap{font-size:11px;color:var(--sub)}
+.hrow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.seg{font-size:10px;display:flex;background:var(--track);border-radius:99px;padding:2px}.seg span{padding:2px 8px;border-radius:99px}.seg .on{background:var(--card);font-weight:600}
+.ghost{opacity:.45}
+.ghost .t{font-weight:500}
+.rule{border-top:1px solid var(--rule);margin:10px 0}
+/* 合计 */
+.totals{display:flex;gap:18px;align-items:baseline;margin-top:8px}
+.tot .v{font-size:20px;font-weight:600}.tot .v small{font-size:11px;font-weight:400;color:var(--sub);margin-left:2px}
+.tot .n{font-size:10px;color:var(--sub)}
+.dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:4px;vertical-align:2px}
+/* 柱状图 */
+.bars{position:relative;height:44px;margin-top:8px;display:flex;align-items:flex-end;gap:2px;border-bottom:1px solid var(--rule)}
+.bars .b{flex:1;display:flex;flex-direction:column-reverse;min-width:0}
+.bars .b i{display:block;width:100%}
+.bars .b .dn{background:var(--teal);border-radius:0 0 1px 1px}
+.bars .b .up{background:var(--purple);opacity:.75;border-radius:1.5px 1.5px 0 0}
+.bars .b.none{height:100%;background:repeating-linear-gradient(135deg,transparent 0 2px,var(--gray) 2px 3px);opacity:.35}
+.bars .b.now .dn{background:repeating-linear-gradient(90deg,var(--teal) 0 2px,transparent 2px 3px)}
+.bars .b.hl{outline:1.5px solid var(--text);outline-offset:1px}
+.ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--sub);margin-top:2px}
+.legend{font-size:10px;color:var(--sub);margin-top:3px;display:flex;gap:10px;align-items:center}
+.missing-key{display:inline-block;width:12px;height:7px;margin-right:3px;background:repeating-linear-gradient(135deg,transparent 0 2px,var(--gray) 2px 3px);opacity:.6;vertical-align:-1px}
+.tipbox{position:absolute;left:150px;bottom:52px;z-index:4;background:var(--tip);color:var(--text);border-radius:8px;padding:6px 8px;font-size:10px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.18);width:150px}
+/* Top 进程 */
+.procs{background:var(--group);border-radius:10px;margin-top:8px;overflow:hidden}
+.pr{padding:6px 10px;border-top:1px solid var(--rule)}.pr:first-child{border-top:0}
+.pr .l1{display:grid;grid-template-columns:1fr 64px 38px 10px;gap:6px;align-items:center}
+.pr .nm{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr .val{font-size:12px;text-align:right;white-space:nowrap}
+.pr .pct{font-size:11px;color:var(--sub);text-align:right}
+.pr .chev{font-size:9px;color:var(--sub);text-align:center}
+.pr .share{height:3px;border-radius:2px;background:var(--track);margin-top:4px}.pr .share i{display:block;height:3px;border-radius:2px;background:var(--teal)}
+.pr .more{margin-top:5px;padding-left:2px}
+.pr .dom{display:grid;grid-template-columns:1fr 56px;gap:6px;font-size:11px;line-height:17px}
+.pr .dom span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:10.5px}
+.pr .dom span:last-child{text-align:right;color:var(--sub)}
+.pr .rl{font-size:10px;color:var(--sub);margin-top:2px}
+.foot{font-size:10px;color:var(--sub);margin-top:6px;line-height:1.5}
+.foot b{font-weight:600;color:var(--orangeText)}
+.empty{background:var(--group);border-radius:10px;margin-top:8px;padding:14px 10px;font-size:11px;color:var(--sub);line-height:1.6;text-align:center}
+.empty b{color:var(--text);font-weight:600;display:block;font-size:12.5px;margin-bottom:2px}
+code{font-size:11px}
+</style>
+</head>
+<body>
+<header>
+<h1>网络页 · 代理流量卡片</h1>
+<p>位置：网络页“上下行速率”之后、“出口 IP”之前，参与现有的分块排序和隐藏。样式沿用 <code>docs/design/mockups/network-redesign.html</code>。数据全部虚构，域名只用 <code>example.*</code>。</p>
+<p>只统计经代理的流量，即出口不是 DIRECT 的连接；直连流量不算机场流量，不计入。HTML 只模拟材质，真实观感以实机为准。</p>
+</header>
+<div class="grid" id="root"></div>
+<div class="notes">
+<b>版式（从上到下）</b><br>
+1. 标题“代理流量”（13pt 半粗）；右侧是“今天 / 近 7 天”分段切换，默认“今天”，只作用于本卡片。<br>
+2. 合计：下行、上行各一组。数值 20pt 半粗，单位 11pt 说明色；名称 10pt，前面是 5pt 色点（下行 <code>systemTeal</code>，上行 <code>systemPurple</code>）。第三组写“经代理占全部 N%”：代理流量占代理加直连总流量的比例，作为参考。<br>
+3. 柱状图，高 44pt：今天按小时 24 根，近 7 天按天 7 根。每根是下行（实色）叠上行（75% 透明）。当前小时或今天用竖纹表示“进行中”。MeowMac 没运行、没有记录的时段画灰色斜纹，不补数据。悬停一根柱子时，原生提示写时段、下行、上行和这一时段最大的进程。量程取窗口内峰值的 1.15 倍。下方写 3 个时刻刻度和“现在”，图例写“斜纹 无记录”。<br>
+4. Top 5 进程：分组样式同“连接检查”（圆角 10pt，<code>quaternarySystemFill</code> 底，行间 1pt 分隔线）。每行是进程名（12.5pt 半粗，放不下截断）、下行加上行合计（12pt）、占比（11pt 说明色）和展开箭头，下面一条 3pt 的占比条。进程名取不到时写“未知进程”。点一行展开，列出这个进程用量最大的 5 个域名及用量；再下一行 10pt 说明色写命中最多的规则和节点，例如“规则 Match → 🐟 漏网之鱼 · 节点 香港 02”。<br>
+5. 底部一行 10pt：“未匹配任何规则（走 MATCH）的流量占 <b>N%</b>”。占比 ≥ 30% 时数字用橙色强调，这是最大的嫌疑点。<br>
+6. 控制接口读不到（Clash Verge 没运行，或 socket 找不到）：合计、图表和列表不显示，改为一个空状态分组，写原因和“恢复后自动继续采集”。已有的历史仍可以切到“近 7 天”查看。<br>
+<b>数据口径</b><br>
+- 每 5 秒读一次 mihomo 的 <code>/connections</code>，按连接 id 计算增量；连接消失时用最后一次读数结算。图表和列表读本地小时汇总，当前小时加上内存里尚未落盘的部分。<br>
+- Top 5 进程按每小时不截断的 <code>by_process</code> 累加，排名准确；展开后的域名、规则和节点来自每小时前 100 项明细，是近似值。展开区末行（10pt 说明色）写“基于保留明细 · 未保留明细 X”，X 是所选范围内 <code>other</code> 的合计；某个进程没有保留明细时，展开区只写“明细未保留”（2026-10-13 预审补充）。<br>
+- 单位：&lt; 1 MB 写 KB，&lt; 1 GB 写 MB（保留 1 位小数），以上写 GB（保留 2 位小数）。
+</div>
+<script>
+const H=[0,0,0,0,0,0,0,0,12,40,95,60,22,30,180,420,96,70,0,0,0,0,0,0];
+const U=[0,0,0,0,0,0,0,0,3,8,20,12,5,7,22,35,14,9,0,0,0,0,0,0];
+const NONE=[0,1,2,3,4,5,6,7,18,19,20,21,22,23];
+const NOW=17;
+const W=[1.8,2.4,0.9,3.1,2.2,4.6,1.2],WU=[.3,.4,.2,.5,.4,.6,.2];
+function bars(d,u,none,now,hl){const m=Math.max(...d.map((v,i)=>v+u[i]))*1.15;
+ return '<div class="bars">'+d.map((v,i)=>{if(none.includes(i))return '<div class="b none"></div>';
+  return `<div class="b${i===now?' now':''}${i===hl?' hl':''}" style="height:${((v+u[i])/m*100).toFixed(1)}%"><i class="dn" style="height:${(v/(v+u[i])*100).toFixed(1)}%"></i><i class="up" style="height:${(u[i]/(v+u[i])*100).toFixed(1)}%"></i></div>`}).join('')+'</div>'}
+const P=[["softwareupdated","412 MB",40,38],["Google Chrome Helper","236 MB",22,22],["Codex","118 MB",11,11],["Telegram","74 MB",7,7],["未知进程","52 MB",5,5]];
+function procs(open){return '<div class="procs">'+P.map((p,i)=>`<div class="pr"><div class="l1"><span class="nm">${p[0]}</span><span class="val">${p[1]}</span><span class="pct">${p[2]}%</span><span class="chev">${i===open?'▾':'▸'}</span></div><div class="share"><i style="width:${p[3]}%"></i></div>${i===open?`<div class="more"><div class="dom"><span>updates.cdn.example.com</span><span>388 MB</span></div><div class="dom"><span>swscan.example.com</span><span>16 MB</span></div><div class="dom"><span>gdmf.example.net</span><span>5.2 MB</span></div><div class="dom"><span>mesu.example.org</span><span>2.1 MB</span></div><div class="dom"><span>xp.example.com</span><span>640 KB</span></div><div class="rl">规则 Match → 🐟 漏网之鱼 · 节点 香港 02</div><div class="rl">基于保留明细 · 未保留明细 3.4 MB</div></div>`:''}</div>`).join('')+'</div>'}
+function head(seg){return `<div class="hrow"><span class="t">代理流量</span><div class="seg"><span class="${seg==0?'on':''}">今天</span><span class="${seg==1?'on':''}">近 7 天</span></div></div>`}
+function totals(d,u,pct){return `<div class="totals"><div class="tot"><div class="v">${d}</div><div class="n"><span class="dot" style="background:var(--teal)"></span>下行</div></div><div class="tot"><div class="v">${u}</div><div class="n"><span class="dot" style="background:var(--purple)"></span>上行</div></div><div class="tot" style="margin-left:auto;text-align:right"><div class="v" style="font-size:13px">${pct}</div><div class="n">经代理占全部</div></div></div>`}
+function today(open,tip){return head(0)+totals('1.03<small>GB</small>','155<small>MB</small>','38%')+
+ `<div style="position:relative">${bars(H,U,NONE,NOW,tip?15:-1)}${tip?'<div class="tipbox"><b>15:00–16:00</b><br>下行 420 MB · 上行 35 MB<br>最大：softwareupdated</div>':''}</div>`+
+ '<div class="ticks"><span>0:00</span><span>8:00</span><span>16:00</span><span>现在</span></div><div class="legend"><span><span class="missing-key"></span>无记录</span><span>竖纹 进行中</span></div>'+
+ procs(open)+'<div class="foot">未匹配任何规则（走 MATCH）的流量占 <b>46%</b></div>'}
+function week(){return head(1)+totals('16.2<small>GB</small>','2.6<small>GB</small>','41%')+
+ bars(W,WU,[],6,-1)+'<div class="ticks"><span>10/7</span><span>10/9</span><span>10/11</span><span>今天</span></div><div class="legend"><span><span class="missing-key"></span>无记录</span><span>竖纹 进行中</span></div>'+
+ procs(-1)+'<div class="foot">未匹配任何规则（走 MATCH）的流量占 <b>44%</b></div>'}
+function empty(){return head(0)+'<div class="empty"><b>读不到代理的控制接口</b>Clash Verge 没有运行，或找不到控制 socket。<br>恢复后自动继续采集；历史仍可在“近 7 天”查看。</div>'}
+const S=[["今天 · 浅色 · 收起",today(-1,false),""],["今天 · 浅色 · 展开第一行，悬停 15 点",today(0,true),""],["近 7 天 · 浅色",week(),""],
+["今天 · 深色 · 展开第一行",today(0,false),"dark"],["近 7 天 · 深色",week(),"dark"],["读不到控制接口 · 深色",empty(),"dark"]];
+document.getElementById('root').innerHTML=S.map(s=>`<div class="sample"><h3>${s[0]}</h3><div class="panel ${s[2]}">${s[1]}</div></div>`).join('');
+</script>
+</body>
+</html>
