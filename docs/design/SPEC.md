@@ -169,7 +169,7 @@
 
 ## 网络页
 
-2026-10-04 重新设计，设计稿见 `mockups/network-redesign.html`（合成稿，来源和取舍见 `docs/plans/2026-10-04-network-tab/`）。MeowMac 自己画，不嵌入 TunCanary 的弹窗。当前状态来自 TunCanary 的 `AppModel`：`overall`、`cards`、`siteHistory`、`recentEvents`、`egressState`、`lastCheckedAt`。站点轮次和上下行速率由 MeowMac 自己记录在 `~/Library/Application Support/MeowMac/history/network/`，保留 24 小时。
+2026-10-04 重新设计，设计稿见 `mockups/network-redesign.html`（合成稿，候选稿见 `docs/plans/2026-10-04-network-tab/design-*.html`）。MeowMac 自己画，不嵌入 TunCanary 的弹窗。当前状态来自 TunCanary 的 `AppModel`：`overall`、`cards`、`siteHistory`、`recentEvents`、`egressState`、`lastCheckedAt`。站点轮次和上下行速率由 MeowMac 自己记录在 `~/Library/Application Support/MeowMac/history/network/`，保留 24 小时。
 
 1. **结论**（固定在最前）：28pt 状态图标（绿色对勾、橙色感叹号、红色叉、灰色问号）；结论文字（15pt 半粗）正常时写“网络正常”，有异常时写最严重的检查项、状态和持续时长，如“代理 DNS 提醒 · 8 分钟”；只有站点问题时写“网络异常”或“网络提醒”。下面一句说明写各状态的计数，如“3 项通过 · 1 项提醒 · 1 项未确认”；只有站点问题时写 TunCanary 的原因。右侧上面写“刚刚检测”（10pt），下面是“复测”胶囊按钮，调用 `MonitorController.recheck()`。
 2. **连接检查** `network.checks`：沿用 TunCanary 的红绿灯行。标题右侧写“4 / 5 通过”。五项放在一个圆角 10pt 的分组里（底色 `quaternarySystemFill`，行间 1pt 分隔线），名称固定为代理 TUN、VPN、主网络 DNS、代理 DNS、Tailnet。每行是 14pt 状态徽标（✓、!、✕、?）、名称（12.5pt 半粗）、靠右一句结论（11pt 说明色，单行，放不下截断，悬停看全文）和展开箭头。提醒、失败的行整行着状态色 12% 的底，右侧改写“已持续 N 分钟”（状态色文字，从故障事件的“出现”算起，取不到就不写），下面另起一行写彩色结论和“提示：……”。点任一行展开或收起证据。分组下方一行 10pt 说明色文字，写所选时间范围内已恢复的异常，如“近 1 小时：海外 14:11 失败 1 轮”；最多 3 条，多出写“等 N 项”；没有就写“没有已恢复的异常”；刚启动、范围内没有更早记录时写“14:28 启动，较早时段暂无记录”。检查项来自故障事件的“出现 → 消失”配对，站点来自 MeowMac 自己的历史，最后一轮仍失败的不算已恢复。
