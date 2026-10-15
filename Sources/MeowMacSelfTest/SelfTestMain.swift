@@ -124,6 +124,7 @@ enum SelfTestMain {
             ("UI.CatStore/发布与写入失败", { CatStoreTests.transactions() }),
             ("UI.RenderCat/三档帧图", { SelfTestMain.renderCat() }),
             ("UI.Cat/帧图透明区域", { SelfTestMain.catPixels() }),
+            ("Network.Settings/首次安装默认值与独立保存", { NetworkSettingsTests.freshInstall() }),
             ("UI.NetworkSettings/内存存储与保存回调", { NetworkSettingsTests.roundTrip() }),
             ("UI.NetworkSettings/URL 与三个间隔边界", { NetworkSettingsTests.boundaries() }),
             ("UI.NetworkSettings/新轮次与出口独立调度", { NetworkSettingsTests.status() }),

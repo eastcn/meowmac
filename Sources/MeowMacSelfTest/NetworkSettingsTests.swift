@@ -20,6 +20,31 @@ final class NetworkMemoryDefaults: UserDefaults {
 
 @MainActor
 enum NetworkSettingsTests {
+    /// 首次安装不依赖独立 TunCanary 写入设置；所有存储和回调都留在内存中。
+    static func freshInstall() -> Bool {
+        let store = SettingsStore(defaults: NetworkMemoryDefaults())
+        let initial = store.load()
+        guard initial.intranetURL == nil, initial.tailnetTarget == nil,
+              initial.expectedDNS.isEmpty, initial.disconnectedDNSRule == .notSet,
+              initial.proxyClient == .clashVergeRev,
+              initial.sites.count == 5, initial.sites.allSatisfy({ $0.url.scheme == "https" }),
+              initial.localCheckInterval == 20, initial.lightProbeInterval == 120,
+              initial.egressMonitoring.automatic else { return false }
+        let network = AppModel(settings: initial)
+        var received: AppSettings?
+        network.actions = .live(settingsStore: store, notifier: NotificationUITests.SpyNotifier(),
+            loginItem: MainAppLoginItemController(environment: AppBundleEnvironment(bundleIdentifier: nil, bundlePath: "")),
+            recheck: {}, settingsDidChange: { received = $0 })
+        let model = NetworkSettingsModel(network: network)
+        network.settingsDraft.localCheckInterval = "30"
+        guard model.canSave, model.save(), store.load().localCheckInterval == 30,
+              received == store.load() else { return false }
+        // 已知非法输入必须被同一保存入口拒绝，且不能覆盖已保存值。
+        network.settingsDraft.localCheckInterval = "4"
+        guard !model.canSave, !model.save(), store.load().localCheckInterval == 30 else { return false }
+        let reopened = AppModel(settings: store.load())
+        return reopened.settings.localCheckInterval == 30 && reopened.settings.sites == initial.sites
+    }
     static func fixture() -> AppSettings {
         var settings = AppSettings()
         settings.sites = []
