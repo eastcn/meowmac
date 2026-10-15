@@ -64,7 +64,7 @@
 - 第 2 轮补充（第 1 轮复审 R1 的教训）：Codex 沙箱里 `swift build`、`scripts/check.sh` 或其他命令被拒时，按正常流程申请提权运行原命令；不要自行加 `--disable-sandbox`、改缓存路径或用其他方式绕开。安装、Computer Use、`caffeinate` 和修改配置同样走审批。审批被拒或宿主不支持审批时，在 result 里记录阻碍和原文，把相关验收标为“需规划者实测”，不得绕过。
 
 - 第 2 轮中断记录（2026-10-13 17:11，Codex 服务端 `serverOverloaded` 重试 3 次后停止，规划者记录）：
-  - 已完成：条目 4 已提交 `70c0076`；条目 5 的持续采集验收已通过（`build/acceptance/proxy-traffic/acceptance-round2.json`：同一次运行结算的完整小时覆盖与格式检查通过，精确运行时刻仅保留在本地验收材料中），不用重做。
+  - 已完成：条目 4 已提交 `380f4bd`；条目 5 的持续采集验收已通过（`build/acceptance/proxy-traffic/acceptance-round2.json`：同一次运行结算的完整小时覆盖与格式检查通过，精确运行时刻仅保留在本地验收材料中），不用重做。
   - 中断时在做性能对照的“关闭”组（16/20 个样本），这组作废，两组都要重测；导出检查、Computer Use 截图和第 2 轮 result 都还没做。
   - 规划者已把真实 `config.json` 从 `build/acceptance/config.json.bak` 逐字节恢复（与验收开始时逐字节一致，摘要仅保留在本地验收材料中）。当前运行的 MeowMac 是在采集关闭时启动的，继续前先用 `scripts/install.sh` 重启。
   - 续做时沿用 `build/acceptance/proxy-traffic/` 里已有的脚本和证据，只补没做的部分，然后写第 2 轮 result。
