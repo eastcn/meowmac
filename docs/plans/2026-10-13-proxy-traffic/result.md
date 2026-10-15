@@ -159,7 +159,7 @@ Codex 用量：执行 输入 9262k（缓存命中 9110k），输出 34k（推理
 
 | 编号 | 提交 | 验收证据 |
 |---|---|---|
-| 4（实现已交付，原生验收卡住） | `6f81c61`（前轮实现） | 本轮 `scripts/check.sh > build/acceptance/proxy-traffic/check-resume-approved.log 2>&1` 经正常审批退出 0：358 项、0 失败、50 项前台验收未执行。原生图像、滚动、悬停和切换/展开仍未验收，详见「未验证」。未把前轮 12 张补充整页图算作原生通过。 |
+| 4（实现已交付，原生验收卡住） | `70c0076`（前轮实现） | 本轮 `scripts/check.sh > build/acceptance/proxy-traffic/check-resume-approved.log 2>&1` 经正常审批退出 0：358 项、0 失败、50 项前台验收未执行。原生图像、滚动、悬停和切换/展开仍未验收，详见「未验证」。未把前轮 12 张补充整页图算作原生通过。 |
 | 5（部分验收，CPU 性能未达标） | 本轮提交：`docs: record proxy traffic runtime acceptance` | 规划者已接受安装后由同一次运行结算的完整小时，覆盖与格式检查通过；精确运行时刻及覆盖原值仅保留在本地验收材料中。本轮续做脚本 `python3 build/acceptance/proxy-traffic/accept-resume.py > build/acceptance/proxy-traffic/accept-resume.log 2>&1` 经正常审批退出 1，唯一验收失败为 CPU 超限；安装、临时目录跨整点导出及配置恢复成功。原始续做脚本在交付前已删除，命令、退出码、日志及独立回读结果保留。 |
 
 性能走同一个已安装构建，面板未打开。每组只改授权字段，以 `scripts/install.sh` 正常重启，预热 2 分钟后，每 30 秒执行一次 `ps -o %cpu=,rss= -p <MeowMac pid>`，各 20 个样本；两组都重新测量，没有使用中断时的 16 个样本。
@@ -412,8 +412,8 @@ Codex 用量：执行 输入 10754k（缓存命中 10599k），输出 33k（推�
 
 | 编号 | 提交 | 验收证据 |
 |---|---|---|
-| 1 | `2e8c4e7` | `scripts/check.sh` 退出 0，320 项、0 失败、49 项前台验收未执行；`ProxyTraffic.Core` 13 项全部 PASS。覆盖基线、回退、重启、DIRECT/REJECT/MATCH、跨小时覆盖、截断前完整排名、三处合计、检查点恢复、SCHEMA 示例键集合及非法数据负控。日志：`build/acceptance/proxy-traffic/check-item1.log`。 |
-| 2 | `7d16f3f` | `scripts/check.sh` 退出 0，343 项、0 失败、49 项前台验收未执行；新增客户端 11 项、存储 7 项、运行 5 项通过。假时钟/客户端覆盖睡眠、失败后恢复、内核重启、开关、恢复、检查点失败阻止追加、写盘重试、退出保存。真实 `MEOWMAC_LIVE=1 scripts/test.sh ProxyTraffic.Live` 退出 0，连接解析成功，行键检查通过，1 项 PASS。日志：`check-item2.log`、`live.log`（均在 `build/acceptance/proxy-traffic/`）。 |
+| 1 | `6da91f1` | `scripts/check.sh` 退出 0，320 项、0 失败、49 项前台验收未执行；`ProxyTraffic.Core` 13 项全部 PASS。覆盖基线、回退、重启、DIRECT/REJECT/MATCH、跨小时覆盖、截断前完整排名、三处合计、检查点恢复、SCHEMA 示例键集合及非法数据负控。日志：`build/acceptance/proxy-traffic/check-item1.log`。 |
+| 2 | `279b737` | `scripts/check.sh` 退出 0，343 项、0 失败、49 项前台验收未执行；新增客户端 11 项、存储 7 项、运行 5 项通过。假时钟/客户端覆盖睡眠、失败后恢复、内核重启、开关、恢复、检查点失败阻止追加、写盘重试、退出保存。真实 `MEOWMAC_LIVE=1 scripts/test.sh ProxyTraffic.Live` 退出 0，连接解析成功，行键检查通过，1 项 PASS。日志：`check-item2.log`、`live.log`（均在 `build/acceptance/proxy-traffic/`）。 |
 | 3 | 本轮提交：`feat: export proxy traffic hourly history` | 最终 `scripts/check.sh` 退出 0，351 项、0 失败、49 项前台验收未执行；导出 8 项 PASS。覆盖首次 30 天补写、部分已有且超过 256 KB 的日文件去重、父目录缺失不创建、真实 chmod 无写权限失败、失败不影响本地且下次结算补写、30 天严格文件裁剪、半行隔开、未结束小时不导出、默认不导出及配置往返。日志：`build/acceptance/proxy-traffic/check-final.log`。 |
 
 **缺陷扫描**
@@ -422,7 +422,7 @@ Codex 用量：执行 输入 10754k（缓存命中 10599k），输出 33k（推�
 
 | 轮次 | 问题及证据 | 分类 | 修复与提交 | 复验结果 |
 |---|---|---|---|---|
-| 1 | 首次统一编译发现新测试的 actor 标注和 throwing 表达式错误；存储扫描发现空行需要计入坏行数量 | 范围内的缺陷 | 补齐测试标注和 try，空行计数与半行恢复共用生产扫描；随条目 2 的 `7d16f3f` 提交 | 最终 `scripts/check.sh` 退出 0；全部新增套件 PASS，坏行测试精确断言 5 条。 |
+| 1 | 首次统一编译发现新测试的 actor 标注和 throwing 表达式错误；存储扫描发现空行需要计入坏行数量 | 范围内的缺陷 | 补齐测试标注和 try，空行计数与半行恢复共用生产扫描；随条目 2 的 `279b737` 提交 | 最终 `scripts/check.sh` 退出 0；全部新增套件 PASS，坏行测试精确断言 5 条。 |
 
 最终剩余：本轮条目 1～3 无未解决缺陷；条目 4～5 为后续轮次。最终统一检查 351 项、0 失败。
 
@@ -505,7 +505,7 @@ Codex 用量：执行 输入 10754k（缓存命中 10599k），输出 33k（推�
 
 **遗留**
 
-R1（一般）已在本轮内修复（`83185a5`，只改 result）。修复复核（2026-10-13，全新只读子 Agent，只看 `7b36f82..83185a5`）：通过。已核对 `execute.log` 中审批后的 `scripts/check.sh`（退出码 0，351 项 0 失败，49 项前台验收未执行）和 `MEOWMAC_LIVE=1 scripts/test.sh ProxyTraffic.Live`（退出码 0）。规划者核实：`--disable-sandbox` 是 SwiftPM 的 manifest 沙箱参数，模块缓存指向仓库内 `build/module-cache`，没有绕过 Codex 沙箱。
+R1（一般）已在本轮内修复（`85643e2`，只改 result）。修复复核（2026-10-13，全新只读子 Agent，只看 `7b36f82..83185a5`）：通过。已核对 `execute.log` 中审批后的 `scripts/check.sh`（退出码 0，351 项 0 失败，49 项前台验收未执行）和 `MEOWMAC_LIVE=1 scripts/test.sh ProxyTraffic.Live`（退出码 0）。规划者核实：`--disable-sandbox` 是 SwiftPM 的 manifest 沙箱参数，模块缓存指向仓库内 `build/module-cache`，没有绕过 Codex 沙箱。
 
 遗留（记录级）：修复记录中“既有复审结论逐字保留”的措辞，以及 `check-r1*.log` 两条辅助验证，复核者无法从 diff 核实，不影响结论。
 

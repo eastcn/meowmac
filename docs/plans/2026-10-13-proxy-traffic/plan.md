@@ -29,7 +29,7 @@
 
 - **开工前提**（规划者在启动前核对，不满足就不启动）：
   1. A 已完成，并且复审通过；
-  2. 已满足（2026-10-13）：D43 与 AGENTS.md 修改已写入 `ab719a1`，`plan-baseline` 已移到该提交。
+  2. 已满足（2026-10-13）：D43 与 AGENTS.md 修改已写入 `0a6c601`，`plan-baseline` 已移到该提交。
 - 范围：本机采集、本地历史、检查点、可选导出到笔记库、网络页卡片、布局迁移、设计文档同步、安装和实机验收。
 - 不做：修改 TunCanary 仓库；调用 mihomo 的写接口；在执行阶段写真实的笔记库目录（只写 `build/` 下的临时目录，真实导出由用户在实机验收时打开）；家里 zspace 的任何部署；推送。
 - 全部条目与轮次：
@@ -64,7 +64,7 @@
 - 第 2 轮补充（第 1 轮复审 R1 的教训）：Codex 沙箱里 `swift build`、`scripts/check.sh` 或其他命令被拒时，按正常流程申请提权运行原命令；不要自行加 `--disable-sandbox`、改缓存路径或用其他方式绕开。安装、Computer Use、`caffeinate` 和修改配置同样走审批。审批被拒或宿主不支持审批时，在 result 里记录阻碍和原文，把相关验收标为“需规划者实测”，不得绕过。
 
 - 第 2 轮中断记录（2026-10-13 17:11，Codex 服务端 `serverOverloaded` 重试 3 次后停止，规划者记录）：
-  - 已完成：条目 4 已提交 `6f81c61`；条目 5 的持续采集验收已通过（`build/acceptance/proxy-traffic/acceptance-round2.json`：同一次运行结算的完整小时覆盖与格式检查通过，精确运行时刻仅保留在本地验收材料中），不用重做。
+  - 已完成：条目 4 已提交 `70c0076`；条目 5 的持续采集验收已通过（`build/acceptance/proxy-traffic/acceptance-round2.json`：同一次运行结算的完整小时覆盖与格式检查通过，精确运行时刻仅保留在本地验收材料中），不用重做。
   - 中断时在做性能对照的“关闭”组（16/20 个样本），这组作废，两组都要重测；导出检查、Computer Use 截图和第 2 轮 result 都还没做。
   - 规划者已把真实 `config.json` 从 `build/acceptance/config.json.bak` 逐字节恢复（与验收开始时逐字节一致，摘要仅保留在本地验收材料中）。当前运行的 MeowMac 是在采集关闭时启动的，继续前先用 `scripts/install.sh` 重启。
   - 续做时沿用 `build/acceptance/proxy-traffic/` 里已有的脚本和证据，只补没做的部分，然后写第 2 轮 result。
@@ -82,7 +82,7 @@
 - 预计时长：150
 - 卡住阈值：30
 
-## D43 与 AGENTS.md 修改（用户 2026-10-13 批准，已写入 `ab719a1`，`plan-baseline` 已移到该提交）
+## D43 与 AGENTS.md 修改（用户 2026-10-13 批准，已写入 `0a6c601`，`plan-baseline` 已移到该提交）
 
 写入 `docs/DECISIONS.md`，放在 D42 之后、「附录」之前：
 
@@ -215,7 +215,7 @@
 
 ## 规划者保留
 
-- D43 与 AGENTS.md 的写入、提交和 `plan-baseline` 标签移动：已由规划者完成（`ab719a1`）。
+- D43 与 AGENTS.md 的写入、提交和 `plan-baseline` 标签移动：已由规划者完成（`0a6c601`）。
 - 真实导出：用户实机验收时，在 `config.json` 填写笔记库路径，观察极空间同步后另一端能看到文件。
 - 给 Hermes 的 zspace 部署提示词（部分 C）。
 
