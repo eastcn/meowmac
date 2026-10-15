@@ -4,9 +4,14 @@ MeowMac 是一个 macOS 菜单栏应用，用猫的速度和形态显示整机�
 
 ## 构建与安装
 
-运行需要 macOS 14 或更新版本。构建需要带 macOS 26 SDK 的 Command Line Tools；SwiftPM 的 tools-version 保持 5.10。将 TunCanary 仓库放在本仓库的相邻目录 `../tuncanary`。
+运行需要 macOS 14 或更新版本。构建需要带 macOS 26 SDK 的 Command Line Tools；SwiftPM 的 tools-version 保持 5.10。
+
+网络功能依赖 [TunCanary](https://github.com/eastcn/tuncanary)，以本地路径 `../tuncanary` 引用。克隆时两个仓库放在同一目录下，TunCanary 用已验证的 `v0.5.2`：
 
 ```sh
+git clone https://github.com/eastcn/meowmac.git
+git clone --branch v0.5.2 https://github.com/eastcn/tuncanary.git
+cd meowmac
 scripts/check.sh
 scripts/build-app.sh
 scripts/install.sh
@@ -50,6 +55,8 @@ MEOWMAC_UI_TESTS=1 scripts/check.sh             # 完整离线验收，包含可
 - AI 额度来自 CodexBarCLI。需要安装 CodexBar；MeowMac 不启动 CodexBar.app。
 - 网络检测通过相邻目录中的 TunCanary 库运行。MeowMac 读取 TunCanary 设置，状态文件保存在自己的应用数据目录。
 
-本项目使用 MIT 许可。
+## 许可
 
-渠道 logo 来自 CodexBar 的 ProviderIcon SVG 资源，分别是 Anthropic、OpenAI、DeepSeek 和 OpenCode 的商标。商标权归各自所有者。
+本项目使用 [MIT 许可](LICENSE)。
+
+渠道 logo 来自 CodexBar 的 ProviderIcon SVG 资源（MIT 许可），分别是 Anthropic、OpenAI、DeepSeek 和 OpenCode 的商标。商标权归各自所有者。详见 [第三方声明](THIRD_PARTY_NOTICES.md)。
