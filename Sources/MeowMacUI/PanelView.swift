@@ -115,8 +115,17 @@ public final class PanelState: ObservableObject {
     private var storageLoading: Set<QuotaProvider> = []
     public var now: () -> Date = Date.init
     @Published public var costs: [QuotaProvider: [DailyCost]] = [:]
-    @Published public var proxyTraffic = ProxyTrafficViewData()
-    @Published public var proxyTrafficRange: ProxyTrafficRange = .today
+    @Published public var proxyTraffic = ProxyTrafficViewData() { didSet { proxyTrafficSummaryCache = nil } }
+    @Published public var proxyTrafficRange: ProxyTrafficRange = .today { didSet { proxyTrafficSummaryCache = nil } }
+    private var proxyTrafficSummaryCache: (hour: Date, summary: ProxyTrafficSummary)?
+    /// 面板任一状态变化都会重新求值卡片；汇总只在数据、范围或当前小时变化时重算。
+    public func proxyTrafficSummary() -> ProxyTrafficSummary {
+        let now = now(), hour = ProxyTrafficTime.start(now)
+        if let cache = proxyTrafficSummaryCache, cache.hour == hour { return cache.summary }
+        let summary = ProxyTrafficSummary(rows: proxyTraffic.rows, range: proxyTrafficRange, now: now)
+        proxyTrafficSummaryCache = (hour, summary)
+        return summary
+    }
     @Published public var expandedProxyProcesses: Set<String> = []
     @Published public var networkTone: NetworkTone = .gray { didSet { refreshReminders() } }
     @Published public var failures: [String: Int] = [:] { didSet { refreshReminders() } }

@@ -12,6 +12,7 @@ enum ProxyTrafficSummaryTests {
         ("ProxyTraffic.Card/今天24小时、七天7桶、当前与无记录", bars),
         ("ProxyTraffic.Card/单位边界与MATCH颜色阈值", units),
         ("ProxyTraffic.Card/代理块独立于网络模型且可隐藏", availability),
+        ("ProxyTraffic.Card/汇总缓存随数据、范围和小时失效", cache),
         ("ProxyTraffic.Layout/只缺代理块与重复未知缺项负控", migration),
     ]
 
@@ -89,6 +90,26 @@ enum ProxyTrafficSummaryTests {
         layout.cards["network"] = layout.placements(for: .network).map { .init(id: $0.id, visible: $0.id != "network.proxy") }
         do { try state.saveLayout(layout, for: "builtin.slim") } catch { print("布局保存失败：\(error)"); return false }
         return state.renderedCardIDs(for: .network).isEmpty
+    }
+    static func cache() -> Bool {
+        let state = PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil))
+        var clock = ProxyTrafficTime.start(Date()).addingTimeInterval(1800)
+        state.now = { clock }
+        func current(_ down: Int64) -> ProxyTrafficRow { row(hour: ProxyTrafficTime.hour(clock), processes: [("Demo", 0, down)]) }
+        guard let decoded = try? ProxyTrafficRow.decode(current(100).encoded()),
+              decoded.date == ProxyTrafficTime.start(clock), decoded == current(100) else { return false }
+        state.proxyTraffic = ProxyTrafficViewData(rows: [current(100)], available: true)
+        guard state.proxyTrafficSummary().proxy.total == 100 else { return false }
+        state.proxyTraffic = ProxyTrafficViewData(rows: [current(300)], available: true)
+        let before = state.proxyTrafficSummary()
+        guard before.proxy.total == 300, before.bars.count == 24 else { return false }
+        state.proxyTrafficRange = .week
+        guard state.proxyTrafficSummary().bars.count == 7 else { return false }
+        state.proxyTrafficRange = .today
+        let ongoing = before.bars.firstIndex(where: \.ongoing)
+        clock = clock.addingTimeInterval(3600)
+        let after = state.proxyTrafficSummary().bars.firstIndex(where: \.ongoing)
+        return ongoing != nil && after != nil && ongoing != after
     }
     static func migration() -> Bool {
         var old = PanelLayout.default

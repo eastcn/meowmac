@@ -5,7 +5,7 @@ struct ProxyTrafficCard: View {
     @ObservedObject var state: PanelState
     var body: some View {
         let data = state.proxyTraffic
-        let summary = ProxyTrafficSummary(rows: data.rows, range: state.proxyTrafficRange, now: state.now())
+        let summary = state.proxyTrafficSummary()
         VStack(alignment: .leading, spacing: Design.gap) {
             HStack {
                 SectionHeading(title: "代理流量")

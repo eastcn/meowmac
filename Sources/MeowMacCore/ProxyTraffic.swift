@@ -65,14 +65,26 @@ public struct ProxyTrafficRow: Codable, Equatable, Sendable {
     public let bySrc: [ProxyTrafficProcess]
     public let items: [ProxyTrafficItem]
     public let other: ProxyTrafficBytes
-    public var date: Date? { ProxyTrafficTime.parse(hour) }
+    /// 构造和解码时解析一次。解析要新建格式器，面板汇总会反复读取，不能每次重算。
+    public let date: Date?
     public init(hour: String, coverageSeconds: Int64 = 0, coreRestarts: Int64 = 0,
                 proxy: ProxyTrafficBytes = .init(), direct: ProxyTrafficBytes = .init(), match: ProxyTrafficBytes = .init(),
                 byProcess: [ProxyTrafficProcess] = [], items: [ProxyTrafficItem] = [], other: ProxyTrafficBytes = .init()) {
         schema = "mihomo-traffic/v1"; source = "mac"; collector = "meowmac/" + AppIdentity.version
         self.hour = hour; self.coverageSeconds = coverageSeconds; self.coreRestarts = coreRestarts
         self.proxy = proxy; self.direct = direct; self.match = match; self.byProcess = byProcess; bySrc = []
-        self.items = items; self.other = other
+        self.items = items; self.other = other; date = ProxyTrafficTime.parse(hour)
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        schema = try c.decode(String.self, forKey: .schema); source = try c.decode(String.self, forKey: .source)
+        collector = try c.decode(String.self, forKey: .collector); hour = try c.decode(String.self, forKey: .hour)
+        coverageSeconds = try c.decode(Int64.self, forKey: .coverageSeconds); coreRestarts = try c.decode(Int64.self, forKey: .coreRestarts)
+        proxy = try c.decode(ProxyTrafficBytes.self, forKey: .proxy); direct = try c.decode(ProxyTrafficBytes.self, forKey: .direct)
+        match = try c.decode(ProxyTrafficBytes.self, forKey: .match)
+        byProcess = try c.decode([ProxyTrafficProcess].self, forKey: .byProcess); bySrc = try c.decode([ProxyTrafficProcess].self, forKey: .bySrc)
+        items = try c.decode([ProxyTrafficItem].self, forKey: .items); other = try c.decode(ProxyTrafficBytes.self, forKey: .other)
+        date = ProxyTrafficTime.parse(hour)
     }
     enum CodingKeys: String, CodingKey {
         case schema, source, collector, hour, coverageSeconds = "coverage_seconds", coreRestarts = "core_restarts"
