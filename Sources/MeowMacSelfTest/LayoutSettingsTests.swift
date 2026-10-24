@@ -179,7 +179,7 @@ enum LayoutSettingsTests {
             }
             SettingsControlTestSupport.settle(window)
             try SettingsControlTestSupport.capture(window, name: "layout-default")
-            guard checks().count == 6 else { print("布局复选框数量：\(checks().count)"); return false }
+            guard checks().count == 7 else { print("布局复选框数量：\(checks().count)"); return false }
             let pickers = buttons(view).compactMap { $0 as? NSPopUpButton }
             guard pickers.count == 2, let provider = pickers.first(where: { $0.title == "Claude" }) else { print("布局真实控件：额度下拉数量或默认渠道错误：\(pickers.map(\.title))"); return false }
             guard let providerItem = provider.item(withTitle: "Codex"), let providerAction = providerItem.action,
@@ -227,7 +227,7 @@ enum LayoutSettingsTests {
             click(window, x: networkTabCenter, fromBottom: energy.y + 149)
             guard model.selectedTab == .network else { print("网络标签未触发"); return false }
             optionArrow(window, code: 123, character: "\u{F702}")
-            guard model.draft.tabs == [.system, .network, .quota], checks().count == 8 else { print("布局真实控件：标签快捷键或网络复选框数量错误：\(model.draft.tabs)，数量 \(checks().count)"); return false }
+            guard model.draft.tabs == [.system, .network, .quota], checks().count == 9 else { print("布局真实控件：标签快捷键或网络复选框数量错误：\(model.draft.tabs)，数量 \(checks().count)"); return false }
             check(4)
             let network = point(checks()[4])
             click(window, x: handleCenter, fromBottom: network.y)
@@ -379,5 +379,34 @@ enum LayoutSettingsTests {
                 && state.overviewColor(for: memory) == Color(nsColor: .systemOrange)
                 && state.panelLayout == .default
         } catch { print("总览颜色测试失败：\(error)"); return false }
+    }
+
+    /// 布局设置的“本机没有电池”提示（R5）。SwiftUI 列表行的文字不在 AppKit 辅助功能树里，窗口里取不到，
+    /// 所以离线断言两件事：显示条件对四种快照的结果，以及源码里文案和条件没有被改动。
+    static func noBatteryNote() -> Bool {
+        let state = PanelPreviewRenderer.syntheticState()
+        func snapshot(_ status: BatteryStatus?) -> SystemSnapshot {
+            SystemSnapshot(timestamp: state.now(), cpuUsage: 0.2, memoryPressure: .normal,
+                swapUsedBytes: nil, diskAvailableBytes: nil, diskTotalBytes: nil,
+                networkReceivedBytesPerSecond: nil, networkSentBytesPerSecond: nil,
+                battery: BatteryMetrics(temperatureCelsius: nil, systemPowerWatts: nil, status: status), thermal: .nominal)
+        }
+        // 与 LayoutSettings.swift 里的条件同一个表达式。
+        func showsNote(_ status: BatteryStatus?) -> Bool {
+            state.snapshot = snapshot(status)
+            return state.snapshot?.battery.status?.hasBattery == false
+        }
+        state.snapshot = nil
+        let noSnapshot = state.snapshot?.battery.status?.hasBattery == false
+        guard showsNote(.noBattery), !showsNote(BatteryStatus(state: .battery, percent: 62)),
+              !showsNote(BatteryStatus(state: .acNotCharging, percent: 80)), !showsNote(nil), !noSnapshot else {
+            print("无电池提示条件错误"); return false
+        }
+        guard let source = try? String(contentsOfFile: "Sources/MeowMacUI/LayoutSettings.swift", encoding: .utf8),
+              source.contains("if placement.id == \"system.battery\", state.snapshot?.battery.status?.hasBattery == false {"),
+              source.contains("Text(\"本机没有电池\")") else {
+            print("无电池提示的文案或条件与断言不一致"); return false
+        }
+        return true
     }
 }

@@ -355,6 +355,7 @@ enum SelfTestMain {
         tests.append(("UI.LayoutSettings/真实控件操作", { await LayoutSettingsTests.actualControls() }))
         tests.append(("UI.LayoutSettings/快照到达刷新与选择保留", { LayoutSettingsTests.snapshotArrival() }))
         tests.append(("UI.LayoutSettings/总览指标共用颜色", { LayoutSettingsTests.overviewColors() }))
+        tests.append(("UI.Battery/布局设置无电池提示条件", { LayoutSettingsTests.noBatteryNote() }))
         if ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"] != nil {
             tests.append(("UI.LayoutAcceptance/真实容器合成对照", { await LayoutAcceptanceTests.render() }))
             tests.append(("UI.RenderPreview/三个标签页", { await SelfTestMain.renderPanel() }))
