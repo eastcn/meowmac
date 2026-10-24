@@ -14,6 +14,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
     private var networkBridge: NetworkBridge?
     private var proxyTrafficCoordinator: ProxyTrafficCoordinator?
     private var networkRecorder: NetworkHistoryRecorder?
+    private var batteryRecorder: BatteryHistoryRecorder?
     private var siteHistorySubscription: AnyCancellable?
     private var quotaCoordinator: QuotaCoordinator?
     private var resetCoordinator: CodexResetCoordinator?
@@ -85,6 +86,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
             Task { @MainActor in recorder?.record(siteHistory: history, now: Date()) }
         }
         bridge.start()
+        batteryRecorder = BatteryHistoryRecorder { [weak panelState] history in panelState?.batteryHistory = history }
         let proxy = ProxyTrafficCoordinator(config: configResult.config) { [weak panelState] value in panelState?.proxyTraffic = value }
         proxyTrafficCoordinator = proxy
         proxy.start()
@@ -165,11 +167,11 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
         })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.panelState.rulesWillSleep(); self?.proxyTrafficCoordinator?.sleep() }
+            Task { @MainActor [weak self] in self?.panelState.rulesWillSleep(); self?.proxyTrafficCoordinator?.sleep(); self?.batteryRecorder?.sleep() }
         })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
                                                                             object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.panelState.refreshReminders(); self?.sample(); self?.sampleEnergy(); self?.startEnergyLoop(); self?.proxyTrafficCoordinator?.wake() }
+            Task { @MainActor [weak self] in self?.batteryRecorder?.wake(); self?.panelState.refreshReminders(); self?.sample(); self?.sampleEnergy(); self?.startEnergyLoop(); self?.proxyTrafficCoordinator?.wake() }
         })
     }
 
@@ -184,6 +186,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
                 networkRecorder?.record(received: latest.networkReceivedBytesPerSecond,
                     sent: latest.networkSentBytesPerSecond, at: latest.timestamp)
             })
+        batteryRecorder?.record(latest.battery.status, at: latest.timestamp)
         hasSystemBaseline = true
         cadence.frameInterval = panelState.catDisplay().frameInterval
     }
