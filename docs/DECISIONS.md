@@ -199,6 +199,14 @@ v0.1 第一轮交付的界面不合格，原因是规划里没有视觉要求。
 - 可选导出：`config.json` 的 `proxyTrafficExportDirectory` 不为空时，每个小时结束后把这一小时的汇总行追加到该目录下的 `mac/YYYY-MM-DD.jsonl`。只追加，不重命名，不建临时文件；删除该子目录下超过 30 天、文件名符合 `YYYY-MM-DD.jsonl` 的文件。默认为空，不导出。
 - 网络页新增“代理流量”功能块 `network.proxy`，设计稿见 `docs/plans/2026-10-13-proxy-traffic/design.html`。
 
+**D44　电池与续航（2026-10-24）。** 本项补充 D9 和 D30，其余不变。
+
+- 电池读数来自 IORegistry 的 `AppleSmartBattery`（与 D9 的电池温度同源，不需要 sudo），按字段白名单读取：电量、供电与充放电状态、电压和电流、系统给出的平均预计时间、最大容量、循环次数和适配器额定功率。不读取、不记录序列号；不使用公开接口里的电池健康文字。
+- 预计时间只显示系统给出的值，MeowMac 不自行推算续航。
+- 每 5 分钟记录一个电量点，供电状态变化时立即补记一点，写入 `~/Library/Application Support/MeowMac/history/battery/`，保留 24 小时。
+- 系统页新增“电池”功能块 `system.battery`，默认排在磁盘之后；没有电池的 Mac 不显示。设计稿见 `docs/design/mockups/battery.html`。
+- 本项不新增提醒规则。
+
 ## 附录：已验证的事实
 
 以下事实在 2026-09-29 于作者的 MacBook Pro（Apple M5，16 GB，macOS 26.6.2）上验证。
