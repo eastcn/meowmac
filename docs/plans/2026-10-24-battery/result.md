@@ -105,7 +105,7 @@
 | 已做交付前缺陷扫描，最多 2 轮；问题分类、修复、复验和剩余问题已写进 result | 是 | 1 轮 |
 | 验收的预览、截图和测试走真实路径；模拟证据仅作补充，未验证项已记录 | 是 | 首屏用 `PanelHosting` 真实容器；预览走 `systemPagePNG`；见「未验证」 |
 | 没有降低验收标准或放宽测试断言 | 是 | 改动的旧用例只把系统页期望从三项改为四项（`SensorUITests`、`PanelLayoutUITests`、`LayoutSettingsTests`），拒绝类断言不变 |
-| 每个执行条目至少一个提交 | 是 | `git log --oneline 71cf2fd..HEAD`：`02b31e6 fix: use fictitious cycle count in battery fixtures`、`6413c97 feat: add battery card to system page`、`25bca0c feat: record 24-hour battery charge history`、`0186f4c feat: read battery status through key whitelist`（另加本 result 提交） |
+| 每个执行条目至少一个提交 | 是 | `git log --oneline 71cf2fd..HEAD`：`02b31e6 fix: use fictitious cycle count in battery fixtures`、`6413c97 feat: add battery card to system page`、`25bca0c feat: record 24-hour battery charge history`、`0186f4c feat: read battery status through key whitelist`（另加 `7c15fb4` docs: record battery round 1 result） |
 | 做过的条目都满足执行者要求；不满足的已跳过 | 是 | 条目 2、3 要求强推理模型：Claude Opus 5.5 |
 | 外部写入都在授权范围内 | 是 | 无外部写入 |
 | 用户可见的改动没有混进 refactor 提交 | 是 | 无 refactor 提交 |
@@ -120,14 +120,44 @@
 
 **复审**
 
-<!-- 复审者只读，输出由调度者写入 -->
+复审者：Claude Code 全新子 Agent（Claude Opus 5.5，只读），2026-10-24。依据 plan、本节以上内容和 `git diff 71cf2fd..7c15fb4`；在 `6196fcd` 上自跑 `scripts/check.sh` 退出 0（381 项，0 失败，50 项前台未执行），首屏测量复现。
+
+结论：下一轮（无阻断；唯一原因是 R3 待用户决策，已由用户决定，见下）。根因：规划 2 条，执行 4 条，环境 1 条。
+
+| 编号 | 问题 | 证据 | 根因 | 建议去向 | 用户决定 | 级别 |
+|---|---|---|---|---|---|---|
+| R1 | SPEC 健康行示例的循环次数是本机实测值 | `docs/design/SPEC.md:132`（`6413c97` 引入） | 执行 | 复审者修 | 已修 `393424a` | 一般 |
+| R2 | result 用文字写出了实测循环次数 | result 第 1 轮「缺陷扫描」「建议」 | 执行 | 复审者修 | 已修 `393424a` | 一般 |
+| R3 | 设计稿“刚启动 · 记录不足”与 D10 冲突，执行者自行选了 D10；执行者对影响的描述也不准确（一直接电源时前 24 小时都写“已记录 N 分钟”） | `battery.html`；`BatteryHistory.summary` | 规划 | 待用户决策 | 用户 2026-10-24 选定以 D10 为准，记为 plan D12；规划者已把设计稿该状态改为只有 1 个点的示例 | 一般 |
+| R4 | 缺 `ExternalConnected` 时状态定为“使用电池”，把未知显示成确定状态 | `BatteryStatus.swift` `parse` 的 `else { state = .battery }` | 执行 | 列遗留 | | 记录 |
+| R5 | 布局设置里“本机没有电池”的提示没有离线断言，`LayoutSettingsTests` 的四项期望属于前台用例未运行 | `LayoutSettings.swift`；本轮「未验证」 | 环境 | 列遗留（第 2 轮用 `MEOWMAC_UI_TESTS=1` 补跑） | | 记录 |
+| R6 | 「提交范围」缺 head | 本轮「提交范围」 | 执行 | 复审者修 | 已修 `393424a` | 记录 |
+| R7 | plan 写“系统快照每 10 秒采一次”，实际约 2 秒 | `Sources/MeowMacUI/ApplicationCadence.swift:21` | 规划 | 列遗留（规划者已在 plan 更正） | | 记录 |
+
+补充观察：悬停提示盖住标题行右侧功率，与磁盘卡片现有做法一致；`71cf2fd`、`6413c97` 的历史里仍有该实测值，仓库未推送，复审者不建议改写历史。
 
 **修复记录**
 
-按规划者指令只修 R1、R2、R6，未改复审结论。修复提交：本提交 `docs: fix battery round 1 review findings`（提交号由调度者补）。
+按规划者指令只修 R1、R2、R6，未改复审结论。修复提交：`393424a` docs: fix battery round 1 review findings。
 
 | 编号 | 提交 | 改动 | 验证 |
 |---|---|---|---|
-| R1 | 本提交 | `docs/design/SPEC.md` 健康行示例的循环次数改为 123，与设计稿一致 | `scripts/check.sh` 退出 0：“自测完成：381 项，0 项失败，50 项前台验收未执行”“check 通过” |
-| R2 | 本提交 | result 第 1 轮「缺陷扫描」和「建议」两处去掉实测循环次数，改为“与本机实测值相同” | 同上；`grep -n "77" result.md` 只剩与该值无关的命中 |
-| R6 | 本提交 | 「提交范围」补为 `71cf2fd..7c15fb4`，本轮提交列出 `7c15fb4` | 同上 |
+| R1 | `393424a` | `docs/design/SPEC.md` 健康行示例的循环次数改为 123，与设计稿一致 | `scripts/check.sh` 退出 0：“自测完成：381 项，0 项失败，50 项前台验收未执行”“check 通过” |
+| R2 | `393424a` | result 第 1 轮「缺陷扫描」和「建议」两处去掉实测循环次数，改为“与本机实测值相同” | 同上；`grep -n "77" result.md` 只剩与该值无关的命中 |
+| R6 | `393424a` | 「提交范围」补为 `71cf2fd..7c15fb4`，本轮提交列出 `7c15fb4` | 同上 |
+
+**修复复核**
+
+复核者：Claude Code 全新子 Agent（只读），只看 `git show 393424a`。复核结论：通过。
+
+| 编号 | 是否修好 | 证据 | 新问题 | 级别 |
+|---|---|---|---|---|
+| R1 | 是 | SPEC 健康行改为“循环 123 / 1000”，与设计稿一致；diff 在 SPEC 只有这一行 | 无 | |
+| R2 | 是 | result 两处改为“与本机实测值相同”，不含数字；`git grep -n -w 77` 在 SPEC、设计稿和本目录只剩修复记录里引用的检查命令 | 无 | |
+| R6 | 是 | 「提交范围」为 `71cf2fd..7c15fb4`，列出 `7c15fb4` | 自检表第 108 行未列 `7c15fb4`、修复记录提交号为占位：规划者已补 | 记录 |
+
+**遗留**
+
+- R4：缺 `ExternalConnected` 时的状态判定（记录级）。
+- R5：前台 UI 用例与“本机没有电池”提示，第 2 轮用 `MEOWMAC_UI_TESTS=1` 补跑。
+- R7：plan 已更正采样间隔，无代码影响。

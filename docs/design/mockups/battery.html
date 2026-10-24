@@ -39,7 +39,7 @@ function disk(sparse){return `<section class="section disk"><div class="heading 
 function batSeries(kind){
  const N2=145,out=[];
  for(let i=0;i<N2;i++){let ac=true,v=80;
-  if(kind==='sparse'){out.push(i<N2-4?null:{v:58-(i-(N2-4))*.5,ac:false});continue;}
+  if(kind==='sparse'){out.push(i<N2-1?null:{v:58,ac:false});continue;}
   if(i>=90&&i<108){ac=false;v=80-(i-90)*1.65}
   else if(i>=108&&i<120){ac=true;v=Math.min(80,50.3+(i-108)*2.6)}
   else if(i>=120){ac=kind==='ac';v=kind==='ac'?80:80-(i-120)*.75}
@@ -67,7 +67,7 @@ function battery(kind){
   discharge:{pct:'62',state:'使用电池',rate:'放电 9.3 W',line:'预计还能用 <b>4 小时 20 分</b>',sum:'用电池 6 小时 · 耗电 48% · 平均 8.6 W',right:'低电量 20%'},
   charging:{pct:'68',state:'充电中',rate:'充电 24.6 W',line:'预计 <b>35 分钟</b>充满',sum:'用电池 5 小时 · 耗电 39% · 平均 8.6 W',right:'适配器 65 W'},
   ac:{pct:'80',state:'接电源 · 未充电',rate:'整机 9.3 W',line:'由电源供电，电池保持在 80%',sum:'用电池 3 小时 · 耗电 30% · 平均 9.1 W',right:'适配器 65 W'},
-  sparse:{pct:'58',state:'使用电池',rate:'放电 8.1 W',line:'续航估算中，系统还没给出预计时间',sum:'已记录 30 分钟',right:'低电量 20%'}}[kind];
+  sparse:{pct:'58',state:'使用电池',rate:'放电 8.1 W',line:'续航估算中，系统还没给出预计时间',sum:'已记录 4 分钟',right:'低电量 20%'}}[kind];
  return `<section class="section battery"><div class="heading bat-title">电池 <strong>${C.pct}</strong><span class="unit">%</span><span class="state">${C.state}</span><span class="rate right">${C.rate}</span></div>
  <div class="bat-line"><span>${C.line}</span><span class="right">近 24 小时</span></div>${batGraph(kind)}
  <div class="axis"><span>昨天 14:00</span><span>02:00</span><span>14:00</span></div>
@@ -75,7 +75,7 @@ function battery(kind){
  <div class="bat-meta"><span>健康 <b>100%</b> · 循环 <b>123</b> / 1000</span><span>电池 31.0 °C · ${C.right}</span></div></section>`;
 }
 function diag(){return '<div class="diagnosis"><div class="title">能耗诊断</div><div class="row"><b>ExampleWorker</b><span class="sub">占满 1 核</span><b class="right warn">96%</b><span class="sub">20 分钟</span></div><div class="hint">建议用 AI 诊断：把进程名和数值交给 AI 助手排查</div></div>';}
-function render(){document.querySelector('#root').innerHTML=[['discharge-dark','dark','使用电池 · 深色','discharge'],['charging-light','','充电中 · 浅色','charging'],['ac-dark','dark','接电源未充电 · 深色','ac'],['sparse-light','','刚启动 · 记录不足','sparse']].map(([id,theme,title,kind])=>`<article class="sample" id="${id}"><h2>${title}</h2><div class="panel ${theme}">${header(false)}<div class="body">${trends(false,false)}${energy(false)}${disk(false)}${battery(kind)}</div><div class="footer"><span class="pill">↻ 刷新</span><span class="sub">额度更新于 13:57</span><span class="pill">⚙ 设置</span></div></div><p class="note">${({discharge:'放电时显示系统的平均预计时间；电量曲线下方虚线为 20% 低电量线。',charging:'充电时显示系统给出的预计充满时间，不写目标百分比（D6）。',ac:'接电源但不充电（充电上限或优化充电）时，功率改写整机功耗，不写预计时间。',sparse:'曲线只画真实样本；应用未运行或休眠的时段画斜纹，不插值。'})[kind]}</p></article>`).join('');const only=new URLSearchParams(location.search).get('panel');if(only){document.body.classList.add('single');document.getElementById(only)?.classList.add('chosen');}}
+function render(){document.querySelector('#root').innerHTML=[['discharge-dark','dark','使用电池 · 深色','discharge'],['charging-light','','充电中 · 浅色','charging'],['ac-dark','dark','接电源未充电 · 深色','ac'],['sparse-light','','刚启动 · 记录不足','sparse']].map(([id,theme,title,kind])=>`<article class="sample" id="${id}"><h2>${title}</h2><div class="panel ${theme}">${header(false)}<div class="body">${trends(false,false)}${energy(false)}${disk(false)}${battery(kind)}</div><div class="footer"><span class="pill">↻ 刷新</span><span class="sub">额度更新于 13:57</span><span class="pill">⚙ 设置</span></div></div><p class="note">${({discharge:'放电时显示系统的平均预计时间；电量曲线下方虚线为 20% 低电量线。',charging:'充电时显示系统给出的预计充满时间，不写目标百分比（D6）。',ac:'接电源但不充电（充电上限或优化充电）时，功率改写整机功耗，不写预计时间。',sparse:'刚启动只有 1 个点；用电池满 5 分钟后摘要即改为真实用量（D10、D12）。应用未运行或休眠的时段画斜纹，不插值。'})[kind]}</p></article>`).join('');const only=new URLSearchParams(location.search).get('panel');if(only){document.body.classList.add('single');document.getElementById(only)?.classList.add('chosen');}}
 render();
 </script>
 </html>

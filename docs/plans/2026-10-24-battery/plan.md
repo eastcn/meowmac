@@ -30,7 +30,7 @@
 ## 背景与已知事实
 
 - 设计稿：`docs/design/mockups/battery.html`（用户 2026-10-24 定稿）。四个状态：使用电池、充电中、接电源未充电、刚启动记录不足。页面底部「口径」是实现规格。
-- 现有采集：`Sources/MeowMacSystem/SystemCollector.swift:130` 的 `batteryMetrics()` 已经读 IORegistry `AppleSmartBattery`，只取 `Temperature` 和 `PowerTelemetryData.SystemLoad`；`BatteryMetrics` 在 `Sources/MeowMacCore/SystemMetrics.swift:56`。系统快照每 10 秒采一次。
+- 现有采集：`Sources/MeowMacSystem/SystemCollector.swift:130` 的 `batteryMetrics()` 已经读 IORegistry `AppleSmartBattery`，只取 `Temperature` 和 `PowerTelemetryData.SystemLoad`；`BatteryMetrics` 在 `Sources/MeowMacCore/SystemMetrics.swift:56`。系统快照约每 2 秒采一次（`Sources/MeowMacUI/ApplicationCadence.swift`，第 1 轮复审 R7 更正）。
 - 规划者 2026-10-24 在本机（macOS 26.6.2，接电源、未充电、电量 80%）实测，不需要 sudo 能读到：
   - 顶层：`ExternalConnected`、`IsCharging`、`FullyCharged`、`CurrentCapacity`（百分比）、`MaxCapacity`（系统口径的最大容量百分比，与“系统设置 › 电池”一致）、`AppleRawMaxCapacity`、`DesignCapacity`（mAh）、`CycleCount`、`DesignCycleCount9C`、`Voltage`（mV）、`Amperage`（mA，放电为负）、`AvgTimeToEmpty`、`AvgTimeToFull`（分钟）、`BatteryInstalled`。
   - 接电源未充电时 `AvgTimeToEmpty`、`AvgTimeToFull`、`TimeRemaining` 都是 65535，`Amperage` 为 0。
@@ -83,6 +83,7 @@
 | D9 | 偏好 | 执行者自主权 | 已定：宽松。不部署，不写线上数据，不改系统设置。 |
 | D10 | 技术 | 24 小时摘要 | 允许默认：历史分连续采集段，应用启动后和每次系统唤醒后的第一个点标记为新段起点（行字段 `segmentStart: true`）；曲线和摘要都不跨段连线、不跨段累计，段起点前的空档画斜纹。只统计同一段内相邻两点都在使用电池、间隔不超过 330 秒的区间；用电池时长为这些区间之和；耗电为这些区间内电量下降之和；平均功率为这些点放电功率的均值。没有这样的区间时写“已记录 N 分钟”或“近 24 小时未用电池”。 |
 | D11 | 安全 | 隐私和公开红线 | 已定：应用按字段白名单逐键读取 `AppleSmartBattery`（`IORegistryEntryCreateCFProperty`，或读取 `BatteryData`、`AdapterDetails` 后只取白名单子键），不再取完整属性字典，不碰任何序列号键。验收不运行 `ioreg` 命令：IORegistry 的真实值只经应用自己的白名单读取器取得（`MEOWMAC_LIVE=1` 用例，只输出白名单标量；读取或解析失败时只输出错误类别，不输出原文）。`system_profiler SPPowerDataType` 是一行一个字段的文本，只允许经 `grep -E '^ *(Cycle Count|Maximum Capacity|Condition|State of Charge \(%\)|Charging|Fully Charged):'` 按行首字段名过滤后显示或写文件；`pmset -g batt` 不含序列号，可直接使用。不允许完整的 `system_profiler` 输出或任何 `ioreg` 输出进入终端日志、result 或 `build/`。序列号在任何地方都不记录。夹具和预览图只用虚构数据；过滤后的真实读数只在 `build/acceptance/battery/`。 |
+| D12 | 偏好 | 设计稿“刚启动 · 记录不足”与 D10 的冲突（第 1 轮复审 R3） | 已定：以 D10 为准（用户 2026-10-24 选定）。设计稿该状态改为只有 1 个点、“已记录 4 分钟”的示例。 |
 
 ## 进度
 
