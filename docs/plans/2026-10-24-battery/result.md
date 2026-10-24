@@ -8,7 +8,7 @@
 
 ### 第 1 轮（2026-10-24，Claude Code 子 Agent · Claude Opus 5.5，推理强度：宿主默认）
 
-**提交范围**：`71cf2fd..`（本轮提交：`0186f4c` feat: read battery status through key whitelist、`25bca0c` feat: record 24-hour battery charge history、`6413c97` feat: add battery card to system page、`02b31e6` fix: use fictitious cycle count in battery fixtures；另有本提交 docs: record battery round 1 result，提交号由复审者补）
+**提交范围**：`71cf2fd..7c15fb4`（本轮提交：`0186f4c` feat: read battery status through key whitelist、`25bca0c` feat: record 24-hour battery charge history、`6413c97` feat: add battery card to system page、`02b31e6` fix: use fictitious cycle count in battery fixtures、`7c15fb4` docs: record battery round 1 result）
 
 **开工检查**：无人值守；plan 复核：不需要（格式 relay-plan v2，定稿 2026-10-24，未超过 3 天）
 
@@ -28,7 +28,7 @@
 
 | 轮次 | 问题及证据 | 分类 | 修复与提交 | 复验结果 |
 |---|---|---|---|---|
-| 1 | 夹具和合成预览沿用设计稿的循环次数 77，与本机实测循环次数相同（对照 `build/acceptance/battery/live-reading.txt`），违反“夹具只用虚构数据” | 范围内的缺陷 | 改为 123，`02b31e6` | `scripts/check.sh` 退出 0，381 项 0 失败；其余虚构值 4321 / 4500 / 4620 / 12000 / 775 / 2050 / 9300 / 3100 与实测文件逐个比对无重合 |
+| 1 | 夹具和合成预览沿用设计稿的循环次数，该值与本机实测循环次数相同（对照 `build/acceptance/battery/live-reading.txt`），违反“夹具只用虚构数据” | 范围内的缺陷 | 改为 123，`02b31e6` | `scripts/check.sh` 退出 0，381 项 0 失败；其余虚构值 4321 / 4500 / 4620 / 12000 / 775 / 2050 / 9300 / 3100 与实测文件逐个比对无重合 |
 | 1 | 标题行下间距 3 pt，设计稿 `.heading` 为 8 px（电池未像磁盘那样覆盖成 3 px） | 范围内的缺陷 | 提交前改为 8 pt，含在 `6413c97` | 首屏测量电池块高 149 → 154 pt，磁盘仍在首屏 |
 | 1 | 窗口起点恰好落在两次记录之间时，左端出现不足 5 分钟的斜纹细条 | 范围内的缺陷 | 提交前改为窗口开头不超过 330 秒的空白不算缺失，含在 `6413c97` | `UI.Battery/无电池不渲染与悬停选择` 通过，含“窗口开头超过 330 秒才算缺失”断言 |
 
@@ -66,7 +66,7 @@
 
 **建议**
 
-- 设计稿 `battery.html` 的示例循环次数 77 与本机实测相同，建议规划者换成虚构值（设计稿是用户定稿的文件，执行者没有改）。
+- 设计稿 `battery.html` 的示例循环次数与本机实测值相同，建议规划者换成虚构值（设计稿是用户定稿的文件，执行者没有改）。
 - `SystemUpdatePath` 的“电池”数据源失败计数仍以温度为空判定，无电池的 Mac 会持续累加；与本任务无关，未改。
 
 **外部写入**
@@ -121,3 +121,13 @@
 **复审**
 
 <!-- 复审者只读，输出由调度者写入 -->
+
+**修复记录**
+
+按规划者指令只修 R1、R2、R6，未改复审结论。修复提交：本提交 `docs: fix battery round 1 review findings`（提交号由调度者补）。
+
+| 编号 | 提交 | 改动 | 验证 |
+|---|---|---|---|
+| R1 | 本提交 | `docs/design/SPEC.md` 健康行示例的循环次数改为 123，与设计稿一致 | `scripts/check.sh` 退出 0：“自测完成：381 项，0 项失败，50 项前台验收未执行”“check 通过” |
+| R2 | 本提交 | result 第 1 轮「缺陷扫描」和「建议」两处去掉实测循环次数，改为“与本机实测值相同” | 同上；`grep -n "77" result.md` 只剩与该值无关的命中 |
+| R6 | 本提交 | 「提交范围」补为 `71cf2fd..7c15fb4`，本轮提交列出 `7c15fb4` | 同上 |
