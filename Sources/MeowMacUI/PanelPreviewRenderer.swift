@@ -87,16 +87,16 @@ public enum PanelPreviewRenderer {
         switch kind {
         case .discharge:
             status = BatteryStatus(state: .battery, percent: 62, maxCapacityPercent: 100, rawMaxCapacity: 4620, designCapacity: 4500,
-                                   cycleCount: 77, designCycleCount: 1000, powerWatts: 9.3, minutesToEmpty: 260, adapterWatts: nil)
+                                   cycleCount: 123, designCycleCount: 1000, powerWatts: 9.3, minutesToEmpty: 260, adapterWatts: nil)
         case .charging:
             status = BatteryStatus(state: .charging, percent: 68, maxCapacityPercent: 100, rawMaxCapacity: 4620, designCapacity: 4500,
-                                   cycleCount: 77, designCycleCount: 1000, powerWatts: 24.6, minutesToFull: 35, adapterWatts: 65)
+                                   cycleCount: 123, designCycleCount: 1000, powerWatts: 24.6, minutesToFull: 35, adapterWatts: 65)
         case .ac:
             status = BatteryStatus(state: .acNotCharging, percent: 80, maxCapacityPercent: 100, rawMaxCapacity: 4620, designCapacity: 4500,
-                                   cycleCount: 77, designCycleCount: 1000, powerWatts: 0, adapterWatts: 65)
+                                   cycleCount: 123, designCycleCount: 1000, powerWatts: 0, adapterWatts: 65)
         case .sparse:
             status = BatteryStatus(state: .battery, percent: 58, maxCapacityPercent: 100, rawMaxCapacity: 4620, designCapacity: 4500,
-                                   cycleCount: 77, designCycleCount: 1000, powerWatts: 8.1, adapterWatts: nil)
+                                   cycleCount: 123, designCycleCount: 1000, powerWatts: 8.1, adapterWatts: nil)
         }
         state.snapshot = SystemSnapshot(timestamp: now, cpuUsage: latest.cpuUsage, memoryPressure: latest.memoryPressure,
             swapUsedBytes: latest.swapUsedBytes, diskAvailableBytes: latest.diskAvailableBytes, diskTotalBytes: latest.diskTotalBytes,

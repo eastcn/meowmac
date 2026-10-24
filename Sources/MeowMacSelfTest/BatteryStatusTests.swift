@@ -22,7 +22,7 @@ enum BatteryStatusTests {
             "BatteryInstalled": kCFBooleanTrue!, "ExternalConnected": kCFBooleanFalse!,
             "IsCharging": kCFBooleanFalse!, "FullyCharged": kCFBooleanFalse!,
             "CurrentCapacity": 62, "MaxCapacity": 97, "AppleRawMaxCapacity": 4321, "DesignCapacity": 4500,
-            "CycleCount": 77, "DesignCycleCount9C": 1000, "Voltage": 12000, "Amperage": -775,
+            "CycleCount": 123, "DesignCycleCount9C": 1000, "Voltage": 12000, "Amperage": -775,
             "AvgTimeToEmpty": 260, "AvgTimeToFull": 65535, "Temperature": 3100,
             "PowerTelemetryData": ["SystemLoad": 9300], "AdapterDetails": ["Watts": 65],
         ]
@@ -94,12 +94,12 @@ enum BatteryStatusTests {
         let wrongBool = BatteryStatus.parse(fixture(["ExternalConnected": kCFBooleanTrue!, "IsCharging": 1, "FullyCharged": "true"]))
         let reference = BatteryStatus.parse(fixture())
         return check("缺适配器只影响适配器", noAdapter.adapterWatts == nil && noAdapter.percent == 62 && noAdapter.powerWatts == reference.powerWatts)
-            && check("缺电压功率为空", noVoltage.powerWatts == nil && noVoltage.cycleCount == 77 && noVoltage.estimateMinutes == 260)
+            && check("缺电压功率为空", noVoltage.powerWatts == nil && noVoltage.cycleCount == 123 && noVoltage.estimateMinutes == 260)
             && check("适配器不是字典", adapterNotDictionary.adapterWatts == nil && adapterNotDictionary.percent == 62)
             && check("类型错误逐项为空", wrong.percent == nil && wrong.cycleCount == nil && wrong.powerWatts == nil
                 && wrong.adapterWatts == nil && wrong.maxCapacityPercent == nil && wrong.designCapacity == 4500 && wrong.state == .battery)
             && check("布尔字段不接受数字和文字", wrongBool.state == .acNotCharging)
-            && check("参照读数", reference.percent == 62 && reference.cycleCount == 77 && reference.designCycleCount == 1000 && reference.adapterWatts == 65)
+            && check("参照读数", reference.percent == 62 && reference.cycleCount == 123 && reference.designCycleCount == 1000 && reference.adapterWatts == 65)
             && check("温度和整机功耗照旧", BatteryMetrics.parse(properties: fixture()).temperatureCelsius == 31
                 && BatteryMetrics.parse(properties: fixture()).systemPowerWatts == 9.3
                 && BatteryMetrics.parse(properties: [:]) == BatteryMetrics(temperatureCelsius: nil, systemPowerWatts: nil, status: .noBattery))

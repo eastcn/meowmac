@@ -98,7 +98,7 @@ enum BatteryCardTests {
 
     static func texts() -> Bool {
         let discharge = display(BatteryStatus(state: .battery, percent: 62, maxCapacityPercent: 100, rawMaxCapacity: 4321, designCapacity: 4500,
-                                              cycleCount: 77, designCycleCount: 1000, powerWatts: 9.3, minutesToEmpty: 260))
+                                              cycleCount: 123, designCycleCount: 1000, powerWatts: 9.3, minutesToEmpty: 260))
         let charging = display(BatteryStatus(state: .charging, percent: 68, powerWatts: 24.6, minutesToFull: 35, adapterWatts: 65))
         let ac = display(BatteryStatus(state: .acNotCharging, percent: 80, powerWatts: 0, minutesToEmpty: 300, minutesToFull: 20, adapterWatts: 65))
         let charged = display(BatteryStatus(state: .charged, percent: 100, powerWatts: 0, adapterWatts: 96))
@@ -108,7 +108,7 @@ enum BatteryCardTests {
         let short = display(BatteryStatus(state: .charging, percent: 90, powerWatts: 5, minutesToFull: 5))
         return check("使用电池", discharge.percent == "62" && discharge.state == "使用电池" && discharge.rate == "放电 9.3 W"
                 && discharge.estimate.plain == "预计还能用 4 小时 20 分" && discharge.estimate.emphasis == "4 小时 20 分"
-                && discharge.health == "100%" && discharge.cycles == "77" && discharge.designCycles == "1000"
+                && discharge.health == "100%" && discharge.cycles == "123" && discharge.designCycles == "1000"
                 && discharge.meta == "电池 31.0 °C · 低电量 20%" && discharge.healthHelp.contains("原始满充 4321 mAh · 设计容量 4500 mAh · 换算 96.0%"))
             && check("充电中（D6 不写目标百分比）", charging.state == "充电中" && charging.rate == "充电 24.6 W"
                 && charging.estimate.plain == "预计 35 分钟充满" && charging.estimate.emphasis == "35 分钟"
