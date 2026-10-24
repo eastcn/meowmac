@@ -6,6 +6,120 @@
 
 <!-- 执行者：在这一行下面插入新的一轮，格式见 relay Skill 的 references/result-template.md「第 N 轮」 -->
 
+### 第 2 轮（2026-10-24，Claude Code 子 Agent · Claude Sonnet 5.5，推理强度：宿主默认）
+
+**提交范围**：`c1a2444..（本轮提交：`4a737b4` test: update layout settings checkbox counts and add no-battery note assertion、docs: record battery round 2 result）`
+
+**开工检查**：无人值守；plan 复核：不需要（格式 relay-plan v2，定稿 2026-10-24，复核 2026-10-24）
+
+**完成的条目**
+
+| 编号 | 提交 | 验收证据 |
+|---|---|---|
+| 4 | `4a737b4` | 见下方分项。结论：离线可验收的项全部通过；原生面板截图、悬停、材质、拔插电源后的放电和充电状态本宿主没有 Computer Use，留用户实机验收。 |
+
+条目 4 分项：
+
+1. 安装与持续运行：安装前历史目录不存在（0 行，T0 无）。`scripts/build-app.sh && scripts/install.sh` 退出 0，旧进程正常退出、新进程 pid 20048 启动（日志 `build/acceptance/battery/install.log`）。验收脚本 `build/acceptance/battery/wait.sh` 由 `caffeinate -i -w` 守护，期间 MeowMac 未重启、未改配置，机器接电源、未充电、电量 80%（`pmset -g batt`）。
+2. 前台用例（R5）：`MEOWMAC_UI_TESTS=1 scripts/test.sh UI.PanelLayout` 退出 0，7 项 0 失败；`UI.Sensors` 退出 0，4 项 0 失败；`UI.LayoutSettings` 首次 7 项 1 失败（`真实控件操作`：复选框数量 7，预期 6）。原因两处：电池在系统页新增 1 个可隐藏行（6 → 7，第 1 轮漏改，属本任务范围内缺陷）；网络页 `network.proxy` 加入后有 5 个可隐藏行，期望值 8 自 `380f4bd` 起就是过期的（9）。按产品实际更正两处期望值（`checks().count == 7`、`== 9`），没有放宽任何拒绝类或布尔断言。更正后 `MEOWMAC_UI_TESTS=1 scripts/test.sh UI.LayoutSettings` 退出 0，7 项 0 失败（含该用例，其余 6 项原本通过）。日志在 `build/acceptance/battery/ui-*.log`。
+3. “本机没有电池”提示：本机有电池无法触发。SwiftUI 列表行的文字不在 AppKit 辅助功能树中（实测遍历窗口树找不到“电池”“磁盘”等行文字，只有带 accessibilityIdentifier 的控件可取），所以窗口断言做不到，且不允许改应用代码。补了离线断言 `UI.Battery/布局设置无电池提示条件`（`4a737b4`）：无电池 → 显示；有电池（使用电池、接电源未充电）、未采集（`status == nil`）、没有快照 → 不显示；并断言 `LayoutSettings.swift` 里文案 `Text("本机没有电池")` 与条件表达式未被改动。该用例是普通离线用例，`scripts/test.sh UI.Battery` 6 项全过，计入 `check.sh`。局限：断言的是条件和源码，没有渲染出真实设置窗口里的这一行，真实显示未验证。
+4. 历史文件：`~/Library/Application Support/MeowMac/history/battery/samples.jsonl`，只用 `python3 -I` 解析输出数值摘要（`build/acceptance/battery/history-summary.txt`）：共 4 点，字段只有 `percent`、`sampledAt`、`segmentStart`、`state`；`segmentStart` 只在第 0 行；相邻间隔 300.0、300.0、300.0 秒；状态都是 `acNotCharging`；原文经大小写不敏感检索不含序列号相关键。验收：第一行是段起点，其后 3 个点，间隔 300 ± 15 秒且都不是段起点，通过。
+5. 读数对照：`MEOWMAC_LIVE=1 scripts/test.sh System.Live.Battery` 退出 0，关键行“电池实测对照：供电 true，充电 true，电量 true，循环次数 true，最大容量 true，字段问题 0 项”；同时 `pmset -g batt` 为“80%; AC attached; not charging”，过滤后的 `system_profiler` 为 Charging: No、Fully Charged: No、State of Charge 80、Condition: Normal、Maximum Capacity 100%（原值在 `build/acceptance/battery/`，其中 `grep -ci serial` 为 0）。全部一致。
+6. `scripts/check.sh` 退出 0：“自测完成：382 项，0 项失败，50 项前台验收未执行”“check 通过”（新增 1 项离线用例）。
+
+**缺陷扫描**
+
+扫描轮次：1。真实入口与环境：已安装应用的真实运行和历史文件、前台窗口用例（真实设置窗口）、实机白名单读取；原生面板未截图（见「未验证」）。
+
+| 轮次 | 问题及证据 | 分类 | 修复与提交 | 复验结果 |
+|---|---|---|---|---|
+| 1 | `UI.LayoutSettings/真实控件操作` 失败：复选框 7 ≠ 6（电池新增行）；随后暴露网络页期望 8 已过期（实为 9） | 范围内的缺陷 | 更正两处期望值，`4a737b4` | `MEOWMAC_UI_TESTS=1 scripts/test.sh UI.LayoutSettings` 退出 0，7 项 0 失败 |
+
+最终剩余：无。
+
+**顺手修复**
+
+无。
+
+**自主决定**
+
+| 条目 | 选择 | 备选 | 理由 |
+|---|---|---|---|
+| 4 | 把“无电池提示”做成条件加源码文案断言，普通离线用例 | 前台窗口断言 | 窗口树取不到 SwiftUI 行文字；改应用代码不在本轮授权内 |
+
+**技术更正与异议**
+
+| 类型 | 对象 | 证据 | 处理 | 影响 |
+|---|---|---|---|---|
+| 更正 | `LayoutSettingsTests` 复选框期望 6 / 8 | 实测 7 / 9，来源见上 | 改为 7 / 9，`4a737b4` | 无；网络页 8 是 `380f4bd` 起就过期的期望，第 1 轮未运行前台用例所以没暴露 |
+
+**plan 勘误**
+
+无。
+
+**建议**
+
+- 布局设置里的“本机没有电池”若要用真实窗口断言，需要给该 Text 加 `accessibilityIdentifier`（应用代码改动，规划者决定是否另开条目）。
+
+**外部写入**
+
+- 无。本地提交，未推送；`scripts/install.sh` 安装到 `~/Applications/MeowMac.app`（授权范围内）；应用运行写 `~/Library/Application Support/MeowMac/history/battery/`；未运行 `ioreg`、`sudo`、`pmset` 写参数。
+
+**跳过的决策点**
+
+- 无。
+
+**未做**
+
+- 无（条目 4 的原生面板部分按 plan 交给用户实机验收）。
+
+**偏离 plan 的地方**
+
+- 无。
+
+**未验证**
+
+- 原生面板的截图、悬停提示、液态玻璃材质、系统页滚动到电池卡片的真实显示：宿主没有 Computer Use，留用户实机验收。
+- 放电、充电状态的实机读数与曲线绿色底变化：本机全程接电源，由用户拔插电源验收。
+- 布局设置窗口里“本机没有电池”这一行的真实显示（见分项 3）。
+- 历史文件只覆盖接电源未充电一种状态；供电变化补点只有离线用例（第 1 轮）证明。
+
+**自检**
+
+| 项 | 结果 | 说明或证据 |
+|---|---|---|
+| 只做了执行清单、范围内缺陷修复和满足条件的顺手修复 | 是 | 条目 4；唯一改动是 `test:` 提交 |
+| 范围内缺陷已修复并重新验收；卡住或跳过的项已记录，未标成已完成 | 是 | 见「缺陷扫描」 |
+| 顺手修复不碰核心，不加依赖，行数在本档上限内 | 不适用 | 无 |
+| 顺手修复每项都有单独的 `fix:` 提交、理由、复验证据和 result 记录 | 不适用 | 无 |
+| 没有改变核心；没有放宽安全 | 是 | 未改应用代码；受保护文件见下 |
+| 自主决定、技术更正与异议、plan 勘误都已记录并附理由或证据 | 是 | 见上 |
+| 已做交付前缺陷扫描，最多 2 轮；问题分类、修复、复验和剩余问题已写进 result | 是 | 1 轮 |
+| 验收的预览、截图和测试走真实路径；模拟证据仅作补充，未验证项已记录 | 是 | 安装的真实应用和真实窗口用例；未验证项见上 |
+| 没有降低验收标准或放宽测试断言 | 是 | 两处期望值按实际产品更正，其余断言不变 |
+| 每个执行条目至少一个提交 | 是 | `git log --oneline c1a2444..HEAD`：`4a737b4 test: update layout settings checkbox counts and add no-battery note assertion`（另加本轮 docs 提交） |
+| 做过的条目都满足执行者要求；不满足的已跳过 | 是 | 条目 4 无执行者要求 |
+| 外部写入都在授权范围内 | 是 | 见上 |
+| 用户可见的改动没有混进 refactor 提交 | 是 | 无 refactor |
+| 新增的后台任务、异常分支都有日志，没有静默吞掉异常 | 不适用 | 无应用代码改动 |
+| 临时文件、临时脚本都已清理，包括远端机器上的 | 是 | `wait.sh` 留在忽略的 `build/acceptance/battery/`；调试输出已从测试里去掉 |
+| `scripts/check.sh` 通过，`plan-baseline` 比对通过 | 是 | 退出 0，382 项 0 失败；check 含受保护文件比对 |
+| 没有修改 `../tuncanary` | 是 | 见提交前核对 |
+| 新代码和夹具中没有读取或记录电池序列号 | 是 | 本轮只改测试期望并新增条件断言，无序列号相关字符串 |
+| `build/acceptance/battery/` 下的文件不含 `Serial` | 是 | 见提交前核对 |
+| 夹具和预览图只用虚构数据 | 是 | 新增断言只用 62 / 80 百分比 |
+| 没有调用 `pmset` 的写参数、没有 `sudo`、没有运行 `ioreg` | 是 | 只运行 `pmset -g batt` 与过滤的 `system_profiler` |
+
+**复审**
+
+<!-- 复审者只读，输出由调度者写入 -->
+
+**遗留**
+
+- R4：缺 `ExternalConnected` 时的状态判定（记录级，沿用第 1 轮）。
+- R5：已补跑前台用例；“本机没有电池”真实窗口显示未验证（见「未验证」）。
+
+
 ### 第 1 轮（2026-10-24，Claude Code 子 Agent · Claude Opus 5.5，推理强度：宿主默认）
 
 **提交范围**：`71cf2fd..7c15fb4`（本轮提交：`0186f4c` feat: read battery status through key whitelist、`25bca0c` feat: record 24-hour battery charge history、`6413c97` feat: add battery card to system page、`02b31e6` fix: use fictitious cycle count in battery fixtures、`7c15fb4` docs: record battery round 1 result）
