@@ -6,7 +6,7 @@
 - 目标：系统页新增“电池”卡片，显示当前电量、供电和充放电状态、系统给出的预计时间、近 24 小时电量曲线和电池健康；没有电池的 Mac 不显示。
 - 规划：Claude Opus 5.5
 - 定稿：2026-10-24
-- 复核：无
+- 复核：2026-10-24，第 2 轮规划
 - 模式：delegate（用户 2026-10-24 指定）
 - 执行宿主：Claude Code 子 Agent（每轮一个执行者，按条目的「执行者要求」选模型）
 - 复审宿主：Claude Code 全新子 Agent，只读
@@ -51,7 +51,7 @@
 
 ## 授权范围
 
-- 允许：本地 git commit；`scripts/check.sh`、`scripts/test.sh`、`scripts/build-app.sh`；`scripts/install.sh`（按 AGENTS.md 让旧进程正常退出）；只读执行 `pmset -g batt`、`pmset -g rawbatt`，以及按 D11 过滤的 `system_profiler SPPowerDataType`；`MEOWMAC_LIVE=1` 的实机用例；在 `build/` 下写测试输出、实测数据、预览图和截图；读取 TunCanary 仓库的文件；用 Computer Use 打开 MeowMac 面板、切到系统页、滚动到电池卡片、悬停查看提示、截图。
+- 允许：本地 git commit；`scripts/check.sh`、`scripts/test.sh`、`scripts/build-app.sh`；`scripts/install.sh`（按 AGENTS.md 让旧进程正常退出）；只读执行 `pmset -g batt`、`pmset -g rawbatt`，以及按 D11 过滤的 `system_profiler SPPowerDataType`；`MEOWMAC_LIVE=1` 的实机用例；第 2 轮运行 `MEOWMAC_UI_TESTS=1 scripts/test.sh <过滤词>` 的前台用例（会弹出 MeowMac 自己的窗口）；验收期间用 `caffeinate -i -w <pid>` 防止空闲睡眠；在 `build/` 下写测试输出、实测数据、预览图和截图；读取 TunCanary 仓库的文件；用 Computer Use 打开 MeowMac 面板、切到系统页、滚动到电池卡片、悬停查看提示、截图。
 - 不允许：运行 `ioreg`（见 D11）；推送；修改 TunCanary；`sudo`、`pmset` 的任何写操作或修改充电设置；把电池序列号或原始 mAh、电压、电流写进仓库；Computer Use 操作 MeowMac 以外的应用；在设置窗口里点保存。没列在“允许”里的都不允许。
 - 应用运行数据和验收材料分开：安装后的 MeowMac 按 D44 在 `~/Library/Application Support/MeowMac/history/battery/` 写电量历史，这是正常运行。执行者为验收另外导出的读数和截图只放 `build/acceptance/battery/`，result 里只写结论和偏差。
 - 命令或 Computer Use 的权限请求被拒时，不自行绕开；在 result 记录原文，把相关验收标为“需规划者实测”。
@@ -89,10 +89,10 @@
 
 | 编号 | 条目 | 档位 | 状态 | 提交 |
 |---|---|---|---|---|
-| 1 | 电池读数的采集与解析 | 可交付 | 已交付，待复审 | `0186f4c`、`02b31e6` |
-| 2 | 24 小时电量历史 | 需强模型 | 已交付，待复审 | `25bca0c` |
-| 3 | 电池卡片和布局迁移 | 需强模型 | 已交付，待复审 | `6413c97`、`02b31e6` |
-| 4 | 安装和实机验收 | 可交付 | 后续轮次 | |
+| 1 | 电池读数的采集与解析 | 可交付 | 已完成，第 1 轮复审通过 | `0186f4c`、`02b31e6` |
+| 2 | 24 小时电量历史 | 需强模型 | 已完成，第 1 轮复审通过 | `25bca0c` |
+| 3 | 电池卡片和布局迁移 | 需强模型 | 已完成，第 1 轮复审通过（修复 `393424a`） | `6413c97`、`02b31e6` |
+| 4 | 安装和实机验收 | 可交付 | 未开始 | |
 
 ## 执行清单
 
@@ -135,12 +135,19 @@
 
 ### 4. 安装和实机验收（第 2 轮）
 
-- 改法：`scripts/install.sh` 安装，MeowMac 持续运行至少 15 分钟（`caffeinate -i` 防睡眠）。
+- 依据：D3、D4、D8、D12；第 1 轮复审遗留 R5。宿主（Claude Code 子 Agent）没有 Computer Use，原生面板的截图、悬停和材质交给用户实机验收，执行者不尝试其他截屏方式。
+- 改法：只做验证，不改应用代码；验收脚本放 `build/acceptance/battery/`。
+  1. 安装前记下历史文件现有的行数和最后一点的时刻 T0；`scripts/install.sh` 安装（会让正在运行的 MeowMac 正常退出并重启）；用 `caffeinate -i -w <验收脚本 pid>` 防睡眠，MeowMac 持续运行，直到本次启动的段起点之后出现至少 3 个周期点（最长等 20 分钟），期间不重启、不改配置。
+  2. 补跑前台用例（R5）：`MEOWMAC_UI_TESTS=1 scripts/test.sh LayoutSettings` 以及第 1 轮改过期望的 `SensorUITests`、`PanelLayoutUITests` 对应过滤词；在 result 写命令、退出码和通过数。“本机没有电池”的提示若无法在本机触发，补一条离线断言覆盖它的文案和显示条件（这是允许的测试补充，用 `test:` 提交）。
+  3. 历史文件检查：读 `~/Library/Application Support/MeowMac/history/battery/samples.jsonl`，只用脚本解析并输出数值摘要（点数、相邻间隔、`segmentStart` 位置），不把原行写进 result。
+  4. 读数对照：`MEOWMAC_LIVE=1 scripts/test.sh System.Live.Battery` 再跑一次，与同一时刻的 `pmset -g batt`、过滤后的 `system_profiler` 对照。
 - 验收：
-  - 历史文件出现至少 3 个点，间隔 300 ± 15 秒，不含序列号；
-  - 用 Computer Use 打开面板 → 系统页 → 滚动到电池卡片，截图和悬停各一张，存 `build/acceptance/battery/`；读数与同一时刻的 `pmset -g batt`、`system_profiler SPPowerDataType` 对照（电量、供电描述、循环次数、最大容量），result 只写是否一致；
-  - 拔电源、充电状态执行者做不到，列入用户实机验收：拔掉电源后 1 分钟内卡片切到“使用电池”并在系统给出预计时间后显示；重新接上后切到“充电中”或“接电源 · 未充电”；曲线上出现对应的绿色底变化。
-- 相关决策点：D3、D4、D8
+  - 晚于 T0 的新增行中，第一行是 `segmentStart: true`（本次启动的段起点），其后至少 3 个点，相邻间隔 300 ± 15 秒且都不是段起点；文件不含 `Serial`；
+  - 前台用例必须全部通过。失败或因权限阻塞时，在 result 写原文和原因，该项标为“未通过”或“需规划者实测”，条目 4 不得标为已完成；不放宽断言；
+  - 读数对照全部一致；
+  - `scripts/check.sh` 通过。
+- 用户实机验收（执行者做完后由规划者请用户做）：打开面板 → 系统页 → 滚动到电池卡片，对照设计稿看版式和悬停；拔掉电源，1 分钟内卡片切到“使用电池”，系统给出预计时间后显示“预计还能用 …”；重新接上后切到“充电中”或“接电源 · 未充电”；曲线上出现对应的绿色底变化。
+- 相关决策点：D3、D4、D8、D12
 
 ## 规划者保留
 
