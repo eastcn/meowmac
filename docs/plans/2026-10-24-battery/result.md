@@ -21,7 +21,7 @@
 条目 4 分项：
 
 1. 安装与持续运行：安装前历史目录不存在（0 行，T0 无）。`scripts/build-app.sh && scripts/install.sh` 退出 0，旧进程正常退出、新进程 pid 20048 启动（日志 `build/acceptance/battery/install.log`）。验收脚本 `build/acceptance/battery/wait.sh` 由 `caffeinate -i -w` 守护，期间 MeowMac 未重启、未改配置，机器接电源、未充电、电量 80%（`pmset -g batt`）。
-2. 前台用例（R5）：`MEOWMAC_UI_TESTS=1 scripts/test.sh UI.PanelLayout` 退出 0，7 项 0 失败；`UI.Sensors` 退出 0，4 项 0 失败；`UI.LayoutSettings` 首次 7 项 1 失败（`真实控件操作`：复选框数量 7，预期 6）。原因两处：电池在系统页新增 1 个可隐藏行（6 → 7，第 1 轮漏改，属本任务范围内缺陷）；网络页 `network.proxy` 加入后有 5 个可隐藏行，期望值 8 自 `380f4bd` 起就是过期的（9）。按产品实际更正两处期望值（`checks().count == 7`、`== 9`），没有放宽任何拒绝类或布尔断言。更正后 `MEOWMAC_UI_TESTS=1 scripts/test.sh UI.LayoutSettings` 退出 0，7 项 0 失败（含该用例，其余 6 项原本通过）。日志在 `build/acceptance/battery/ui-*.log`。
+2. 前台用例（R5）：`MEOWMAC_UI_TESTS=1 scripts/test.sh UI.PanelLayout` 退出 0，7 项 0 失败；`UI.Sensors` 退出 0，4 项 0 失败；`UI.LayoutSettings` 首次 7 项 1 失败（`真实控件操作`：复选框数量 7，预期 6）。原因两处：电池在系统页新增 1 个可隐藏行（6 → 7，第 1 轮漏改，属本任务范围内缺陷）；网络页 `network.proxy` 加入后有 5 个可隐藏行，期望值 8 自 `380f4bd` 起就是过期的（9）。按产品实际更正两处期望值（`checks().count == 7`、`== 9`），没有放宽任何拒绝类或布尔断言。更正后 `MEOWMAC_UI_TESTS=1 scripts/test.sh UI.LayoutSettings` 曾跑出退出 0、7 项 0 失败（含该用例，其余 6 项原本通过），但这次通过的日志没有留存，同样首次 7≠6 的失败日志也没留；`ui-PanelLayout.log`、`ui-Sensors.log` 留存。`ui-LayoutSettings.log` 是之后一次中间窗口试验的日志（8 项 1 失败：失败的是后来删掉的 `UI.LayoutSettings/本机没有电池提示`，`真实控件操作` 在其中 PASS），不是最终通过的日志。最终的 `UI.LayoutSettings` 未单独重跑留痕；最终状态由 `scripts/check.sh`（382 项 0 失败，前台用例不在其中）和上述记录支撑，复审者如需可自行带 `MEOWMAC_UI_TESTS=1` 复跑。
 3. “本机没有电池”提示：本机有电池无法触发。SwiftUI 列表行的文字不在 AppKit 辅助功能树中（实测遍历窗口树找不到“电池”“磁盘”等行文字，只有带 accessibilityIdentifier 的控件可取），所以窗口断言做不到，且不允许改应用代码。补了离线断言 `UI.Battery/布局设置无电池提示条件`（`4a737b4`）：无电池 → 显示；有电池（使用电池、接电源未充电）、未采集（`status == nil`）、没有快照 → 不显示；并断言 `LayoutSettings.swift` 里文案 `Text("本机没有电池")` 与条件表达式未被改动。该用例是普通离线用例，`scripts/test.sh UI.Battery` 6 项全过，计入 `check.sh`。局限：断言的是条件和源码，没有渲染出真实设置窗口里的这一行，真实显示未验证。
 4. 历史文件：`~/Library/Application Support/MeowMac/history/battery/samples.jsonl`，只用 `python3 -I` 解析输出数值摘要（`build/acceptance/battery/history-summary.txt`）：共 4 点，字段只有 `percent`、`sampledAt`、`segmentStart`、`state`；`segmentStart` 只在第 0 行；相邻间隔 300.0、300.0、300.0 秒；状态都是 `acNotCharging`；原文经大小写不敏感检索不含序列号相关键。验收：第一行是段起点，其后 3 个点，间隔 300 ± 15 秒且都不是段起点，通过。
 5. 读数对照：`MEOWMAC_LIVE=1 scripts/test.sh System.Live.Battery` 退出 0，关键行“电池实测对照：供电 true，充电 true，电量 true，循环次数 true，最大容量 true，字段问题 0 项”；同时 `pmset -g batt` 为“80%; AC attached; not charging”，过滤后的 `system_profiler` 为 Charging: No、Fully Charged: No、State of Charge 80、Condition: Normal、Maximum Capacity 100%（原值在 `build/acceptance/battery/`，其中 `grep -ci serial` 为 0）。全部一致。
@@ -119,6 +119,13 @@
 - R4：缺 `ExternalConnected` 时的状态判定（记录级，沿用第 1 轮）。
 - R5：已补跑前台用例；“本机没有电池”真实窗口显示未验证（见「未验证」）。
 
+**修复记录**
+
+按规划者指令只修 R1，未改复审结论。
+
+| 编号 | 提交 | 改动 | 验证 |
+|---|---|---|---|
+| R1 | 本修复提交（`docs: correct battery round 2 UI log evidence`，提交号由规划者补） | 分项 2 改为如实说明：通过日志和首次失败日志均未留存，`ui-LayoutSettings.log` 是后来的中间窗口试验（8 项 1 失败，失败项已删除） | `scripts/check.sh` 退出 0 |
 
 ### 第 1 轮（2026-10-24，Claude Code 子 Agent · Claude Opus 5.5，推理强度：宿主默认）
 
