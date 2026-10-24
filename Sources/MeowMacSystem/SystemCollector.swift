@@ -128,18 +128,18 @@ public final class SystemCollector {
     }
 
     public static func batteryMetrics() -> BatteryMetrics {
-        let matching = IOServiceMatching("AppleSmartBattery")
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, matching)
-        guard service != 0 else { return BatteryMetrics(temperatureCelsius: nil, systemPowerWatts: nil) }
+        BatteryMetrics.parse(properties: batteryProperties())
+    }
+
+    /// 按白名单逐键读取 `AppleSmartBattery`（D44），不取完整属性字典，不碰序列号键。
+    /// 没有这个服务时返回空字典，解析为无电池。
+    public static func batteryProperties() -> [String: Any] {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
+        guard service != 0 else { return [:] }
         defer { IOObjectRelease(service) }
-        var unmanaged: Unmanaged<CFMutableDictionary>?
-        guard IORegistryEntryCreateCFProperties(service, &unmanaged, kCFAllocatorDefault, 0) == KERN_SUCCESS,
-              let properties = unmanaged?.takeRetainedValue() as? [String: Any] else {
-            return BatteryMetrics(temperatureCelsius: nil, systemPowerWatts: nil)
+        return BatteryRegistryKeys.filtered { key in
+            IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue()
         }
-        let telemetry = properties["PowerTelemetryData"] as? [String: Any]
-        return BatteryMetrics.parse(temperature: properties["Temperature"] as? Int,
-                                    systemLoad: telemetry?["SystemLoad"] as? Int)
     }
 
     public static func thermalLevel() -> ThermalLevel {

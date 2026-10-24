@@ -56,10 +56,21 @@ public struct ByteCounters: Equatable {
 public struct BatteryMetrics: Equatable, Codable {
     public let temperatureCelsius: Double?
     public let systemPowerWatts: Double?
+    /// 电池读数（D44）。nil 表示本次没有采集；旧数据没有这个字段，解码后也是 nil。
+    public let status: BatteryStatus?
 
-    public init(temperatureCelsius: Double?, systemPowerWatts: Double?) {
+    public init(temperatureCelsius: Double?, systemPowerWatts: Double?, status: BatteryStatus? = nil) {
         self.temperatureCelsius = temperatureCelsius
         self.systemPowerWatts = systemPowerWatts
+        self.status = status
+    }
+
+    /// 输入是白名单字段组成的字典（见 `BatteryRegistryKeys.filtered`）。
+    public static func parse(properties: [String: Any]) -> BatteryMetrics {
+        let telemetry = properties["PowerTelemetryData"] as? [String: Any]
+        let base = parse(temperature: BatteryValue.int(properties["Temperature"]), systemLoad: BatteryValue.int(telemetry?["SystemLoad"]))
+        return BatteryMetrics(temperatureCelsius: base.temperatureCelsius, systemPowerWatts: base.systemPowerWatts,
+                              status: BatteryStatus.parse(properties))
     }
 
     public static func parse(temperature: Int?, systemLoad: Int?) -> BatteryMetrics {
