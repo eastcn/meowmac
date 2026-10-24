@@ -8,7 +8,7 @@
 
 ### 第 2 轮（2026-10-24，Claude Code 子 Agent · Claude Sonnet 5.5，推理强度：宿主默认）
 
-**提交范围**：`c1a2444..（本轮提交：`4a737b4` test: update layout settings checkbox counts and add no-battery note assertion、docs: record battery round 2 result）`
+**提交范围**：`c1a2444..958f9df`（`4a737b4` test: update layout settings checkbox counts and add no-battery note assertion、`958f9df` docs: record battery round 2 result；修复 `2ce3309`）
 
 **开工检查**：无人值守；plan 复核：不需要（格式 relay-plan v2，定稿 2026-10-24，复核 2026-10-24）
 
@@ -112,7 +112,17 @@
 
 **复审**
 
-<!-- 复审者只读，输出由调度者写入 -->
+复审者：Claude Code 全新子 Agent（Claude Opus 5.5，只读），2026-10-24。依据 plan 条目 4、本轮内容、`git diff c1a2444..958f9df` 和 `build/acceptance/battery/` 下的日志；在 `958f9df` 上自跑 `scripts/check.sh` 退出 0（382 项，0 失败，50 项前台未执行）。
+
+结论：有条件收工。条目 4 中执行者负责的验收项都已满足；收工条件是用户实机验收。根因：执行 3 条。
+
+| 编号 | 问题 | 证据 | 根因 | 建议去向 | 用户决定 | 级别 |
+|---|---|---|---|---|---|---|
+| R1 | result 写更正后 `UI.LayoutSettings` 7 项 0 失败、日志在 `ui-*.log`，但留存的 `ui-LayoutSettings.log` 是中间窗口试验（8 项 1 失败），首次失败和最终通过的日志都没留 | `ui-LayoutSettings.log` 末尾 | 执行 | 复审者修 | 已修 `2ce3309` | 一般 |
+| R2 | 新增离线用例 `UI.Battery/布局设置无电池提示条件` 前半是把条件表达式抄进测试，真正起作用的是源码整行文本匹配，脆弱且证明不了真实渲染 | `4a737b4` `LayoutSettingsTests.swift:384-411` | 执行 | 列遗留（要改成真实断言需改应用代码，另开事项） | | 记录 |
+| R3 | 等待脚本上限 25 分钟，plan 写 20 分钟；实际约 15 分钟达标 | `build/acceptance/battery/wait.sh` | 执行 | 列遗留 | | 记录 |
+
+核对要点：复选框期望 6→7、8→9 按“总览 4 格 + 当前页可隐藏卡片数”与产品实际一致，仍是精确断言，不是放宽；历史文件 4 行均为安装后新增，段起点只在第 0 行，间隔 300.0 秒 ×3，无序列号相关键；读数对照全为 true；本轮 result 只写百分比和状态描述，没有原值。
 
 **遗留**
 
@@ -125,7 +135,25 @@
 
 | 编号 | 提交 | 改动 | 验证 |
 |---|---|---|---|
-| R1 | 本修复提交（`docs: correct battery round 2 UI log evidence`，提交号由规划者补） | 分项 2 改为如实说明：通过日志和首次失败日志均未留存，`ui-LayoutSettings.log` 是后来的中间窗口试验（8 项 1 失败，失败项已删除） | `scripts/check.sh` 退出 0 |
+| R1 | `2ce3309` | 分项 2 改为如实说明：通过日志和首次失败日志均未留存，`ui-LayoutSettings.log` 是后来的中间窗口试验（8 项 1 失败，失败项已删除） | `scripts/check.sh` 退出 0 |
+
+**修复复核**
+
+复核者：Claude Code 全新子 Agent（只读），只看 `git show 2ce3309`。复核结论：通过。
+
+| 编号 | 是否修好 | 证据 | 新问题 | 级别 |
+|---|---|---|---|---|
+| R1 | 是 | 分项 2 如实写明通过日志和首次失败日志未留存、现存日志是中间窗口试验；与 `ui-LayoutSettings.log` 末尾（7 PASS、`真实控件操作` PASS、1 FAIL、“8 项，1 项失败”）一致；其余内容和复审结论未改 | 无 | |
+
+**遗留**
+
+- R2：无电池提示的离线用例只做源码文本匹配；改成真实断言需要给 `Text` 加 `accessibilityIdentifier` 或把条件提成函数（改应用代码），另开事项。
+- R3：等待脚本上限与 plan 不一致，结果不受影响。
+- 沿用第 1 轮 R4：缺 `ExternalConnected` 时状态判定为“使用电池”。
+
+**用户实机验收**
+
+待用户完成：系统页电池卡片的版式、材质和悬停；拔掉电源后切到“使用电池”并显示预计时间；接回后切到“充电中”或“接电源 · 未充电”，曲线出现绿色底变化。“本机没有电池”提示在本机无法触发，按未验证接受。
 
 ### 第 1 轮（2026-10-24，Claude Code 子 Agent · Claude Opus 5.5，推理强度：宿主默认）
 
