@@ -42,6 +42,8 @@ public enum PanelCardRegistry {
                 case "quota.cost": return state.costDisplay(state.selectedProvider) != nil
                 case "quota.storage": return [.claude, .codex].contains(state.selectedProvider) && state.localStorage[state.selectedProvider] != nil
                 case "network.checks", "network.sites", "network.traffic", "network.egress": return state.networkModel != nil
+                // 没有电池的 Mac 不显示，也不占位（D44）。
+                case "system.battery": return state.snapshot?.battery.status?.hasBattery == true
                 default: return true
                 }
             }, render: { state in
@@ -49,6 +51,7 @@ public enum PanelCardRegistry {
                 case "system.chart": return AnyView(SystemChartCard(state: state))
                 case "system.energy": return AnyView(EnergyCard(state: state))
                 case "system.disk": return AnyView(DiskCard(state: state))
+                case "system.battery": return AnyView(BatteryCard(state: state))
                 case "quota.trend": return AnyView(QuotaTrendView(state: state, provider: state.selectedProvider))
                 case "quota.cost":
                     return AnyView(state.costDisplay(state.selectedProvider).map { CostCard(state: state, value: $0, provider: state.selectedProvider) })
@@ -164,6 +167,8 @@ public final class PanelState: ObservableObject {
     @Published public var networkHistory = NetworkHistory()
     /// 近 24 小时电量（D44），由 `BatteryHistoryRecorder` 更新。
     @Published public var batteryHistory = BatteryHistory()
+    /// 电池曲线上鼠标所在的时刻，独立于系统趋势的时间轴。
+    @Published public var batteryHoverDate: Date?
     @Published public var networkRange: NetworkTrendRange = .hour
     public var networkCapture: NetworkCaptureInfo?
     @Published public var cleanTerminalPreference: CleanTerminal

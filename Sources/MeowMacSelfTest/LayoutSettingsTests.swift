@@ -68,7 +68,7 @@ enum LayoutSettingsTests {
             model.setVisible(false, id: "system.energy", in: .system)
             model.setVisible(false, id: "system.chart", in: .system)
             guard model.isDirty, model.draft.tabs.first == .network,
-                  model.draft.placements(for: .system).map(\.id) == ["system.disk", "system.chart", "system.energy"],
+                  model.draft.placements(for: .system).map(\.id) == ["system.disk", "system.chart", "system.energy", "system.battery"],
                   model.draft.placements(for: .system)[1].visible,
                   !model.draft.placements(for: .system)[2].visible,
                   state.panelLayout == .default,

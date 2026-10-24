@@ -28,7 +28,9 @@ enum PanelLayoutUITests {
             var changed = PanelLayout.default
             changed.tabs = [.network, .system, .quota]
             for tab in PanelTab.allCases { changed.cards[tab.rawValue]?.reverse() }
+            // 反转后系统页依次是电池、磁盘、能耗、趋势。隐藏电池和磁盘；合成状态没有电池读数，电池本来也不渲染。
             changed.cards["system"]?[0].visible = false
+            changed.cards["system"]?[1].visible = false
             changed.cards["quota"]?[0].visible = false
             changed.cards["network"]?[0].visible = false
             try state.saveLayout(changed, for: "builtin.slim")
@@ -77,7 +79,8 @@ enum PanelLayoutUITests {
             extreme.tabs.reverse()
             extreme.cards["system"] = [extreme.placements(for: .system)[2],
                                       extreme.placements(for: .system)[0],
-                                      PanelCardPlacement(id: "system.energy", visible: false)]
+                                      PanelCardPlacement(id: "system.energy", visible: false),
+                                      PanelCardPlacement(id: "system.battery", visible: false)]
             extreme.cards["quota"] = extreme.placements(for: .quota).map { PanelCardPlacement(id: $0.id, visible: false) }
             extreme.cards["network"] = extreme.placements(for: .network).map { PanelCardPlacement(id: $0.id, visible: false) }
             try state.saveLayout(extreme, for: "builtin.slim")

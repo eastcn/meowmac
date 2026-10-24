@@ -146,7 +146,7 @@ struct SystemTrendGraph: View {
 }
 
 /// 使用原生 tracking area，弹出面板未成为键盘焦点时也能查看历史。
-private struct TrendMouseSurface: NSViewRepresentable {
+struct TrendMouseSurface: NSViewRepresentable {
     let kind: String
     let moved: (CGPoint?) -> Void
     func makeNSView(context: Context) -> TrackingView {

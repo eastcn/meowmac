@@ -74,6 +74,70 @@ public enum PanelPreviewRenderer {
         return state
     }
 
+    /// 电池卡片的四种状态（设计稿 battery.html），全部为虚构数据。
+    public enum BatteryPreview: String, CaseIterable {
+        case discharge, charging, ac, sparse
+    }
+
+    public static func batteryState(_ kind: BatteryPreview) -> PanelState {
+        let state = syntheticState()
+        guard let latest = state.snapshot else { return state }
+        let now = latest.timestamp
+        let status: BatteryStatus
+        switch kind {
+        case .discharge:
+            status = BatteryStatus(state: .battery, percent: 62, maxCapacityPercent: 100, rawMaxCapacity: 4620, designCapacity: 4500,
+                                   cycleCount: 77, designCycleCount: 1000, powerWatts: 9.3, minutesToEmpty: 260, adapterWatts: nil)
+        case .charging:
+            status = BatteryStatus(state: .charging, percent: 68, maxCapacityPercent: 100, rawMaxCapacity: 4620, designCapacity: 4500,
+                                   cycleCount: 77, designCycleCount: 1000, powerWatts: 24.6, minutesToFull: 35, adapterWatts: 65)
+        case .ac:
+            status = BatteryStatus(state: .acNotCharging, percent: 80, maxCapacityPercent: 100, rawMaxCapacity: 4620, designCapacity: 4500,
+                                   cycleCount: 77, designCycleCount: 1000, powerWatts: 0, adapterWatts: 65)
+        case .sparse:
+            status = BatteryStatus(state: .battery, percent: 58, maxCapacityPercent: 100, rawMaxCapacity: 4620, designCapacity: 4500,
+                                   cycleCount: 77, designCycleCount: 1000, powerWatts: 8.1, adapterWatts: nil)
+        }
+        state.snapshot = SystemSnapshot(timestamp: now, cpuUsage: latest.cpuUsage, memoryPressure: latest.memoryPressure,
+            swapUsedBytes: latest.swapUsedBytes, diskAvailableBytes: latest.diskAvailableBytes, diskTotalBytes: latest.diskTotalBytes,
+            networkReceivedBytesPerSecond: latest.networkReceivedBytesPerSecond, networkSentBytesPerSecond: latest.networkSentBytesPerSecond,
+            battery: BatteryMetrics(temperatureCelsius: 31, systemPowerWatts: 9.3, status: status), thermal: latest.thermal,
+            memoryUsedBytes: latest.memoryUsedBytes, memoryTotalBytes: latest.memoryTotalBytes,
+            memoryPressurePercent: latest.memoryPressurePercent, sensors: latest.sensors)
+        state.batteryHistory = BatteryHistory(records: batteryRecords(kind, now: now))
+        return state
+    }
+
+    /// 近 24 小时的虚构电量点，每 5 分钟一个，形状参照设计稿：长时间接电源、凌晨 2 小时没有记录、两段用电池。
+    static func batteryRecords(_ kind: BatteryPreview, now: Date) -> [BatteryHistoryRecord] {
+        if kind == .sparse {
+            // 刚启动 4 分钟，只有一个点（D10：还没有可统计的用电池区间）。
+            return [BatteryHistoryRecord(sampledAt: now.addingTimeInterval(-240), percent: 58, state: .battery, dischargeWatts: 8.1, segmentStart: true)]
+        }
+        var rows: [BatteryHistoryRecord] = []
+        var newSegment = true
+        for step in 0...288 {
+            let date = now.addingTimeInterval(Double(step - 288) * 300)
+            let i = Double(step) / 2
+            if (80..<104).contains(step) { newSegment = true; continue }
+            var state: BatteryPowerState = .acNotCharging, percent = 80.0
+            if i >= 90 && i < 108 { state = .battery; percent = 80 - (i - 90) * 1.65 }
+            else if i >= 108 && i < 120 { state = .charging; percent = min(80, 50.3 + (i - 108) * 2.6) }
+            else if i >= 120 {
+                switch kind {
+                case .ac: state = .acNotCharging; percent = 80
+                case .charging where i >= 132: state = .charging; percent = min(80, 71 - 12 * 0.75 + (i - 132) * 0.5)
+                default: state = .battery; percent = 80 - (i - 120) * 0.75
+                }
+            }
+            if state == .charging, percent >= 80 { state = .acNotCharging }
+            rows.append(BatteryHistoryRecord(sampledAt: date, percent: Int(percent.rounded()), state: state,
+                                             dischargeWatts: state == .battery ? 8.6 + sin(Double(step) / 5) * 0.6 : nil, segmentStart: newSegment))
+            newSegment = false
+        }
+        return rows
+    }
+
     /// 传感器的六种状态（沿用 sensors.html 的状态划分，界面以 system-tab-redesign.html 方案 A 为准），全部为虚构数据。
     public enum SensorPreview: String, CaseIterable {
         case idle, spinning, cooling, gpuMissing, noFan, unavailable

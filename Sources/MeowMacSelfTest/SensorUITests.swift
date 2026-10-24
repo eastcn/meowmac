@@ -32,15 +32,16 @@ enum SensorUITests {
     }
 
     static func migration() -> Bool {
-        let expected = ["system.disk", "system.chart", "system.energy"]
+        // 2026-10-24 起系统页新增电池（D44）：去掉传感器后恰好只缺电池，以可见状态追加到末尾。
+        let expected = ["system.disk", "system.chart", "system.energy", "system.battery"]
         // v1、v2 本机布局含 system.sensors：去掉它，其余顺序和显隐不变；不含时照常读取。
         for version in [1, 2] {
             guard let layout = try? PanelLayout.parse(layoutJSON(version: version, system: withSensors)),
                   layout.placements(for: .system).map(\.id) == expected,
-                  layout.placements(for: .system).map(\.visible) == [true, true, false] else { print("v\(version) 迁移失败"); return false }
+                  layout.placements(for: .system).map(\.visible) == [true, true, false, true] else { print("v\(version) 迁移失败"); return false }
             guard let data = try? JSONEncoder().encode(layout),
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  ((object["cards"] as? [String: Any])?["system"] as? [Any])?.count == 3,
+                  ((object["cards"] as? [String: Any])?["system"] as? [Any])?.count == 4,
                   (try? PanelLayout.parse(data)) == layout else { print("v\(version) 写回失败"); return false }
             let plain = withSensors.filter { $0["id"] as? String != "system.sensors" }
             guard (try? PanelLayout.parse(layoutJSON(version: version, system: plain))) == layout else { return false }
@@ -69,7 +70,7 @@ enum SensorUITests {
         guard let data = try? JSONSerialization.data(withJSONObject: manifest),
               let package = try? CatPackage.parse(data, builtin: true) else { print("猫包迁移失败"); return false }
         return package.panel.placements(for: .system).map(\.id) == expected
-            && PanelLayout.default.placements(for: .system).map(\.id) == ["system.chart", "system.energy", "system.disk"]
+            && PanelLayout.default.placements(for: .system).map(\.id) == ["system.chart", "system.energy", "system.disk", "system.battery"]
             && CatPackageLoader.builtinIDs.count == 4 && CatPackageLoader.builtinIDs.allSatisfy { (try? CatPackageLoader.builtin($0))?.package.panel == .default }
     }
 

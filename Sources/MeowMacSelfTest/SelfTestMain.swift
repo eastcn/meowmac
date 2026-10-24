@@ -173,6 +173,7 @@ enum SelfTestMain {
         tests += NetworkPowerBacklogTests.tests
         for test in BatteryStatusTests.tests { tests.append((test.0, { test.1() })) }
         for test in BatteryHistoryTests.tests { tests.append((test.0, { test.1() })) }
+        tests.append(contentsOf: BatteryCardTests.tests)
         tests += CodexResetRecoveryTests.tests
         tests.append(("UI.AppIcon/年糕图标尺寸透明边界与对比度", { AppIconTests.sizes() }))
         for test in RuleClockTests.tests { tests.append((test.0, { (try? test.1()) ?? false })) }

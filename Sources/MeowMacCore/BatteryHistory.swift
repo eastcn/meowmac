@@ -112,6 +112,30 @@ public struct BatteryHistory: Equatable {
         return result
     }
 
+    /// 没有记录的时段（D10），曲线在这些时段画斜纹：段与段之间；窗口开头到第一个点、最后一点到现在超过 330 秒的部分。
+    public static func missingPeriods(_ segments: [[BatteryHistoryRecord]], domain: ClosedRange<Date>) -> [ClosedRange<Date>] {
+        var result: [ClosedRange<Date>] = [], cursor = domain.lowerBound
+        for (index, segment) in segments.enumerated() {
+            guard let first = segment.first, let last = segment.last else { continue }
+            // 窗口开头恰好落在两次记录之间时，不足一个记录间隔的空白不算缺失。
+            let leading = index == 0 && first.sampledAt.timeIntervalSince(cursor) <= maxGap
+            if first.sampledAt > cursor, !leading { result.append(cursor...first.sampledAt) }
+            cursor = max(cursor, last.sampledAt)
+        }
+        if segments.isEmpty || domain.upperBound.timeIntervalSince(cursor) > maxGap { result.append(cursor...domain.upperBound) }
+        return result
+    }
+
+    /// 悬停选择：只选距 `date` 不超过 5 分钟的真实样本，规则同磁盘卡片。
+    public func selection(at date: Date, now: Date) -> BatteryHistoryRecord? {
+        let start = now.addingTimeInterval(-Self.retention)
+        guard date.timeIntervalSince1970.isFinite, date >= start, date <= now,
+              let nearest = records.filter({ $0.sampledAt > start && $0.sampledAt <= now })
+                .min(by: { abs($0.sampledAt.timeIntervalSince(date)) < abs($1.sampledAt.timeIntervalSince(date)) }),
+              abs(nearest.sampledAt.timeIntervalSince(date)) <= Self.recordInterval else { return nil }
+        return nearest
+    }
+
     /// D10：只统计同一段内相邻两点都在使用电池、间隔不超过 330 秒的区间。
     public func summary(now: Date) -> BatteryUsageSummary {
         var seconds: TimeInterval = 0, drained = 0

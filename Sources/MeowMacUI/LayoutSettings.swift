@@ -239,6 +239,9 @@ struct LayoutSettingsView: View {
                                 Text(definition?.title ?? placement.id)
                                     .foregroundStyle(placement.visible ? .primary : .secondary)
                                 Spacer()
+                                if placement.id == "system.battery", state.snapshot?.battery.status?.hasBattery == false {
+                                    Text("本机没有电池").font(.caption).foregroundStyle(.secondary)
+                                }
                                 if definition?.canHide == false { Text("常驻").font(.caption).foregroundStyle(.secondary) }
                                 else {
                                     Toggle("显示", isOn: Binding(get: { placement.visible }, set: {

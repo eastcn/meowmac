@@ -11,7 +11,7 @@ public struct PanelCardDefinition {
 
 public enum PanelLayoutCatalog {
     public static let definitions: [PanelTab: [PanelCardDefinition]] = [
-        .system: [.init("system.chart", "系统趋势", canHide: false), .init("system.energy", "能耗排行"), .init("system.disk", "磁盘")],
+        .system: [.init("system.chart", "系统趋势", canHide: false), .init("system.energy", "能耗排行"), .init("system.disk", "磁盘"), .init("system.battery", "电池")],
         .quota: [.init("quota.trend", "用量趋势"), .init("quota.cost", "花费"), .init("quota.storage", "本地存储")],
         .network: [.init("network.checks", "连接检查"), .init("network.sites", "站点延迟"),
                    .init("network.traffic", "上下行速率"), .init("network.proxy", "代理流量"), .init("network.egress", "出口 IP")],
@@ -168,10 +168,20 @@ public struct PanelLayout: Codable, Equatable {
     /// 已删除的功能块。v0.3 第 1 轮写入过 `system.sensors`，读取时去掉，其余顺序和显隐不变。
     static let removedCards: Set<String> = ["system.sensors"]
     static let addedNetworkCard = "network.traffic"
+    /// 2026-10-24 新增（D44）。
+    static let addedSystemCard = "system.battery"
 
     static func migrated(_ cards: [String: [PanelCardPlacement]]) -> [String: [PanelCardPlacement]] {
         var result = cards
-        result[PanelTab.system.rawValue] = cards[PanelTab.system.rawValue]?.filter { !removedCards.contains($0.id) }
+        if var system = cards[PanelTab.system.rawValue]?.filter({ !removedCards.contains($0.id) }) {
+            // 系统页恰好只缺电池、其余完整且不重复时，以可见状态追加到末尾；其他缺项、重复或未知 id 留给校验拒绝。
+            let ids = system.map(\.id), expected = (PanelLayoutCatalog.definitions[.system] ?? []).map(\.id)
+            if ids.count == Set(ids).count, Set(ids).isSubset(of: Set(expected)),
+               Set(expected).subtracting(ids) == [addedSystemCard] {
+                system.append(PanelCardPlacement(id: addedSystemCard))
+            }
+            result[PanelTab.system.rawValue] = system
+        }
         // 只接受缺少新增块的完整旧布局；不修复其他缺项、重复或未知 id。
         if var network = cards[PanelTab.network.rawValue] {
             let ids = network.map(\.id), expected = (PanelLayoutCatalog.definitions[.network] ?? []).map(\.id)
