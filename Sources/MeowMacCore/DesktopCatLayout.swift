@@ -29,6 +29,7 @@ public struct DesktopCatLayout: Equatable {
     /// 左边的角时内容左侧多留的透明宽度，容纳猫图格子里猫左边的空白。
     private var leading: CGFloat { mirrored ? catTrim : 0 }
 
+    /// 1 项时 1 列，其余 2 列；最多 8 项、4 行（D47）。
     public var columns: Int { count == 1 ? 1 : 2 }
     public var rows: Int { (count + columns - 1) / columns }
     public var bubbleSize: CGSize {

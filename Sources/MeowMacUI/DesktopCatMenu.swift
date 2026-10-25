@@ -11,7 +11,7 @@ public enum DesktopCatMenu {
         case footer(String)
     }
 
-    /// 四类分组，已选打勾；满 4 项时未选项变灰，只剩 1 项时已选项变灰。已选但暂时不在目录里的项也列出，便于取消。
+    /// 按类分组，已选打勾；满 `maxMetrics` 项时未选项变灰，只剩 1 项时已选项变灰。已选但暂时不在目录里的项也列出，便于取消。
     public static func entries(catalog: [DesktopCatCatalogEntry], selected: [String], inputs: DesktopCatInputs = DesktopCatInputs()) -> [Entry] {
         let full = selected.count >= DesktopCatConfig.maxMetrics, last = selected.count <= 1
         var result: [Entry] = []

@@ -56,8 +56,11 @@ enum DesktopCatConfigTests {
         let url = temporaryURL(); defer { try? FileManager.default.removeItem(at: url) }
         do {
             var config = DesktopCatConfig(enabled: true)
-            // 第 5 项拒绝；重复拒绝；未知拒绝。
-            guard (try? config.adding("system.power")) == nil, (try? config.adding("system.cpu")) == nil else { return false }
+            // 第 5～8 项可加，第 9 项拒绝（D47）；重复拒绝；未知拒绝。
+            let eight = try ["system.power", "system.disk", "sensor.temperature", "network.status"].reduce(config) { try $0.adding($1) }
+            guard eight.metrics.count == 8, (try? eight.adding("network.proxy.today")) == nil,
+                  (try? config.adding("system.cpu")) == nil else { return false }
+            do { _ = try eight.adding("network.proxy.today"); return false } catch DesktopCatError.full {} catch { return false }
             config = try config.removing("network.speed").adding("system.power")
             guard config.metrics == ["system.cpu", "system.memory", "quota.claude.minutes:300", "system.power"] else { return false }
             guard (try? config.removing("network.speed")) == nil, (try? DesktopCatConfig().adding("example.unknown")) == nil else { return false }
@@ -74,12 +77,13 @@ enum DesktopCatConfigTests {
             for id in config.metrics.dropLast() { single = try single.removing(id) }
             guard single.metrics == ["system.power"] else { return false }
             do { _ = try single.removing("system.power"); return false } catch DesktopCatError.lastMetric {} catch { return false }
-            do { _ = try DesktopCatConfig().adding("system.disk"); return false } catch DesktopCatError.full {} catch { return false }
             do { _ = try single.toggling("system.power"); return false } catch DesktopCatError.lastMetric {} catch { return false }
             guard try single.toggling("system.disk").metrics == ["system.power", "system.disk"] else { return false }
-            // 校验拒绝 0 项和 5 项。
+            // 校验拒绝 0 项和 9 项，8 项通过。
+            let nine = DesktopCatConfig.defaultMetrics + ["system.power", "system.disk", "sensor.temperature", "network.status", "network.proxy.today"]
             guard (try? DesktopCatConfig(metrics: []).validated()) == nil,
-                  (try? DesktopCatConfig(metrics: DesktopCatConfig.defaultMetrics + ["system.disk"]).validated()) == nil else { return false }
+                  (try? DesktopCatConfig(metrics: nine).validated()) == nil,
+                  (try? DesktopCatConfig(metrics: Array(nine.prefix(8))).validated()) != nil else { return false }
             return true
         } catch { print("桌面猫编辑用例失败：\(error)"); return false }
     }
@@ -120,7 +124,10 @@ enum DesktopCatConfigTests {
             (#""desktopCat":{"enabled":true,"metrics":["system.cpu","system.cpu","network.speed","system.cpu"]}}"#,
              { $0.enabled && $0.metrics == ["system.cpu", "network.speed"] && !$0.diagnostics.isEmpty }),
             (#""desktopCat":{"enabled":true,"metrics":["system.cpu","system.memory","system.power","system.disk","network.speed","network.status"]}}"#,
-             { $0.metrics == ["system.cpu", "system.memory", "system.power", "system.disk"] && !$0.diagnostics.isEmpty }),
+             { $0.metrics == ["system.cpu", "system.memory", "system.power", "system.disk", "network.speed", "network.status"] && $0.diagnostics.isEmpty }),
+            (#""desktopCat":{"enabled":true,"metrics":["system.cpu","system.memory","system.power","system.disk","sensor.temperature","sensor.fan","battery.level","quota.cost.today","network.speed","network.status"]}}"#,
+             { $0.metrics == ["system.cpu", "system.memory", "system.power", "system.disk", "sensor.temperature", "sensor.fan", "battery.level", "quota.cost.today"]
+                 && $0.diagnostics == ["桌面猫最多 8 项指标，已取前 8 项"] }),
             (#""desktopCat":{"enabled":true,"metrics":["example.one","quota..x","quota.claude.minutes:0"]}}"#,
              { $0.enabled && $0.metrics == DesktopCatConfig.defaultMetrics && !$0.diagnostics.isEmpty }),
             (#""desktopCat":{"enabled":true,"metrics":[]}}"#, { $0.metrics == DesktopCatConfig.defaultMetrics }),
@@ -280,15 +287,19 @@ enum DesktopCatConfigTests {
         state.onDesktopCatChanged = { changes.append($0) }
         guard state.updateDesktopCat({ $0.with(enabled: true) }), state.desktopCat.enabled,
               ConfigStore.load(from: url).config.desktopCat.enabled, changes.count == 1 else { return false }
-        // 第 5 项被拒：界面、文件都不变，显示原因。
+        // 加到 8 项；第 9 项被拒：界面、文件都不变，显示原因。
+        for id in ["system.power", "system.disk", "sensor.temperature", "network.status"] {
+            guard state.updateDesktopCat({ try $0.adding(id) }) else { return false }
+        }
+        guard state.desktopCat.metrics.count == 8, ConfigStore.load(from: url).config.desktopCat.metrics.count == 8, changes.count == 5 else { return false }
         let before = try? Data(contentsOf: url)
-        guard !state.updateDesktopCat({ try $0.adding("system.disk") }), state.desktopCat.metrics.count == 4,
-              state.desktopCatError != nil, (try? Data(contentsOf: url)) == before, changes.count == 1 else { return false }
+        guard !state.updateDesktopCat({ try $0.adding("network.proxy.today") }), state.desktopCat.metrics.count == 8,
+              state.desktopCatError == "最多显示 8 项指标", (try? Data(contentsOf: url)) == before, changes.count == 5 else { return false }
         // 文件损坏时保存失败，不覆盖。
         try? Data("{broken".utf8).write(to: url)
         guard !state.updateDesktopCat({ $0.with(enabled: false) }), state.desktopCat.enabled, state.desktopCatError != nil,
               (try? Data(contentsOf: url)) == Data("{broken".utf8) else { return false }
-        return changes.count == 1
+        return changes.count == 5
     }
 
     static func appearanceReset() async -> Bool {

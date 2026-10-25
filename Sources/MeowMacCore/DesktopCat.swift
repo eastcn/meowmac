@@ -41,7 +41,8 @@ public enum DesktopCatError: Error, LocalizedError, Equatable {
 
 /// `config.json` 的 `desktopCat` 字段（D8）。坏值按字段回退，诊断只记原因，不含路径。
 public struct DesktopCatConfig: Codable, Equatable, Sendable {
-    public static let maxMetrics = 4
+    /// 最多 8 项，2 列最多 4 行（D47）。
+    public static let maxMetrics = 8
     public static let defaultMetrics = ["system.cpu", "system.memory", "quota.claude.minutes:300", "network.speed"]
     public var enabled = false
     public var metrics: [String] = DesktopCatConfig.defaultMetrics
@@ -97,7 +98,7 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
         lhs.enabled == rhs.enabled && lhs.metrics == rhs.metrics && lhs.placement == rhs.placement && lhs.pet == rhs.pet
     }
 
-    /// 未知 id 跳过，重复去重，多出的取前 4 项；全部无效时回到默认 4 项。
+    /// 未知 id 跳过，重复去重，多出的取前 `maxMetrics` 项；全部无效时回到默认 4 项。
     public static func normalized(_ raw: [String]) -> (metrics: [String], notes: [String]) {
         var notes: [String] = []
         let known = raw.filter { DesktopCatMetric(id: $0) != nil }
@@ -111,9 +112,9 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
         return (result, notes)
     }
 
-    /// 写回前的校验：1～4 项、不重复、id 都有效。
+    /// 写回前的校验：1～`maxMetrics` 项、不重复、id 都有效。
     public func validated() throws -> Self {
-        guard (1...Self.maxMetrics).contains(metrics.count) else { throw DesktopCatError.invalid("指标数量必须是 1～4 项") }
+        guard (1...Self.maxMetrics).contains(metrics.count) else { throw DesktopCatError.invalid("指标数量必须是 1～\(Self.maxMetrics) 项") }
         guard Set(metrics).count == metrics.count else { throw DesktopCatError.duplicate }
         guard metrics.allSatisfy({ DesktopCatMetric(id: $0) != nil }) else { throw DesktopCatError.unknownMetric }
         if let display = placement.display {

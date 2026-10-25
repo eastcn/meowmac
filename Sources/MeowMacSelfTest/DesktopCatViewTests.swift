@@ -9,6 +9,7 @@ enum DesktopCatViewTests {
     static var tests: [(String, @MainActor () async -> Bool)] {
         var list: [(String, @MainActor () async -> Bool)] = [
             ("Core.DesktopCat/气泡版式尺寸、对齐与尾巴", { layout() }),
+            ("Core.DesktopCat/5～8 项版式逐行累加且远离屏幕角生长", { moreMetrics() }),
             ("Core.DesktopCat/缩字最小 12 pt 与附注去除", { textFit() }),
             ("UI.DesktopCat/猫图缓存同一帧不重复光栅化", { imageCache() }),
             ("UI.DesktopCat/真实字体下的缩字与附注", { realText() }),
@@ -33,8 +34,40 @@ enum DesktopCatViewTests {
               one.bubbleRect.maxX == one.catRect.maxX else { return false }
         let three = DesktopCatLayout(count: 3, corner: .bottomLeft)
         guard three.rows == 2, three.itemOrigin(2) == CGPoint(x: 11, y: 50), three.itemOrigin(1) == CGPoint(x: 89, y: 8) else { return false }
-        // 越界的数量按 1～4 处理。
-        return DesktopCatLayout(count: 0, corner: .bottomRight).count == 1 && DesktopCatLayout(count: 9, corner: .bottomRight).count == 4
+        // 越界的数量按 1～8 处理（D47）。
+        return DesktopCatLayout(count: 0, corner: .bottomRight).count == 1 && DesktopCatLayout(count: 9, corner: .bottomRight).count == 8
+    }
+
+    /// D47：5～8 项仍是 2 列，3～4 行；行高 35 pt、行距 7 pt、上下内边距各 8 pt。
+    static func moreMetrics() -> Bool {
+        let item = DesktopCatLayout.itemHeight, gap = DesktopCatLayout.rowGap, pad = DesktopCatLayout.paddingV
+        guard item == 35 else { return false }
+        for (count, rows) in [(5, 3), (6, 3), (7, 4), (8, 4)] {
+            let layout = DesktopCatLayout(count: count, corner: .bottomRight)
+            let height = CGFloat(rows) * item + CGFloat(rows - 1) * gap + 2 * pad
+            guard layout.columns == 2, layout.rows == rows, layout.bubbleSize == CGSize(width: 166, height: height),
+                  layout.contentSize == CGSize(width: 166, height: height + 10 + 52),
+                  layout.itemOrigin(count - 1).y == pad + CGFloat(rows - 1) * (item + gap) else { return false }
+        }
+        guard DesktopCatLayout(count: 6, corner: .bottomRight).bubbleSize.height == 135,
+              DesktopCatLayout(count: 8, corner: .bottomRight).bubbleSize.height == 177 else { return false }
+        // 四个角：增加项数时，贴角的一侧不动，气泡向远离屏幕角的方向长。
+        let visible = DesktopCatWindowTests.main.visibleFrame
+        for corner in DesktopCatCorner.allCases {
+            let contents = (1...8).map { count -> CGRect in
+                let layout = DesktopCatLayout(count: count, corner: corner)
+                let frame = DesktopCatGeometry.windowFrame(layout: layout, corner: corner, visibleFrame: visible)
+                return DesktopCatWindowTests.content(frame, layout)
+            }
+            for (previous, next) in zip(contents, contents.dropFirst()) {
+                let anchored = corner.isTop ? next.maxY == previous.maxY : next.minY == previous.minY
+                let side = corner.isLeft ? next.minX == previous.minX : next.maxX == previous.maxX
+                let grows = corner.isTop ? next.minY <= previous.minY : next.maxY >= previous.maxY
+                guard anchored, side, grows, visible.contains(next) else { return false }
+            }
+            guard corner.isTop ? contents[7].minY < contents[3].minY : contents[7].maxY > contents[3].maxY else { return false }
+        }
+        return true
     }
 
     static func textFit() -> Bool {

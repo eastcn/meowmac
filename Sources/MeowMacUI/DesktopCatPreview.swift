@@ -7,6 +7,8 @@ import MeowMacCore
 public enum DesktopCatPreview {
     public enum Case: String, CaseIterable {
         case normal, alert, severe, missing, single, longSpeed, leftCorner
+        /// D47：8 项、6 项、左上角 8 项。
+        case eight, six, topLeftEight
         /// 设计稿“提醒 · 深色”“2 项 · 缺数据 · 深色”只出深色；预览两种外观都出。
         public var title: String {
             switch self {
@@ -17,9 +19,16 @@ public enum DesktopCatPreview {
             case .single: return "1 项"
             case .longSpeed: return "超长网速"
             case .leftCorner: return "左下角镜像"
+            case .eight: return "8 项"
+            case .six: return "6 项"
+            case .topLeftEight: return "左上角 8 项"
             }
         }
     }
+
+    /// 设计稿「8 项」的顺序：CPU、内存、功耗、磁盘、Claude、Codex、花费、网络。
+    public static let eightMetrics = ["system.cpu", "system.memory", "system.power", "system.disk",
+                                      "quota.claude.minutes:300", "quota.codex.minutes:300", "quota.cost.today", "network.speed"]
 
     public static func state(_ kind: Case) -> PanelState {
         let state = PanelPreviewRenderer.syntheticState()
@@ -59,9 +68,15 @@ public enum DesktopCatPreview {
             replace(cpu: 0.85, down: 128.6 * 1024 * 1024)
             metrics = ["network.speed", "system.cpu", "quota.deepseek.balance", "network.proxy.today"]
             state.catLevelOverride = .normal
+        case .eight, .topLeftEight:
+            metrics = Self.eightMetrics
+            state.catLevelOverride = .normal
+        case .six:
+            metrics = ["system.cpu", "system.memory", "system.power", "system.disk", "quota.claude.minutes:300", "network.speed"]
+            state.catLevelOverride = .normal
         }
-        state.desktopCat = DesktopCatConfig(enabled: true, metrics: metrics,
-            placement: DesktopCatPlacement(corner: kind == .leftCorner ? .bottomLeft : .bottomRight))
+        let corner: DesktopCatCorner = kind == .leftCorner ? .bottomLeft : kind == .topLeftEight ? .topLeft : .bottomRight
+        state.desktopCat = DesktopCatConfig(enabled: true, metrics: metrics, placement: DesktopCatPlacement(corner: corner))
         return state
     }
 
