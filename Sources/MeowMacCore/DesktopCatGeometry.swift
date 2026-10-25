@@ -86,11 +86,11 @@ public extension DesktopCatGeometry {
     static let targetOutset = CGSize(width: 4, height: 3)
 
     /// 窗口中心所在屏幕的四个落点：猫落到各个角时的位置，离窗口中心最近的一个高亮。
-    static func dropTargets(windowFrame: CGRect, count: Int, catTrim: CGFloat, screens: [DesktopCatScreen])
-        -> (screen: DesktopCatScreen, targets: [DesktopCatDropTarget])? {
+    static func dropTargets(windowFrame: CGRect, count: Int, catTrim: CGFloat, catHeight: CGFloat = DesktopCatSize.defaultHeight,
+                            screens: [DesktopCatScreen]) -> (screen: DesktopCatScreen, targets: [DesktopCatDropTarget])? {
         guard let drop = drop(windowFrame: windowFrame, screens: screens) else { return nil }
         let targets = DesktopCatCorner.allCases.map { corner -> DesktopCatDropTarget in
-            let layout = DesktopCatLayout(count: count, corner: corner, catTrim: catTrim)
+            let layout = DesktopCatLayout(count: count, corner: corner, catTrim: catTrim, catHeight: catHeight)
             let frame = self.windowFrame(layout: layout, corner: corner, visibleFrame: drop.screen.visibleFrame)
             let cat = layout.catRect
             let rect = CGRect(x: frame.minX + cat.minX, y: frame.maxY - cat.maxY, width: cat.width, height: cat.height)
@@ -113,14 +113,25 @@ public struct DesktopCatAlphaMask: Equatable {
     }
 }
 
-/// 点击判断（D11）：只有猫的不透明像素、气泡圆角矩形和尾巴接收鼠标。坐标以窗口左上角为原点，y 向下。
+/// 点击判断（D11）：只有猫的不透明像素、气泡圆角矩形、尾巴和显示中的缩放把手接收鼠标。坐标以窗口左上角为原点，y 向下。
 public struct DesktopCatHitShape {
     public let layout: DesktopCatLayout
     public let catMask: DesktopCatAlphaMask?
-    public init(layout: DesktopCatLayout, catMask: DesktopCatAlphaMask?) { self.layout = layout; self.catMask = catMask }
+    /// 把手只在悬停时显示；隐藏时它所在的位置不接收鼠标。
+    public let handleVisible: Bool
+    public init(layout: DesktopCatLayout, catMask: DesktopCatAlphaMask?, handleVisible: Bool = false) {
+        self.layout = layout; self.catMask = catMask; self.handleVisible = handleVisible
+    }
 
     public func contains(_ point: CGPoint) -> Bool {
-        inBubble(point) || inTail(point) || inCat(point)
+        inHandle(point) || inBubble(point) || inTail(point) || inCat(point)
+    }
+
+    /// 把手的圆形区域（plan D15、D16）。
+    public func inHandle(_ p: CGPoint) -> Bool {
+        guard handleVisible else { return false }
+        let c = layout.handleCenter
+        return hypot(p.x - c.x, p.y - c.y) <= DesktopCatLayout.handleDiameter / 2
     }
 
     func inBubble(_ p: CGPoint) -> Bool {
@@ -138,7 +149,7 @@ public struct DesktopCatHitShape {
         return !(negative && positive)
     }
 
-    func inCat(_ p: CGPoint) -> Bool {
+    public func inCat(_ p: CGPoint) -> Bool {
         let rect = layout.catRect
         guard rect.contains(p) else { return false }
         guard let catMask else { return true }

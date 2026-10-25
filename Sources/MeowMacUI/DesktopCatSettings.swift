@@ -63,6 +63,13 @@ public struct DesktopCatSettingsActions {
     }
     public func setPet(_ id: String?) { state.updateDesktopCat { $0.with(pet: id) } }
 
+    /// 大小（plan D15）：滑块 36～104 pt，松手写入；“恢复默认大小”回到 52 pt。
+    public var catHeight: Double { Double(DesktopCatSize.rendered(state.desktopCat.catHeight)) }
+    public var isDefaultSize: Bool { catHeight == Double(DesktopCatSize.defaultHeight) }
+    public func setCatHeight(_ height: Double) { state.updateDesktopCatHeight(height) }
+    public func resetSize() { setCatHeight(Double(DesktopCatSize.defaultHeight)) }
+    public static func sizeText(_ height: Double) -> String { "\(Int(DesktopCatSize.resolved(CGFloat(height)))) pt" }
+
     public var isDefaultPosition: Bool { state.desktopCat.placement == .default }
     /// 放回主屏右下角。
     public func resetPosition() { state.updateDesktopCat { $0.with(placement: .default) } }
@@ -115,6 +122,8 @@ struct DesktopCatSettingsView: View {
                         .labelsHidden().pickerStyle(.menu).frame(maxWidth: 200)
                         .accessibilityIdentifier("desktop-cat.pet")
                     }.padding(8)
+                    Divider()
+                    DesktopCatSizeRow(state: state).padding(8)
                     Divider()
                     HStack {
                         Text("位置")
@@ -187,6 +196,35 @@ struct DesktopCatSettingsView: View {
             Task { @MainActor in actions.move(id, onto: target) }
         }
         return true
+    }
+}
+
+/// 大小：拖动滑块时只改显示（取整到点，49～55 pt 吸附到 52 pt），松手写配置；“恢复默认大小”立即写入。
+/// 不设 `step`：68 档的刻度会画成一排密点，取整在绑定里做。
+private struct DesktopCatSizeRow: View {
+    @ObservedObject var state: PanelState
+    @State private var draft: Double?
+    private var actions: DesktopCatSettingsActions { DesktopCatSettingsActions(state: state) }
+    var body: some View {
+        let value = draft ?? actions.catHeight
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("大小")
+                Text("默认 52 pt，也可拖猫身上的把手").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Slider(value: Binding(get: { value }, set: { draft = Double(DesktopCatSize.resolved(CGFloat($0))) }),
+                   in: Double(DesktopCatSize.range.lowerBound)...Double(DesktopCatSize.range.upperBound)) { editing in
+                guard !editing, let draft else { return }
+                actions.setCatHeight(draft)
+                self.draft = nil
+            }
+            .frame(width: 140)
+            .accessibilityIdentifier("desktop-cat.size")
+            Text(DesktopCatSettingsActions.sizeText(value)).monospacedDigit().frame(width: 52, alignment: .trailing)
+            SettingsActionButton(title: "恢复默认大小", id: "desktop-cat.reset-size", enabled: !actions.isDefaultSize) { actions.resetSize() }
+                .frame(width: 112, height: 28)
+        }
     }
 }
 

@@ -58,3 +58,26 @@ public extension PanelState {
         }
     }
 }
+
+public extension PanelState {
+    /// 桌面猫大小的即时写入（plan D16）：夹取并吸附后只写 `desktopCat.catHeight`，写入成功后才生效。
+    @discardableResult
+    func updateDesktopCatHeight(_ height: Double) -> Bool {
+        let next = Double(DesktopCatSize.resolved(CGFloat(height)))
+        guard next != desktopCat.catHeight else { desktopCatError = nil; return true }
+        do {
+            try ConfigStore.saveDesktopCatHeight(next, fallback: desktopCat, to: desktopCatConfigURL)
+            desktopCat = desktopCat.with(catHeight: next)
+            desktopCatError = nil
+            onDesktopCatChanged(desktopCat)
+            return true
+        } catch let error as DesktopCatError {
+            desktopCatError = error.localizedDescription
+            return false
+        } catch {
+            desktopCatError = "保存失败，配置文件未改动"
+            Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "desktop-cat").error("桌面猫大小保存失败：\(error.localizedDescription, privacy: .private)")
+            return false
+        }
+    }
+}

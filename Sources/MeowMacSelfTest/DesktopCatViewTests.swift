@@ -140,8 +140,18 @@ enum DesktopCatViewTests {
                 try data.write(to: directory.appendingPathComponent("desktop-cat-drag-\(dark ? "dark" : "light").png"))
                 count += 1
             }
+            // 大小（D47）：36、52、104 pt，带把手和不带把手，浅色和深色。
+            for height in DesktopCatPreview.previewHeights {
+                for handle in [false, true] {
+                    for dark in [false, true] {
+                        guard let data = DesktopCatPreview.sizePNG(height: height, handle: handle, dark: dark, cache: cache), !data.isEmpty else { return false }
+                        try data.write(to: directory.appendingPathComponent("desktop-cat-size-\(Int(height))\(handle ? "-handle" : "")-\(dark ? "dark" : "light").png"))
+                        count += 1
+                    }
+                }
+            }
             print("桌面猫合成预览：\(count) 张，输出 \(directory.path)")
-            return count == DesktopCatPreview.Case.allCases.count * 2 + 2
+            return count == DesktopCatPreview.Case.allCases.count * 2 + 2 + DesktopCatPreview.previewHeights.count * 4
         } catch { print("桌面猫预览失败：\(error)"); return false }
     }
 }

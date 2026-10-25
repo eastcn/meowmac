@@ -47,6 +47,15 @@ public final class DesktopCatController {
     private var observers: [NSObjectProtocol] = []
     private var monitors: [Any] = []
     private var drag: (start: CGPoint, origin: CGPoint, moved: Bool)?
+    /// 拖把手缩放：按下时的鼠标位置和猫的高度（plan D15）。
+    private var resize: (start: CGPoint, height: CGFloat)?
+    /// 鼠标离开猫和把手后 0.3 秒隐藏把手。一次性的延迟任务，不是计时器；回到猫身上即取消。
+    private var handleHide: DispatchWorkItem?
+    public static let handleHideDelay: TimeInterval = 0.3
+    /// 当前是否换成了缩放光标。
+    private var resizeCursorShown = false
+    /// 正在拖把手缩放。
+    public var isResizing: Bool { resize != nil }
     private var mask: (image: ObjectIdentifier, mask: DesktopCatAlphaMask?)?
     /// 拖动时的落点框窗口：透明、不接收鼠标，只在拖动中存在。
     public private(set) var dropWindow: NSPanel?
@@ -113,6 +122,8 @@ public final class DesktopCatController {
         observers.forEach { NotificationCenter.default.removeObserver($0) }; observers.removeAll()
         monitors.forEach { NSEvent.removeMonitor($0) }; monitors.removeAll()
         drag = nil; model.dragging = false; mask = nil
+        resize = nil; handleHide?.cancel(); handleHide = nil; model.handleVisible = false
+        if resizeCursorShown { NSCursor.arrow.set(); resizeCursorShown = false }
         hideDropTargets()
         window?.orderOut(nil)
         window?.contentView = nil
@@ -137,10 +148,15 @@ public final class DesktopCatController {
         guard window != nil else { return }
         let items = state.desktopCatItems
         let corner = state.desktopCat.placement.corner
-        let resized = items.count != model.items.count || corner != model.corner
+        // 拖把手时以拖动中的高度为准，松手写入配置后再跟随配置。
+        let height = DesktopCatSize.rendered(state.desktopCat.catHeight)
+        let sized = resize == nil && height != model.catHeight
+        let resized = items.count != model.items.count || corner != model.corner || sized
         if items != model.items { model.items = items; bubbleUpdates += 1 }
         if corner != model.corner { model.corner = corner }
+        if sized { model.catHeight = height }
         if resized { position(animated: false) }
+        if sized, lastFrame != nil { updateFrame(lastFrame ?? 0, display: state.catDisplay()) }
     }
 
     /// 跟随应用唯一的帧计时器（与菜单栏同一帧号）。拖动时定格第 1 帧。
@@ -149,13 +165,14 @@ public final class DesktopCatController {
         let dark = window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let pet = state.desktopPet
         drawnPet = pet.map(ObjectIdentifier.init)
+        let size = model.layout.catSize
         let image = images.image(cat: state.selectedCat, pet: pet, display: display, frame: drag?.moved == true ? 0 : frame, dark: dark,
-                                 scale: window.backingScaleFactor)
+                                 scale: window.backingScaleFactor, size: size)
         if model.frame.image !== image { model.frame.image = image }
         if model.frame.dark != dark { model.frame.dark = dark }
-        let shadow = images.shadow(pet: pet)
+        let shadow = images.shadow(pet: pet, size: size)
         if model.frame.shadow != shadow { model.frame.shadow = shadow }
-        let trim = images.leadingTrim(cat: state.selectedCat, pet: pet, display: display, dark: dark, scale: window.backingScaleFactor)
+        let trim = images.leadingTrim(cat: state.selectedCat, pet: pet, display: display, dark: dark, scale: window.backingScaleFactor, size: size)
         if model.catTrim != trim {
             model.catTrim = trim
             if model.corner.isLeft { position(animated: false) }
@@ -205,20 +222,46 @@ public final class DesktopCatController {
     public func mouseDown() {
         guard let window else { return }
         guard isMouseInside(window) else { window.ignoresMouseEvents = true; return }
+        // 按在把手上：进入缩放，不移动猫，也不算单击（plan D15）。
+        if hitShape().inHandle(localPoint(window)) {
+            resize = (mouseLocation(), model.catHeight)
+            return
+        }
         drag = (mouseLocation(), window.frame.origin, false)
     }
 
     public func mouseDragged() {
+        if let current = resize {
+            let location = mouseLocation()
+            let height = DesktopCatSize.dragged(from: current.height, delta: CGVector(dx: location.x - current.start.x, dy: location.y - current.start.y),
+                                                corner: model.corner)
+            guard height != model.catHeight else { return }
+            // 实时变大小，锚点按角固定（D14）：窗口按新版式重新落位，猫图按新高度重画。
+            model.catHeight = height
+            position(animated: false)
+            updateFrame(lastFrame ?? 0, display: state.catDisplay())
+            return
+        }
         guard let window, var current = drag else { return }
         let location = mouseLocation()
         if !current.moved && DesktopCatGeometry.isClick(from: current.start, to: location) { return }
-        if !current.moved { current.moved = true; model.dragging = true; updateFrame(0, display: state.catDisplay()) }
+        if !current.moved {
+            current.moved = true; model.dragging = true; model.handleVisible = false
+            handleHide?.cancel(); handleHide = nil
+            updateFrame(0, display: state.catDisplay())
+        }
         drag = current
         window.setFrameOrigin(CGPoint(x: current.origin.x + location.x - current.start.x, y: current.origin.y + location.y - current.start.y))
         showDropTargets(windowFrame: window.frame)
     }
 
     public func mouseUp() {
+        if resize != nil {
+            resize = nil
+            finishResize()
+            updateMouseThrough()
+            return
+        }
         guard let window, let current = drag else { return }
         drag = nil
         guard current.moved || !DesktopCatGeometry.isClick(from: current.start, to: mouseLocation()) else {
@@ -235,10 +278,20 @@ public final class DesktopCatController {
         position(animated: true)
     }
 
+    /// 松手：高度变了才写一次配置；写入失败时回到配置里的大小。
+    private func finishResize() {
+        let height = model.catHeight
+        guard Double(height) != state.desktopCat.catHeight else { return }
+        if !state.updateDesktopCatHeight(Double(height)) {
+            logger.error("桌面猫大小未保存：\(self.state.desktopCatError ?? "", privacy: .public)")
+            refreshBubble()
+        }
+    }
+
     /// 拖动中：在窗口中心所在的屏幕显示四个落点，最近的高亮。只随拖动事件更新，不计时；减少动态效果时也显示。
     private func showDropTargets(windowFrame: CGRect) {
         guard let result = DesktopCatGeometry.dropTargets(windowFrame: windowFrame, count: model.items.count,
-                                                          catTrim: model.catTrim, screens: screens()) else { hideDropTargets(); return }
+                                                          catTrim: model.catTrim, catHeight: model.catHeight, screens: screens()) else { hideDropTargets(); return }
         dropTargets = result.targets
         dropModel.update(result.targets, visibleFrame: result.screen.visibleFrame)
         let overlay = dropWindow ?? makeDropWindow()
@@ -285,16 +338,57 @@ public final class DesktopCatController {
         }) { monitors.append(local) }
     }
 
-    /// 鼠标在猫的不透明像素或气泡里时接收点击，其余时候穿过去（D11 的退路，不轮询）。
+    /// 鼠标在猫的不透明像素、气泡或显示中的把手里时接收点击，其余时候穿过去（D11 的退路，不轮询）。
+    /// 同时管把手：停在猫身上时显示，离开猫和把手 0.3 秒后隐藏；停在把手上时换成缩放光标。
     public func updateMouseThrough() {
-        guard let window, drag == nil else { return }
-        let inside = isMouseInside(window)
+        guard let window, drag == nil, resize == nil else { return }
+        let point = localPoint(window)
+        let shape = hitShape()
+        let inside = shape.contains(point)
         if window.ignoresMouseEvents == inside { window.ignoresMouseEvents = !inside }
+        let onHandle = shape.inHandle(point)
+        updateHandle(hovering: onHandle || shape.inCat(point))
+        if onHandle != resizeCursorShown {
+            (onHandle ? Self.resizeCursor(corner: model.corner) : NSCursor.arrow).set()
+            resizeCursorShown = onHandle
+        }
+    }
+
+    private func updateHandle(hovering: Bool) {
+        if hovering {
+            handleHide?.cancel(); handleHide = nil
+            if !model.handleVisible { model.handleVisible = true }
+            return
+        }
+        guard model.handleVisible, handleHide == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.handleHide = nil
+            guard self.resize == nil else { return }
+            self.model.handleVisible = false
+            self.updateMouseThrough()
+        }
+        handleHide = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.handleHideDelay, execute: work)
+    }
+
+    /// 斜向缩放光标；系统没有时（macOS 14）用十字光标。
+    static func resizeCursor(corner: DesktopCatCorner) -> NSCursor {
+        if #available(macOS 15, *) {
+            // 把手总在猫朝屏幕内侧的上角：右边的角在左上，左边的角在右上。双向箭头沿同一条对角线。
+            return NSCursor.frameResize(position: corner.isLeft ? .topRight : .topLeft, directions: .all)
+        }
+        return .crosshair
+    }
+
+    /// 鼠标在窗口里的位置，原点在左上角，y 向下。
+    private func localPoint(_ window: NSWindow) -> CGPoint {
+        let local = window.convertPoint(fromScreen: mouseLocation())
+        return CGPoint(x: local.x, y: window.frame.height - local.y)
     }
 
     private func isMouseInside(_ window: NSWindow) -> Bool {
-        let local = window.convertPoint(fromScreen: mouseLocation())
-        return hitShape().contains(CGPoint(x: local.x, y: window.frame.height - local.y))
+        hitShape().contains(localPoint(window))
     }
 
     public func hitShape() -> DesktopCatHitShape {
@@ -304,7 +398,7 @@ public final class DesktopCatController {
             if let mask, mask.image == id { catMask = mask.mask }
             else { catMask = Self.alphaMask(image); mask = (id, catMask) }
         }
-        return DesktopCatHitShape(layout: model.layout, catMask: catMask)
+        return DesktopCatHitShape(layout: model.layout, catMask: catMask, handleVisible: model.handleVisible)
     }
 
     static func alphaMask(_ image: NSImage) -> DesktopCatAlphaMask? {

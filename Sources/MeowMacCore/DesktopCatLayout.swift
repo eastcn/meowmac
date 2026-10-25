@@ -3,7 +3,8 @@ import Foundation
 
 /// 桌面猫的版式（D1，设计稿方案 A）。坐标以窗口内容左上角为原点，y 向下。
 public struct DesktopCatLayout: Equatable {
-    public static let catSize = CGSize(width: 120, height: 52)
+    /// 默认大小（52 pt 高）的猫图格子。实际尺寸见实例属性 `catSize`（D47）。
+    public static let catSize = DesktopCatSize.catSize(height: DesktopCatSize.defaultHeight)
     /// 内容四周的透明边距，容纳投影和拖动时的放大与倾斜。
     public static let inset: CGFloat = 16
     public static let itemWidth: CGFloat = 66, columnGap: CGFloat = 12, rowGap: CGFloat = 7
@@ -16,15 +17,20 @@ public struct DesktopCatLayout: Equatable {
     /// 尾巴中心到气泡对齐边的距离。
     public static let tailOffset: CGFloat = 36
     public static let labelSize: CGFloat = 10, valueSize: CGFloat = 15, minimumValueSize: CGFloat = 12
+    /// 缩放把手的直径（plan D15）。
+    public static let handleDiameter: CGFloat = 12
 
     public let count: Int
     public let mirrored: Bool
     /// 猫图格子左边到猫可见左缘的距离。落在左边的角时，猫图往左挪这么多，让可见的猫和气泡左对齐。
     public let catTrim: CGFloat
+    /// 猫图格子的尺寸，随猫的高度缩放（D47）。
+    public let catSize: CGSize
 
-    public init(count: Int, corner: DesktopCatCorner, catTrim: CGFloat = 0) {
+    public init(count: Int, corner: DesktopCatCorner, catTrim: CGFloat = 0, catHeight: CGFloat = DesktopCatSize.defaultHeight) {
         self.count = min(DesktopCatConfig.maxMetrics, max(1, count)); mirrored = corner.isLeft
-        self.catTrim = max(0, min(catTrim, Self.catSize.width))
+        catSize = DesktopCatSize.catSize(height: DesktopCatSize.clamped(catHeight))
+        self.catTrim = max(0, min(catTrim, catSize.width))
     }
     /// 左边的角时内容左侧多留的透明宽度，容纳猫图格子里猫左边的空白。
     private var leading: CGFloat { mirrored ? catTrim : 0 }
@@ -39,7 +45,7 @@ public struct DesktopCatLayout: Equatable {
     }
     /// 猫和气泡的外接区域，不含透明边距。
     public var contentSize: CGSize {
-        CGSize(width: max(Self.catSize.width, bubbleSize.width), height: bubbleSize.height + Self.bubbleGap + Self.catSize.height)
+        CGSize(width: max(catSize.width, bubbleSize.width), height: bubbleSize.height + Self.bubbleGap + catSize.height)
     }
     public var windowSize: CGSize { CGSize(width: contentSize.width + 2 * Self.inset + leading, height: contentSize.height + 2 * Self.inset) }
     /// 内容在窗口里的位置（y 向下）。
@@ -54,7 +60,16 @@ public struct DesktopCatLayout: Equatable {
     }
     /// 猫图格子。左边的角时左移 `catTrim`，可见的猫左缘与气泡左缘对齐。
     public var catRect: CGRect {
-        CGRect(origin: CGPoint(x: aligned(width: Self.catSize.width) - leading, y: contentRect.maxY - Self.catSize.height), size: Self.catSize)
+        CGRect(origin: CGPoint(x: aligned(width: catSize.width) - leading, y: contentRect.maxY - catSize.height), size: catSize)
+    }
+    /// 缩放把手的圆心：猫朝屏幕内侧的上角（plan D15）。右边的角取猫可见左缘，左边的角取猫图格子右缘。
+    public var handleCenter: CGPoint {
+        let cat = catRect
+        return CGPoint(x: mirrored ? cat.maxX : cat.minX + catTrim, y: cat.minY)
+    }
+    public var handleRect: CGRect {
+        let r = Self.handleDiameter / 2
+        return CGRect(x: handleCenter.x - r, y: handleCenter.y - r, width: Self.handleDiameter, height: Self.handleDiameter)
     }
     /// 尾巴三角形：底边贴气泡下沿，尖朝下指向猫头。
     public var tail: [CGPoint] {

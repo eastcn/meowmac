@@ -10,9 +10,13 @@ public final class DesktopCatViewModel: ObservableObject {
     @Published public var dragging = false
     /// 当前猫图的可见左缘，见 `DesktopCatLayout.catTrim`。
     @Published public var catTrim: CGFloat = 0
+    /// 猫的高度（pt）。拖把手时实时变化，松手才写配置（D47）。
+    @Published public var catHeight: CGFloat = DesktopCatSize.defaultHeight
+    /// 鼠标停在猫身上时显示缩放把手（plan D15）。
+    @Published public var handleVisible = false
     public let frame = DesktopCatFrameModel()
     public init() {}
-    public var layout: DesktopCatLayout { DesktopCatLayout(count: items.count, corner: corner, catTrim: catTrim) }
+    public var layout: DesktopCatLayout { DesktopCatLayout(count: items.count, corner: corner, catTrim: catTrim, catHeight: catHeight) }
 }
 
 /// 逐帧更新的猫图。单独发布，换帧不重新计算气泡。
@@ -35,9 +39,13 @@ public struct DesktopCatContentView: View {
             DesktopCatBubble(items: model.items, layout: layout)
                 .frame(width: bubble.width, height: bubble.height + DesktopCatLayout.tailHeight, alignment: .topLeading)
                 .offset(x: bubble.minX, y: bubble.minY)
-            DesktopCatFigure(model: model.frame)
+            DesktopCatFigure(model: model.frame, size: cat.size)
                 .frame(width: cat.width, height: cat.height)
                 .offset(x: cat.minX, y: cat.minY)
+            if model.handleVisible {
+                let handle = layout.handleRect
+                DesktopCatHandle().frame(width: handle.width, height: handle.height).offset(x: handle.minX, y: handle.minY)
+            }
         }
         .frame(width: layout.windowSize.width, height: layout.windowSize.height, alignment: .topLeading)
         .scaleEffect(model.dragging ? 1.06 : 1)
@@ -47,17 +55,32 @@ public struct DesktopCatContentView: View {
 
 struct DesktopCatFigure: View {
     @ObservedObject var model: DesktopCatFrameModel
+    let size: CGSize
     var body: some View {
+        // 投影随猫等比缩放：52 pt 时高 7 pt、模糊 2 pt、下沉 3 pt。
+        let ratio = size.height / DesktopCatSize.defaultHeight
         ZStack(alignment: .topLeading) {
             // 脚下柔和的投影。
-            Ellipse().fill(Color.black.opacity(model.dark ? 0.4 : 0.165)).blur(radius: 2)
-                .frame(width: model.shadow.width, height: 7)
-                .offset(x: model.shadow.x, y: DesktopCatLayout.catSize.height - 3)
+            Ellipse().fill(Color.black.opacity(model.dark ? 0.4 : 0.165)).blur(radius: 2 * ratio)
+                .frame(width: model.shadow.width, height: 7 * ratio)
+                .offset(x: model.shadow.x, y: size.height - 3 * ratio)
             if let image = model.image {
                 Image(nsImage: image).renderingMode(.original).interpolation(.high)
-                    .frame(width: DesktopCatLayout.catSize.width, height: DesktopCatLayout.catSize.height)
+                    .frame(width: size.width, height: size.height)
             }
-        }.frame(width: DesktopCatLayout.catSize.width, height: DesktopCatLayout.catSize.height, alignment: .topLeading)
+        }.frame(width: size.width, height: size.height, alignment: .topLeading)
+    }
+}
+
+/// 缩放把手：12 pt 圆，白底（深色外观用面板底色），1.5 pt `systemBlue` 描边（plan D15）。
+struct DesktopCatHandle: View {
+    @Environment(\.colorScheme) private var colorScheme
+    var body: some View {
+        Circle()
+            .fill(colorScheme == .dark ? Color(red: 0x25 / 255, green: 0x25 / 255, blue: 0x27 / 255) : Color.white)
+            .overlay(Circle().strokeBorder(Design.blue, lineWidth: 1.5))
+            .shadow(color: .black.opacity(0.2), radius: 1.5, y: 1)
+            .accessibilityLabel("调整桌面猫大小")
     }
 }
 

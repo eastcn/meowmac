@@ -49,15 +49,19 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
     public var placement = DesktopCatPlacement()
     /// 用哪只 Codex 宠物，存 `$CODEX_HOME/pets` 下的目录名；nil 表示跟随当前猫。
     public var pet: String?
+    /// 猫的高度（pt），36～104，默认 52（D47）。坏值按 52 运行，不改写文件。
+    public var catHeight = Double(DesktopCatSize.defaultHeight)
     /// 读取时的回退原因，不写回文件。
     public var diagnostics: [String] = []
 
     public init(enabled: Bool = false, metrics: [String] = DesktopCatConfig.defaultMetrics,
-                placement: DesktopCatPlacement = DesktopCatPlacement(), pet: String? = nil, diagnostics: [String] = []) {
-        self.enabled = enabled; self.metrics = metrics; self.placement = placement; self.pet = pet; self.diagnostics = diagnostics
+                placement: DesktopCatPlacement = DesktopCatPlacement(), pet: String? = nil,
+                catHeight: Double = Double(DesktopCatSize.defaultHeight), diagnostics: [String] = []) {
+        self.enabled = enabled; self.metrics = metrics; self.placement = placement; self.pet = pet
+        self.catHeight = catHeight; self.diagnostics = diagnostics
     }
 
-    private enum CodingKeys: String, CodingKey { case enabled, metrics, placement, pet }
+    private enum CodingKeys: String, CodingKey { case enabled, metrics, placement, pet, catHeight }
     private enum PlacementKeys: String, CodingKey { case display, corner }
 
     /// 字段类型错误时抛错，由 `LocalConfig` 把整个桌面猫配置回退到默认值。
@@ -81,6 +85,11 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
             if CodexPetManifest.isValidDirectoryName(name) { pet = name }
             else { notes.append("桌面猫的宠物名无效，已跟随当前猫") }
         }
+        // 大小坏了只回退这一项，不影响其他字段。
+        if fields.contains(.catHeight) {
+            if let height = try? fields.decode(Double.self, forKey: .catHeight), DesktopCatSize.isValid(height) { catHeight = height }
+            else { notes.append("桌面猫的大小无效，已按 52 pt 显示") }
+        }
         diagnostics = notes
     }
 
@@ -92,10 +101,12 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
         try placementFields.encodeIfPresent(placement.display, forKey: .display)
         try placementFields.encode(placement.corner.rawValue, forKey: .corner)
         try fields.encodeIfPresent(pet, forKey: .pet)
+        try fields.encode(catHeight, forKey: .catHeight)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.enabled == rhs.enabled && lhs.metrics == rhs.metrics && lhs.placement == rhs.placement && lhs.pet == rhs.pet
+            && lhs.catHeight == rhs.catHeight
     }
 
     /// 未知 id 跳过，重复去重，多出的取前 `maxMetrics` 项；全部无效时回到默认 4 项。
@@ -123,6 +134,7 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
             }
         }
         if let pet { guard CodexPetManifest.isValidDirectoryName(pet) else { throw DesktopCatError.invalid("宠物名无效") } }
+        guard DesktopCatSize.isValid(catHeight) else { throw DesktopCatError.invalid("大小必须是 36～104 pt") }
         return self
     }
 
@@ -156,6 +168,7 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
     public func with(enabled: Bool) -> Self { var next = self; next.enabled = enabled; return next }
     public func with(placement: DesktopCatPlacement) -> Self { var next = self; next.placement = placement; return next }
     public func with(pet: String?) -> Self { var next = self; next.pet = pet; return next }
+    public func with(catHeight: Double) -> Self { var next = self; next.catHeight = catHeight; return next }
 }
 
 public enum DesktopCatCategory: String, CaseIterable, Sendable {
@@ -518,5 +531,21 @@ public extension ConfigStore {
         let valid = try config.validated()
         let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(valid))
         try updateField("desktopCat", value: object, at: url)
+    }
+
+    /// 只写 `desktopCat.catHeight`，`desktopCat` 的其他字段和未知字段原样保留（plan D16）。
+    /// 文件里的 `desktopCat` 结构无效（整组按默认值运行）时，改为整组写入 `fallback`（界面正在使用的配置），
+    /// 否则新的大小仍会随整组一起被忽略。
+    static func saveDesktopCatHeight(_ height: Double, fallback: DesktopCatConfig, to url: URL = defaultURL) throws {
+        guard DesktopCatSize.isValid(height) else { throw DesktopCatError.invalid("大小必须是 36～104 pt") }
+        let raw = (try? Data(contentsOf: url)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["desktopCat"]
+        if var object = raw as? [String: Any],
+           let data = try? JSONSerialization.data(withJSONObject: object),
+           (try? JSONDecoder().decode(DesktopCatConfig.self, from: data)) != nil {
+            object["catHeight"] = height
+            try updateField("desktopCat", value: object, at: url)
+        } else {
+            try saveDesktopCat(fallback.with(catHeight: height), to: url)
+        }
     }
 }

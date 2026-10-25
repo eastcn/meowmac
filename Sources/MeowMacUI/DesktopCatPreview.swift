@@ -85,11 +85,26 @@ public enum DesktopCatPreview {
         let model = DesktopCatViewModel()
         model.items = state.desktopCatItems
         model.corner = state.desktopCat.placement.corner
+        model.catHeight = DesktopCatSize.rendered(state.desktopCat.catHeight)
         model.frame.dark = dark
         let display = state.catDisplay(reducedMotion: false)
-        model.frame.image = cache.image(cat: state.selectedCat, display: display, frame: frame, dark: dark, scale: scale)
-        model.catTrim = cache.leadingTrim(cat: state.selectedCat, display: display, dark: dark, scale: scale)
+        let size = model.layout.catSize
+        model.frame.image = cache.image(cat: state.selectedCat, display: display, frame: frame, dark: dark, scale: scale, size: size)
+        model.frame.shadow = cache.shadow(pet: nil, size: size)
+        model.catTrim = cache.leadingTrim(cat: state.selectedCat, display: display, dark: dark, scale: scale, size: size)
         return model
+    }
+
+    /// 设计稿「更多指标与猫的大小（D47）」的大小预览：36、52 pt 配 4 项，104 pt 配 2 项（CPU、Claude）。
+    public static let previewHeights: [CGFloat] = [36, 52, 104]
+    public static func sizePNG(height: CGFloat, handle: Bool, dark: Bool, cache: DesktopCatImage? = nil) -> Data? {
+        let cache = cache ?? DesktopCatImage()
+        let state = state(.normal)
+        let metrics = height >= 104 ? ["system.cpu", "quota.claude.minutes:300"] : DesktopCatConfig.defaultMetrics
+        state.desktopCat = DesktopCatConfig(enabled: true, metrics: metrics, catHeight: Double(height))
+        let model = model(state: state, cache: cache, dark: dark)
+        model.handleVisible = handle
+        return render(dark: dark, size: model.layout.windowSize) { DesktopCatContentView(model: model) }
     }
 
     /// 拖动态：一块 720 × 420 pt 的虚构屏幕，猫拎在右下区域，四角落点框中右下高亮（plan D14）。
