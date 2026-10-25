@@ -350,6 +350,8 @@ public struct DesktopCatInputs {
     public var proxyUpdatedAt: Date?
     /// 最近一次 AI 会话检查（D46）；协调器没运行时为 nil。
     public var agentSessions: AgentSessionSnapshot?
+    /// Claude 或 Codex 的记录根目录至少有一个存在（D11）；都不存在算没装，目录里不列“AI 会话”。
+    public var agentSessionsInstalled = false
     public init() {}
 }
 
@@ -373,6 +375,7 @@ public enum DesktopCatCatalog {
         if inputs.costAvailable { result.append((.costToday, "今日花费")) }
         result += [(.networkSpeed, "网速"), (.networkStatus, "网络状态")]
         if inputs.proxyEnabled { result.append((.proxyToday, "今日代理流量")) }
+        if inputs.agentSessionsInstalled || inputs.agentSessions?.installed == true { result.append((.agentSessions, "AI 会话")) }
         return result.enumerated().sorted { a, b in
             a.element.0.sortKey == b.element.0.sortKey ? a.offset < b.offset : a.element.0.sortKey < b.element.0.sortKey
         }.map { DesktopCatCatalogEntry(id: $0.element.0.id, category: $0.element.0.category, title: $0.element.1) }

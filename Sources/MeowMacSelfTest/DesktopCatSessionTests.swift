@@ -15,6 +15,9 @@ enum DesktopCatSessionTests {
             ("UI.DesktopCatSessions/点提示只关这一条，不开面板", { await click() }),
             ("UI.DesktopCatSessions/没选这项时提示变化不触发渲染", { await unselected() }),
             ("UI.DesktopCatSessions/提示宽度上限与名称截断", { widths() }),
+            ("UI.DesktopCatSessions/目录分组：没装不列，选中、取消与满 8 项", { catalog() }),
+            ("UI.DesktopCatSessions/菜单与设置的“AI 会话”分组", { menus() }),
+            ("Core.DesktopCatSessions/配置读写与坏值", { config() }),
         ]
     }
 
@@ -200,5 +203,80 @@ enum DesktopCatSessionTests {
         // 最宽 220 pt；名称最宽 96 pt；截断只发生在名称上（其余部分完整留出）。
         return m1.width <= 220 && m2.width == 220 && m2.nameWidth <= 96 && DesktopCatToastText.truncatesName(long)
             && more.width < 220 && more.nameWidth == 0 && !DesktopCatToastText.truncatesName(.more(count: 3, ids: []))
+    }
+
+    // MARK: - 目录入口（plan 条目 6，D11）
+
+    static func catalog() -> Bool {
+        var inputs = DesktopCatConfigTests.inputs()
+        // 两个根目录都不存在：不列。
+        guard !DesktopCatCatalog.entries(inputs).contains(where: { $0.id == AgentSessionCadence.metricID }) else { return false }
+        inputs.agentSessionsInstalled = true
+        let entries = DesktopCatCatalog.entries(inputs)
+        guard let last = entries.last, last.id == AgentSessionCadence.metricID, last.category == .agents, last.title == "AI 会话" else { return false }
+        let menu = DesktopCatMenu.entries(catalog: entries, selected: DesktopCatConfig.defaultMetrics, inputs: inputs)
+        let headers = menu.compactMap { if case .header(let title) = $0 { return title }; return nil }
+        guard headers == ["系统", "传感器与电池", "额度", "网络", "AI 会话"],
+              let row = DesktopCatSettingsTests.metrics(menu).first(where: { $0.id == AgentSessionCadence.metricID }),
+              !row.checked, row.enabled, row.title == "AI 会话" else { return false }
+        // 选中：打勾；满 8 项时未选的它也变灰；只剩它一项时不能取消。
+        let selected = DesktopCatSettingsTests.metrics(DesktopCatMenu.entries(catalog: entries, selected: ["system.cpu", AgentSessionCadence.metricID], inputs: inputs))
+        let full = DesktopCatSettingsTests.metrics(DesktopCatMenu.entries(catalog: entries, selected: DesktopCatConfig.defaultMetrics + DesktopCatSettingsTests.eightExtra, inputs: inputs))
+        let only = DesktopCatSettingsTests.metrics(DesktopCatMenu.entries(catalog: entries, selected: [AgentSessionCadence.metricID], inputs: inputs))
+        guard selected.first(where: { $0.id == AgentSessionCadence.metricID }).map({ $0.checked && $0.enabled }) == true,
+              full.first(where: { $0.id == AgentSessionCadence.metricID }).map({ !$0.checked && !$0.enabled }) == true,
+              only.first(where: { $0.id == AgentSessionCadence.metricID }).map({ $0.checked && !$0.enabled }) == true else { return false }
+        // 已选但没装：仍列在本类末尾，标“暂无数据”，可取消；气泡里显示“—”。
+        var absent = inputs; absent.agentSessionsInstalled = false
+        let stale = DesktopCatSettingsTests.metrics(DesktopCatMenu.entries(catalog: DesktopCatCatalog.entries(absent),
+                                                                            selected: ["system.cpu", AgentSessionCadence.metricID], inputs: absent))
+        guard let row2 = stale.first(where: { $0.id == AgentSessionCadence.metricID }), row2.checked, row2.enabled,
+              row2.title == "AI 会话（暂无数据）" else { return false }
+        return DesktopCatCatalog.items(selected: [AgentSessionCadence.metricID], inputs: absent)[0].value == "—"
+    }
+
+    static func menus() -> Bool {
+        let (state, url) = DesktopCatSettingsTests.state(); defer { try? FileManager.default.removeItem(at: url) }
+        guard state.updateDesktopCat({ $0.with(enabled: true) }) else { return false }
+        func submenu() -> NSMenu { DesktopCatMenu.make(state: state, openPanel: {}).items[2].submenu! }
+        // 没装：右键菜单和设置的“添加指标…”目录（同一个菜单）都不列。
+        guard !submenu().items.contains(where: { $0.title == "AI 会话" }),
+              !DesktopCatMenu.metricsMenu(state: state).items.contains(where: { $0.title == "AI 会话" }) else { return false }
+        state.agentSessionRootsExist = { true }
+        let menu = submenu()
+        guard menu.items.filter(\.isSectionHeader).map(\.title) == ["系统", "传感器与电池", "额度", "网络", "AI 会话"],
+              let item = menu.items.last(where: { $0.title == "AI 会话" && !$0.isSectionHeader }), item.state == .off, item.isEnabled,
+              let action = item.action, let target = item.target as? NSObject else { return false }
+        // 点一下：加入并写配置；设置的指标行列出它。
+        target.perform(action, with: item)
+        guard state.desktopCat.metrics.last == AgentSessionCadence.metricID,
+              ConfigStore.load(from: url).config.desktopCat.metrics.last == AgentSessionCadence.metricID,
+              DesktopCatSettingsActions(state: state).rows.last?.title == "AI 会话" else { return false }
+        // 再点：取消。
+        let again = submenu().items.last { $0.title == "AI 会话" && !$0.isSectionHeader }!
+        (again.target as? NSObject)?.perform(again.action!, with: again)
+        return !state.desktopCat.metrics.contains(AgentSessionCadence.metricID)
+            && !ConfigStore.load(from: url).config.desktopCat.metrics.contains(AgentSessionCadence.metricID)
+    }
+
+    static func config() -> Bool {
+        let base = #"{"schemaVersion":1,"quotaRemainingWarn":0.15,"desktopCat":{"enabled":true,"metrics":"#
+        // 正常读写。
+        guard DesktopCatConfigTests.load(base + #"["system.cpu","agent.sessions"]}}"#, check: { config, _, _ in
+            config.metrics == ["system.cpu", "agent.sessions"] && config.diagnostics.isEmpty
+        }) else { return false }
+        // 重复去重、拼错的 id 跳过，与 D45 一致。
+        guard DesktopCatConfigTests.load(base + #"["agent.sessions","agent.sessions","agent.session","system.cpu"]}}"#, check: { config, _, _ in
+            config.metrics == ["agent.sessions", "system.cpu"] && config.diagnostics.count == 2
+        }) else { return false }
+        let url = DesktopCatConfigTests.temporaryURL(); defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            let config = try DesktopCatConfig(enabled: true).adding(AgentSessionCadence.metricID)
+            try ConfigStore.saveDesktopCat(config, to: url)
+            let loaded = ConfigStore.load(from: url).config.desktopCat
+            guard loaded.metrics == DesktopCatConfig.defaultMetrics + [AgentSessionCadence.metricID], AgentSessionCadence.wanted(loaded),
+                  !AgentSessionCadence.wanted(loaded.with(enabled: false)), (try? config.adding(AgentSessionCadence.metricID)) == nil else { return false }
+            return true
+        } catch { return false }
     }
 }

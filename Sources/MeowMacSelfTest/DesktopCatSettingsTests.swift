@@ -21,6 +21,8 @@ enum DesktopCatSettingsTests {
         let url = DesktopCatConfigTests.temporaryURL()
         let state = PanelPreviewRenderer.syntheticState()
         state.desktopCatConfigURL = url
+        // 与本机是否装了 Claude、Codex 无关：默认按没装，“AI 会话”的目录由 `DesktopCatSessionTests.catalog` 单独覆盖。
+        state.agentSessionRootsExist = { false }
         return (state, url)
     }
 

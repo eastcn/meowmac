@@ -103,7 +103,7 @@ table.cat th,table.cat td{border-bottom:1px solid #e3e5ea;padding:5px 8px;text-a
 
 <header>
 <h1>桌面猫</h1>
-<p>把当前的猫放到桌面上，像桌面宠物一样蹲在屏幕角落：猫是主角，窗口本身透明，看不到方框。跑得快慢表示负载，颜色和姿态表示健康，规则和菜单栏的猫相同。用户选的 1～4 项指标挂在猫身边。</p>
+<p>把当前的猫放到桌面上，像桌面宠物一样蹲在屏幕角落：猫是主角，窗口本身透明，看不到方框。跑得快慢表示负载，颜色和姿态表示健康，规则和菜单栏的猫相同。用户选的 1～8 项指标挂在猫身边。</p>
 <p>猫始终置顶，所有桌面空间和全屏 App 上都显示。可以拎起来拖动，松手落到最近的屏幕角；单击打开菜单栏面板；右键菜单选指标或让猫回去。只有猫和气泡的不透明部分接收鼠标，透明处的点击穿过去。2026-10-25 用户选定方案 A：猫 + 气泡，实现以方案 A 为准；方案 B、C 只作对比保留。所有数值都是合成数据。</p>
 <div class="controls" id="theme"><span>外观</span><button data-t="light" class="active">浅色</button><button data-t="dark">深色</button></div>
 <div class="controls" id="load"><span>负载</span><button data-l=".1">10%</button><button data-l=".24" class="active">24%</button><button data-l=".55">55%</button><button data-l=".85">85%（速度线）</button></div>
@@ -119,7 +119,7 @@ table.cat th,table.cat td{border-bottom:1px solid #e3e5ea;padding:5px 8px;text-a
 </section>
 
 <section class="block">
-<h2>AI 会话（D46，待用户确认）</h2>
+<h2>AI 会话（D46，2026-10-25 用户确认）</h2>
 <p>指标目录新增“AI 会话”一类，只有一项。数值是 Claude 和 Codex 正在跑的主会话总数，悬停提示写分项，例如“Claude 2 个在跑，Codex 1 个 · 14:02 更新”；有记录读不出状态的会话时追加“另有 n 个未确认”，这些不计入数值。没有会话在跑时写灰色“空闲”；两个记录目录都读不了时写“—”。不画横线（同“今日花费”）。</p>
 <p>选了这项指标，某个会话本轮结束时，气泡上方弹出一条玻璃提示：“✓ 名称 · 渠道 · 已完成 · 耗时”。名称取会话标题，没有就取项目目录名，太长时在末尾截断。最多叠 2 条，新的贴着气泡；更多时离猫远的那条改成“另有 n 个会话完成”。猫在上方的角时，气泡顶着屏幕上沿，提示改放在猫的下方，新的贴着猫。点提示只关掉这一条，不打开面板；5 分钟后自动消失。提示和气泡同侧对齐，猫在左边的角时左对齐。名称都是虚构的。</p>
 <div class="grid" id="sessions"></div>
@@ -133,7 +133,7 @@ table.cat th,table.cat td{border-bottom:1px solid #e3e5ea;padding:5px 8px;text-a
 
 <section class="block">
 <h2>右键菜单</h2>
-<p>原生 <code>NSMenu</code>。指标子菜单按四类分组，已选项打勾，点一下就加或减，立即生效。已选满 4 项时其余项变灰；只剩 1 项时不能取消。</p>
+<p>原生 <code>NSMenu</code>。指标子菜单按类分组，已选项打勾，点一下就加或减，立即生效。已选满 8 项时其余项变灰；只剩 1 项时不能取消。“AI 会话”一类只在本机有 Claude 或 Codex 记录目录时出现。</p>
 <div id="menu"></div>
 </section>
 
@@ -156,7 +156,7 @@ table.cat th,table.cat td{border-bottom:1px solid #e3e5ea;padding:5px 8px;text-a
 · <b>素材</b>：只用现有的 5 帧奔跑和严重睡姿，不新增姿态。“坐着”“打哈欠”这类待机动作需要另出帧图，本次不做。<br>
 <b>指标目录</b>（只用现有采集，不新增数据源）
 <table class="cat"><thead><tr><th>分类</th><th>指标</th><th>标签</th><th>数值</th><th>横线</th></tr></thead><tbody id="catalog"></tbody></table>
-默认选 CPU、内存压力、Claude 5 小时、网速，与总览一致。最多 4 项，至少 1 项；顺序即显示顺序。额度类按已启用的渠道和该渠道实际返回的窗口生成。
+默认选 CPU、内存压力、Claude 5 小时、网速，与总览一致。最多 8 项，至少 1 项；顺序即显示顺序。额度类按已启用的渠道和该渠道实际返回的窗口生成。
 </div>
 
 <script>
@@ -259,7 +259,7 @@ document.getElementById('drag').innerHTML=`<div class="cell"><h3>拎起中</h3>$
 // 菜单
 function menuScene(theme){
  const main=`<div class="nsmenu" style="right:200px;top:170px"><div class="mi">打开面板</div><hr><div class="mi on">指标<span class="k">▸</span></div><div class="mi">桌面猫设置…</div><hr><div class="mi">让猫回去</div></div>`;
- const sub=`<div class="nsmenu" style="right:-10px;top:20px;min-width:210px"><div class="hd">系统</div><div class="mi chk">CPU</div><div class="mi chk">内存压力</div><div class="mi dis">整机功耗</div><div class="mi dis">磁盘剩余</div><div class="hd">传感器与电池</div><div class="mi dis">SoC 温度</div><div class="mi dis">风扇</div><div class="mi dis">电池电量</div><div class="hd">额度</div><div class="mi chk">Claude · 5 小时</div><div class="mi dis">Claude · 7 天</div><div class="mi dis">Codex · 5 小时</div><div class="mi dis">Codex · 7 天</div><div class="mi dis">DeepSeek · 余额</div><div class="mi dis">今日花费</div><div class="hd">网络</div><div class="mi chk">网速</div><div class="mi dis">网络状态</div><div class="mi dis">今日代理流量</div><hr><div class="foot">已选 4 / 4，先取消一项再添加</div></div>`;
+ const sub=`<div class="nsmenu" style="right:-10px;top:20px;min-width:210px"><div class="hd">系统</div><div class="mi chk">CPU</div><div class="mi chk">内存压力</div><div class="mi">整机功耗</div><div class="mi">磁盘剩余</div><div class="hd">传感器与电池</div><div class="mi">SoC 温度</div><div class="mi">风扇</div><div class="mi">电池电量</div><div class="hd">额度</div><div class="mi chk">Claude · 5 小时</div><div class="mi">Claude · 7 天</div><div class="mi">Codex · 5 小时</div><div class="mi">Codex · 7 天</div><div class="mi">DeepSeek · 余额</div><div class="mi">今日花费</div><div class="hd">网络</div><div class="mi chk">网速</div><div class="mi">网络状态</div><div class="mi">今日代理流量</div><div class="hd">AI 会话</div><div class="mi">AI 会话</div><hr><div class="foot">已选 4 / 8</div></div>`;
  return `<div class="${theme}"><div class="menuwrap"><div class="pet" style="left:40px;right:auto;bottom:60px">${cat('normal')}<div class="bubble glass" style="left:-2px;right:auto">${['cpu','mem','claude','net'].map(m).join('')}</div></div><div style="position:absolute;left:170px;top:0;bottom:0;right:0">${main}${sub}</div></div></div>`;
 }
 const renderMenu=()=>document.getElementById('menu').innerHTML=menuScene(document.body.classList.contains('dark')?'dark':'')+`<p class="note" style="font-size:11px;color:#5d6068">“让猫回去”等同于在设置里关掉开关；重新打开从底部设置菜单的“显示桌面猫”或设置窗口。猫在左边的角时，气泡和菜单镜像到右侧。</p>`;
@@ -272,8 +272,8 @@ function renderSettings(){const rows=[['CPU','24%'],['内存压力','55%'],['Cla
  <div class="gh">桌面猫 · 即时生效</div>
  <div class="box"><div class="row">显示桌面猫<span class="s">当前的猫蹲在屏幕角落，所有桌面空间可见</span><span class="r"><span class="toggle"></span></span></div>
  <div class="row">位置<span class="s">内建显示器 · 右下角</span><span class="r"><span class="btn">放回右下角</span></span></div></div>
- <div class="gh">指标<span style="margin-left:auto">已选 4 / 4 · 拖动调整顺序</span></div>
- <div class="box">${rows.map(([n,v])=>`<div class="row"><span class="grip">⋮⋮</span>${n}<span class="r"><span class="s">${v}</span><span class="minus">−</span></span></div>`).join('')}<div class="row"><span class="btn dis">添加指标…</span><span class="s">已满 4 项</span></div></div>
+ <div class="gh">指标<span style="margin-left:auto">已选 4 / 8 · 拖动调整顺序</span></div>
+ <div class="box">${rows.map(([n,v])=>`<div class="row"><span class="grip">⋮⋮</span>${n}<span class="r"><span class="s">${v}</span><span class="minus">−</span></span></div>`).join('')}<div class="row"><span class="btn">添加指标…</span></div></div>
  <div class="hint">“添加指标…”弹出与右键菜单相同的分组目录。只剩 1 项时减号变灰。用哪只猫跟随“猫”栏的当前选择。</div>
  <div class="bottom"><span class="btn">恢复默认…</span><span class="btn dis">取消</span><span class="btn dis">保存</span></div>
  <div class="hint">底部的取消和保存只管样式与布局，与桌面猫分组无关。</div></div></div></div>`;}

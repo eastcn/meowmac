@@ -33,7 +33,12 @@ public extension PanelState {
         inputs.agentSessions = agentSessions
         return inputs
     }
-    var desktopCatCatalog: [DesktopCatCatalogEntry] { DesktopCatCatalog.entries(desktopCatInputs) }
+    /// 目录只在菜单和设置里用：这时才查一次会话记录根目录是否存在（只查目录，不读记录）。
+    var desktopCatCatalog: [DesktopCatCatalogEntry] {
+        var inputs = desktopCatInputs
+        inputs.agentSessionsInstalled = agentSessionRootsExist()
+        return DesktopCatCatalog.entries(inputs)
+    }
     var desktopCatItems: [DesktopCatItem] { DesktopCatCatalog.items(selected: desktopCat.metrics, inputs: desktopCatInputs) }
 }
 
