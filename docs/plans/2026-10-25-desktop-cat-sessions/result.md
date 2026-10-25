@@ -133,11 +133,35 @@
 
 <!-- 复审者只读，输出由调度者写入：relay-run 启动的由 relay-run 写入，子 Agent 的由规划者写入。执行者留空 -->
 
+复审者：全新 Claude Code 子 Agent（Claude Opus 5.5，只读），2026-10-25。复审范围 `f925c52..d3b4f51`；复跑 `scripts/check.sh` 退出码 0，“自测完成：463 项，0 项失败，52 项前台验收未执行”“check 通过”。
+
+结论：有条件收工（只因 R1）。已核对无问题：隐私（只解码元数据字段，隐私用例覆盖 `String(describing:)` 和 `String(reflecting:)`，日志只有 D7a 两条数字日志，夹具虚构，diff、result、提交里没有本机路径或真实会话名）；`AgentSessionReader` 无写操作，`AgentActivityScanner`、`SessionPoller`、`QuotaCoordinator` 的 diff 为空，没有调用 CodexBarCLI；D5、D5a 和执行者 4 条判定更正都有字段级证据，在 D5 允许范围内；D7 的预算、Codex 全日期目录、缓存和不跟随符号链接；D4 未选指标时不建计时器、不读记录，60/10 秒切换、休眠暂停、唤醒检查都有用例；D7a 日志；提示区四角版式和第 1 轮 R6 的重跑（`toastWidths: [220, 220]`）。
+
+| 编号 | 问题 | 证据 | 根因 | 去向 | 用户决定 | 级别 |
+|---|---|---|---|---|---|---|
+| R1 | 结束提示的耗时仍是面板长格式（“12 分钟”“1 小时 5 分”），不符合 D17 和设计稿的短格式 | `AgentSessionNotices.swift:17-19`；`AgentSessionTests.swift:278,281,288`；`SPEC.md:265`；plan D17 | 规划 | 复审者修（交回执行者） | | 阻断 |
+| R2 | 只有 `agent_role` 或 `source.subagent`、没有 `parent_thread_id` 的 Codex 线程按独立主会话计数，D6 要求写进 result，没写 | `AgentSessionReader.swift:127`；`AgentSessions.swift:242-273,373` | 执行 | 复审者修（补 result，不改代码） | | 记录 |
+| R3 | Claude 中断靠匹配原始字节里的固定串，依赖 Claude Code 当前的 JSON 写法；写法变了只会多算最长 10 分钟的“在跑”，不会误弹提示 | `AgentSessions.swift:178,216` | 环境 | 遗留，第 3 轮实机“中断一个会话”时核对计数 | | 记录 |
+| R4 | 悬停提示新增“X 记录读不了”，D2 和设计稿没有这句；只写在完成条目表里，没进「自主决定」 | `DesktopCat.swift` 的 `agentItem` | 执行 | 遗留 | | 记录 |
+| R5 | 设计稿右键菜单示意的改动超出第 1 轮 R5 列出的文字：未选项不再灰显，加了“AI 会话”分组；两处都是 8 项上限和 D11 的直接结果，但改了用户确认过的设计稿 | `mini-window.html` 的 `menuScene`（`e26bda6`） | 执行 | 遗留，第 3 轮实机验收时告知用户 | | 记录 |
+| R6 | 自主决定“完成时间超过 10 分钟的不提示”比 D5a 多一个条件：休眠超过 10 分钟或读取一直延后时，这次完成不再提示 | `AgentSessionNotices.swift:80-81` | 执行 | 遗留 | | 记录 |
+
+汇总：阻断 1、一般 0、记录 5。根因：规划 1（R1），执行 4（R2、R4、R5、R6），环境 1（R3）。
+
 **修复记录**
 
 - R1：`35f5e42`。按规划者指令 D17（plan 提交 `2880e1a`），Core 新增 `AgentSessionNotice.shortDuration`：不足 1 分记 1 分，写“12 分”；满 60 分写“1 时 5 分”。`detail` 改用它，面板的 `MetricFormat.duration` 不变。`AgentSessionTests.noticeDisplay` 的 3 处文案断言跟随 D17 改成短格式，另加边界断言：0、59 秒为“1 分”，3599 秒为“59 分”，3600 秒为“1 时 0 分”，3900 秒为“1 时 5 分”，面板的 720 秒仍是“12 分钟”。SPEC「桌面猫」的结束提示一段改为短格式。验证：`scripts/test.sh AgentSessions` 17 项、`scripts/test.sh DesktopCat` 50 项，都是 0 项失败（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-fix-test.log`）。重出预览 52 张（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-fix-preview.log`），会话预览在 `build/acceptance/desktop-cat-sessions/preview/desktop-cat-sessions*-{light,dark}.png`。名称宽度按 `DesktopCatToastText.metrics` 的同一算法测量（11 pt 系统字体，220 pt 上限）。“· Claude · 已完成 · 3 分”时名称可用 56 pt，此前长格式是 45 pt；“· Codex · 已完成 · 12 分”时 55 pt；“1 时 5 分”时 34～37 pt。96 pt 的名称上限在 220 pt 内达不到。虚构名“notes-app”自然宽 57 pt，仍差 1 pt，显示成“notes-a…”。
 - R2：未改代码。「自主决定」已补一条（条目 4，Codex 只有 `agent_role` / `source.subagent` 的线程按独立主会话计数）。
 
+**修复复核**
+
+复核者：全新 Claude Code 子 Agent（Claude Sonnet 5.5，只读），2026-10-25，只看 `d3b4f51..5699325`。复跑 `scripts/check.sh` 通过：463 项，0 项失败，52 项前台验收未执行。
+
+- R1：已解决。`Sources` 只改了 `AgentSessionNotices.swift` 和 `AgentSessionTests.swift`；3 处文案断言只跟随 D17 改成短格式，另加边界断言；`MetricFormat.duration(720) == "12 分钟"` 仍断言，面板格式未变；SPEC 只改耗时一句。重出的 52 张预览只核对了日志路径，没有逐张看。
+- R2：已解决。「自主决定」已补说明，没有改代码。
+- 新问题：未发现。
+
+本轮结论：通过（阻断已在本轮修复并复核）。遗留：R3～R6；另外名称在 220 pt 上限内只有 34～56 pt（虚构名“notes-app”显示为“notes-a…”），并入第 3 轮用户实机验收，由用户决定是否放宽上限。
 
 ### 第 1 轮（2026-10-25，Claude Code 子 Agent · Claude Opus 5.5，高推理档位）
 
