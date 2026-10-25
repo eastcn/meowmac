@@ -77,12 +77,35 @@ public enum DesktopCatPreview {
         return model
     }
 
+    /// 拖动态：一块 720 × 420 pt 的虚构屏幕，猫拎在右下区域，四角落点框中右下高亮（plan D14）。
+    public static func dragPNG(dark: Bool, cache: DesktopCatImage? = nil) -> Data? {
+        let cache = cache ?? DesktopCatImage()
+        let state = state(.normal)
+        let model = model(state: state, cache: cache, dark: dark, frame: 0)
+        model.dragging = true
+        let visible = CGRect(x: 0, y: 0, width: 720, height: 420)
+        let screen = DesktopCatScreen(id: "preview", visibleFrame: visible, isMain: true)
+        let window = CGRect(origin: CGPoint(x: 400, y: 70), size: model.layout.windowSize)
+        guard let result = DesktopCatGeometry.dropTargets(windowFrame: window, count: model.items.count, catTrim: model.catTrim, screens: [screen]) else { return nil }
+        let drop = DesktopCatDropModel()
+        drop.update(result.targets, visibleFrame: visible)
+        return render(dark: dark, size: visible.size) {
+            ZStack(alignment: .topLeading) {
+                DesktopCatDropTargetsView(model: drop)
+                DesktopCatContentView(model: model).offset(x: window.minX, y: visible.maxY - window.maxY)
+            }
+        }
+    }
+
     /// 把内容视图放在设计稿同款的渐变壁纸上渲染。
     public static func png(_ kind: Case, dark: Bool, cache: DesktopCatImage? = nil) -> Data? {
         let cache = cache ?? DesktopCatImage()
         let state = state(kind)
         let model = model(state: state, cache: cache, dark: dark)
-        let size = model.layout.windowSize
+        return render(dark: dark, size: model.layout.windowSize) { DesktopCatContentView(model: model) }
+    }
+
+    private static func render<Content: View>(dark: Bool, size: CGSize, @ViewBuilder content: () -> Content) -> Data? {
         let wall = dark
             ? [Color(red: 0x1c / 255, green: 0x2a / 255, blue: 0x44 / 255), Color(red: 0x3a / 255, green: 0x2d / 255, blue: 0x4d / 255), Color(red: 0x5a / 255, green: 0x3b / 255, blue: 0x2c / 255)]
             : [Color(red: 0x9f / 255, green: 0xc3 / 255, blue: 0xe6 / 255), Color(red: 0xd6 / 255, green: 0xc6 / 255, blue: 0xe6 / 255), Color(red: 0xf3 / 255, green: 0xc9 / 255, blue: 0xa8 / 255)]
@@ -93,7 +116,8 @@ public enum DesktopCatPreview {
         defer { app.appearance = previous }
         var result: Data?
         appearance.performAsCurrentDrawingAppearance {
-            let renderer = ImageRenderer(content: DesktopCatContentView(model: model)
+            let renderer = ImageRenderer(content: content()
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
                 .environment(\.colorScheme, dark ? .dark : .light)
                 .environment(\.previewMaterial, true)
                 .background(LinearGradient(colors: wall, startPoint: .topLeading, endPoint: .bottomTrailing))

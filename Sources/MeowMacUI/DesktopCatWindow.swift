@@ -46,6 +46,11 @@ public final class DesktopCatController {
     private var monitors: [Any] = []
     private var drag: (start: CGPoint, origin: CGPoint, moved: Bool)?
     private var mask: (image: ObjectIdentifier, mask: DesktopCatAlphaMask?)?
+    /// 拖动时的落点框窗口：透明、不接收鼠标，只在拖动中存在。
+    public private(set) var dropWindow: NSPanel?
+    public let dropModel = DesktopCatDropModel()
+    /// 当前显示的落点（屏幕坐标），不在拖动时为空。供测试断言。
+    public private(set) var dropTargets: [DesktopCatDropTarget] = []
     private let logger = Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "desktop-cat")
 
     public init(state: PanelState, onOpenPanel: @escaping () -> Void) {
@@ -102,6 +107,7 @@ public final class DesktopCatController {
         observers.forEach { NotificationCenter.default.removeObserver($0) }; observers.removeAll()
         monitors.forEach { NSEvent.removeMonitor($0) }; monitors.removeAll()
         drag = nil; model.dragging = false; mask = nil
+        hideDropTargets()
         window?.orderOut(nil)
         window?.contentView = nil
         window?.close()
@@ -199,6 +205,7 @@ public final class DesktopCatController {
         if !current.moved { current.moved = true; model.dragging = true; updateFrame(0, display: state.catDisplay()) }
         drag = current
         window.setFrameOrigin(CGPoint(x: current.origin.x + location.x - current.start.x, y: current.origin.y + location.y - current.start.y))
+        showDropTargets(windowFrame: window.frame)
     }
 
     public func mouseUp() {
@@ -208,6 +215,7 @@ public final class DesktopCatController {
             onOpenPanel(); return
         }
         model.dragging = false
+        hideDropTargets()
         guard let drop = DesktopCatGeometry.drop(windowFrame: window.frame, screens: screens()) else { position(animated: false); return }
         let placement = DesktopCatPlacement(display: drop.screen.id, corner: drop.corner)
         if !state.updateDesktopCat({ $0.with(placement: placement) }) {
@@ -215,6 +223,42 @@ public final class DesktopCatController {
         }
         model.corner = state.desktopCat.placement.corner
         position(animated: true)
+    }
+
+    /// 拖动中：在窗口中心所在的屏幕显示四个落点，最近的高亮。只随拖动事件更新，不计时；减少动态效果时也显示。
+    private func showDropTargets(windowFrame: CGRect) {
+        guard let result = DesktopCatGeometry.dropTargets(windowFrame: windowFrame, count: model.items.count,
+                                                          catTrim: model.catTrim, screens: screens()) else { hideDropTargets(); return }
+        dropTargets = result.targets
+        dropModel.update(result.targets, visibleFrame: result.screen.visibleFrame)
+        let overlay = dropWindow ?? makeDropWindow()
+        if overlay.frame != result.screen.visibleFrame { overlay.setFrame(result.screen.visibleFrame, display: true) }
+        if ordersFront, let window, !overlay.isVisible { overlay.order(.below, relativeTo: window.windowNumber) }
+    }
+
+    private func makeDropWindow() -> NSPanel {
+        let panel = DesktopCatPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.ignoresMouseEvents = true
+        panel.contentView = NSHostingView(rootView: DesktopCatDropTargetsView(model: dropModel))
+        dropWindow = panel
+        return panel
+    }
+
+    /// 松手或关闭时立即移除落点框。
+    private func hideDropTargets() {
+        dropTargets = []
+        dropModel.targets = []
+        dropWindow?.orderOut(nil)
+        dropWindow?.contentView = nil
+        dropWindow?.close()
+        dropWindow = nil
     }
 
     func showMenu(event: NSEvent, in view: NSView) {

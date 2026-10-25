@@ -71,6 +71,36 @@ public enum DesktopCatGeometry {
     }
 }
 
+/// 拖动时的一个落点框（plan D14）：屏幕坐标（AppKit，y 向上）。
+public struct DesktopCatDropTarget: Equatable {
+    public let corner: DesktopCatCorner
+    public let rect: CGRect
+    public let highlighted: Bool
+    public init(corner: DesktopCatCorner, rect: CGRect, highlighted: Bool) {
+        self.corner = corner; self.rect = rect; self.highlighted = highlighted
+    }
+}
+
+public extension DesktopCatGeometry {
+    /// 落点框比猫图格子每边宽 4 pt、高 3 pt（设计稿 128 × 58）。
+    static let targetOutset = CGSize(width: 4, height: 3)
+
+    /// 窗口中心所在屏幕的四个落点：猫落到各个角时的位置，离窗口中心最近的一个高亮。
+    static func dropTargets(windowFrame: CGRect, count: Int, catTrim: CGFloat, screens: [DesktopCatScreen])
+        -> (screen: DesktopCatScreen, targets: [DesktopCatDropTarget])? {
+        guard let drop = drop(windowFrame: windowFrame, screens: screens) else { return nil }
+        let targets = DesktopCatCorner.allCases.map { corner -> DesktopCatDropTarget in
+            let layout = DesktopCatLayout(count: count, corner: corner, catTrim: catTrim)
+            let frame = self.windowFrame(layout: layout, corner: corner, visibleFrame: drop.screen.visibleFrame)
+            let cat = layout.catRect
+            let rect = CGRect(x: frame.minX + cat.minX, y: frame.maxY - cat.maxY, width: cat.width, height: cat.height)
+                .insetBy(dx: -targetOutset.width, dy: -targetOutset.height)
+            return DesktopCatDropTarget(corner: corner, rect: rect, highlighted: corner == drop.corner)
+        }
+        return (drop.screen, targets)
+    }
+}
+
 /// 猫图的 alpha 掩码，y 向下，行优先。
 public struct DesktopCatAlphaMask: Equatable {
     public let width: Int, height: Int

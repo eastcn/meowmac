@@ -102,8 +102,13 @@ enum DesktopCatViewTests {
                     count += 1
                 }
             }
+            for dark in [false, true] {
+                guard let data = DesktopCatPreview.dragPNG(dark: dark, cache: cache), !data.isEmpty else { return false }
+                try data.write(to: directory.appendingPathComponent("desktop-cat-drag-\(dark ? "dark" : "light").png"))
+                count += 1
+            }
             print("桌面猫合成预览：\(count) 张，输出 \(directory.path)")
-            return count == DesktopCatPreview.Case.allCases.count * 2
+            return count == DesktopCatPreview.Case.allCases.count * 2 + 2
         } catch { print("桌面猫预览失败：\(error)"); return false }
     }
 }

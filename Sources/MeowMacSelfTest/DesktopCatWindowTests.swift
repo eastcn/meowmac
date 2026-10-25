@@ -19,6 +19,8 @@ enum DesktopCatWindowTests {
             ("UI.DesktopCat/拖动吸附存新屏与单击开面板", { await dragAndClick() }),
             ("UI.DesktopCat/按下点不在猫和气泡上时不拖不开面板", { await missedPress() }),
             ("UI.DesktopCat/左边的角猫与气泡左对齐", { await leftAlignment() }),
+            ("Core.DesktopCat/四角落点框位置与最近角高亮", { dropTargetGeometry() }),
+            ("UI.DesktopCat/拖动时显示落点框松手消失", { await dropTargets() }),
             ("UI.DesktopCatWindow/真实屏幕窗口属性与右下角", { await foregroundWindow() }),
         ]
     }
@@ -298,6 +300,57 @@ enum DesktopCatWindowTests {
         mouse = CGPoint(x: home.minX + bubble.midX, y: home.maxY - bubble.midY)
         controller.mouseDown(); controller.mouseUp()
         return opened == 1
+    }
+
+    static func dropTargetGeometry() -> Bool {
+        // 窗口中心在主屏右下区域：四个框都在主屏，右下角高亮；框为 128 × 58，与猫落位后的位置对应。
+        let frame = CGRect(x: 1100, y: 200, width: 198, height: 187)
+        guard let result = DesktopCatGeometry.dropTargets(windowFrame: frame, count: 4, catTrim: 0, screens: [main, side]),
+              result.screen == main, result.targets.map(\.corner) == DesktopCatCorner.allCases,
+              result.targets.filter(\.highlighted).map(\.corner) == [.bottomRight],
+              result.targets.allSatisfy({ $0.rect.size == CGSize(width: 128, height: 58) }) else { return false }
+        let v = main.visibleFrame
+        func rect(_ corner: DesktopCatCorner) -> CGRect { result.targets.first { $0.corner == corner }!.rect }
+        guard rect(.bottomRight).maxX == v.maxX - 16 + 4, rect(.bottomRight).minY == v.minY + 8 - 3,
+              rect(.bottomLeft).minX == v.minX + 16 - 4, rect(.topLeft).minX == v.minX + 16 - 4,
+              rect(.topRight).maxY == v.maxY - 8 - 93 - 10 + 3 else { return false }
+        // 中心移到副屏左上区域：框换到副屏，左上高亮。
+        guard let other = DesktopCatGeometry.dropTargets(windowFrame: CGRect(x: 1700, y: 600, width: 198, height: 187), count: 4, catTrim: 0, screens: [main, side]),
+              other.screen == side, other.targets.filter(\.highlighted).map(\.corner) == [.topLeft],
+              other.targets.allSatisfy({ side.visibleFrame.contains($0.rect) }) else { return false }
+        return DesktopCatGeometry.dropTargets(windowFrame: frame, count: 4, catTrim: 0, screens: []) == nil
+    }
+
+    static func dropTargets() async -> Bool {
+        let (_, controller, url) = controller(enabled: true); defer { try? FileManager.default.removeItem(at: url) }
+        var opened = 0
+        controller.onOpenPanel = { opened += 1 }
+        var mouse = CGPoint(x: 1400, y: 150)
+        controller.mouseLocation = { mouse }
+        controller.apply(); defer { controller.hide() }
+        // 单击（移动不到 4 pt）不出落点框。
+        controller.mouseDown(); mouse.x += 2; controller.mouseDragged()
+        guard controller.dropTargets.isEmpty, controller.dropWindow == nil else { return false }
+        controller.mouseUp()
+        guard opened == 1 else { return false }
+        // 拖到主屏左上区域（测试里开着“减少动态效果”，落点框照常显示）。
+        controller.mouseDown(); mouse = CGPoint(x: 300, y: 800); controller.mouseDragged()
+        guard controller.dropTargets.count == 4, controller.dropTargets.filter(\.highlighted).map(\.corner) == [.topLeft],
+              let overlay = controller.dropWindow, overlay.ignoresMouseEvents, !overlay.canBecomeKey,
+              overlay.frame == main.visibleFrame, overlay.level == .floating,
+              controller.dropModel.targets.filter(\.highlighted).map(\.corner) == [.topLeft],
+              let screenRect = controller.dropTargets.first(where: { $0.corner == .topLeft })?.rect,
+              controller.dropModel.targets.first(where: { $0.corner == .topLeft })?.rect
+                == CGRect(x: screenRect.minX - main.visibleFrame.minX, y: main.visibleFrame.maxY - screenRect.maxY, width: 128, height: 58),
+              controller.dropModel.size == main.visibleFrame.size else { return false }
+        // 继续拖到副屏右下区域：框换到副屏，右下高亮。
+        mouse = CGPoint(x: 3200, y: -100); controller.mouseDragged()
+        guard controller.dropTargets.filter(\.highlighted).map(\.corner) == [.bottomRight],
+              controller.dropWindow?.frame == side.visibleFrame else { return false }
+        // 松手即消失，并落到高亮的角。
+        controller.mouseUp()
+        return controller.dropTargets.isEmpty && controller.dropWindow == nil && controller.dropModel.targets.isEmpty
+            && controller.model.corner == .bottomRight && opened == 1
     }
 
     /// 前台用例（第 2 轮 `MEOWMAC_UI_TESTS=1` 运行）：真实屏幕上的窗口属性和落位。
