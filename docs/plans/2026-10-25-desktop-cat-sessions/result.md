@@ -58,6 +58,7 @@
 | 4 | 计时器只有一个，下一次触发取“下次检查”和“第一条提示到期”中较早的 | 检查和提示过期各一个计时器 | 符合项目专属自检“新增的计时器只有会话协调器这一个” |
 | 4 | 20 个文件的预算两家共用，按修改时间新到旧，Codex 开头元数据的读取也计入 | 每家各 20 个 | plan 写“每次最多读 20 个文件”，共用才不超 |
 | 5 | 名称最宽 96 pt，整条放不下时只缩名称 | 先缩耗时 | 设计稿名称是视觉重点但允许截断；状态和耗时要完整 |
+| 4 | Codex 线程只有 `agent_role` 或 `source.subagent`、没有 `parent_thread_id` 时，按独立主会话计数（`AgentSessionReader.swift:127`；`AgentSessions.swift:242-273,373`） | 按 `agent_role` / `source.subagent` 也判为子线程，不计数 | 找不到父线程就无法把写入时间交给父会话；不计数会让这类线程的“在跑”和结束提示全部消失。代价是这类线程会被多计一个在跑数并能弹提示。D6 要求把这一点写进 result，未改代码 |
 
 **技术更正与异议**
 
@@ -131,6 +132,11 @@
 **复审**
 
 <!-- 复审者只读，输出由调度者写入：relay-run 启动的由 relay-run 写入，子 Agent 的由规划者写入。执行者留空 -->
+
+**修复记录**
+
+- R1：`35f5e42`。按规划者指令 D17（plan 提交 `2880e1a`），Core 新增 `AgentSessionNotice.shortDuration`：不足 1 分记 1 分，写“12 分”；满 60 分写“1 时 5 分”。`detail` 改用它，面板的 `MetricFormat.duration` 不变。`AgentSessionTests.noticeDisplay` 的 3 处文案断言跟随 D17 改成短格式，另加边界断言：0、59 秒为“1 分”，3599 秒为“59 分”，3600 秒为“1 时 0 分”，3900 秒为“1 时 5 分”，面板的 720 秒仍是“12 分钟”。SPEC「桌面猫」的结束提示一段改为短格式。验证：`scripts/test.sh AgentSessions` 17 项、`scripts/test.sh DesktopCat` 50 项，都是 0 项失败（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-fix-test.log`）。重出预览 52 张（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-fix-preview.log`），会话预览在 `build/acceptance/desktop-cat-sessions/preview/desktop-cat-sessions*-{light,dark}.png`。名称宽度按 `DesktopCatToastText.metrics` 的同一算法测量（11 pt 系统字体，220 pt 上限）。“· Claude · 已完成 · 3 分”时名称可用 56 pt，此前长格式是 45 pt；“· Codex · 已完成 · 12 分”时 55 pt；“1 时 5 分”时 34～37 pt。96 pt 的名称上限在 220 pt 内达不到。虚构名“notes-app”自然宽 57 pt，仍差 1 pt，显示成“notes-a…”。
+- R2：未改代码。「自主决定」已补一条（条目 4，Codex 只有 `agent_role` / `source.subagent` 的线程按独立主会话计数）。
 
 
 ### 第 1 轮（2026-10-25，Claude Code 子 Agent · Claude Opus 5.5，高推理档位）
