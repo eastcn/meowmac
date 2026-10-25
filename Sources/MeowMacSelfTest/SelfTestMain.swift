@@ -368,6 +368,7 @@ enum SelfTestMain {
         tests.append(contentsOf: DesktopCatSettingsTests.tests)
         tests.append(contentsOf: DesktopCatSizeTests.tests)
         tests.append(contentsOf: AgentSessionTests.tests)
+        tests.append(contentsOf: AgentSessionReaderTests.tests)
         tests.append(contentsOf: CodexPetTests.tests)
         tests.append(contentsOf: ProxyTrafficCoreTests.tests())
         tests.append(contentsOf: ProxyTrafficSummaryTests.tests.map { name, run in (name, { @MainActor in run() }) })

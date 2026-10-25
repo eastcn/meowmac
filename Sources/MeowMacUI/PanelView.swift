@@ -192,6 +192,12 @@ public final class PanelState: ObservableObject {
     public var onPetAnimationSpeedChanged: () -> Void = {}
     public var codexPetsRoot: URL = CodexPetLibrary.defaultRoot()
     public var onDesktopCatChanged: (DesktopCatConfig) -> Void = { _ in }
+    /// AI 会话的最近一次检查（D46）。只在桌面猫开着且选了“AI 会话”时有值；不写历史文件，也不进 `config.json`。
+    @Published public var agentSessions: AgentSessionSnapshot?
+    /// 桌面猫上显示的结束提示，第 0 条贴着气泡（上方的角贴着猫）。
+    @Published public var agentSessionToasts: [AgentSessionToast] = []
+    /// 点提示关掉这一条（合并的那条关掉它包含的全部）。
+    public var onDismissAgentSessionToast: ([String]) -> Void = { _ in }
     public var onOpenDesktopCatSettings: () -> Void = {}
     @Published public var aiAgentInstallations: [AIAgentInstallation] = []
     @Published public var aiSettingsError: String?

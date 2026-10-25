@@ -38,6 +38,8 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
     private var energyLoop: EnergyLoopControl?
     private let menuBarImage = MenuBarCatImage()
     private lazy var desktopCat = DesktopCatController(state: panelState, onOpenPanel: { [weak self] in self?.showPanel() })
+    /// AI 会话（D46）：只在桌面猫开着且选了这项指标时运行。
+    private lazy var agentSessions = AgentSessionCoordinator(state: panelState)
     private lazy var cadence = ApplicationCadence(
         display: { [weak self] in self?.panelState.catDisplay() ?? PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil)).catDisplay() },
         updateImage: { [weak self] _ in self?.updateCatImage() },
@@ -139,7 +141,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
         panelState.onImportCodexBarHistory = { [weak self] in self?.importCodexBarHistory() }
         panelState.onCatChanged = { [weak self] in self?.settingsWindow?.catDidChange() }
         panelState.onQuit = { NSApplication.shared.terminate(nil) }
-        panelState.onDesktopCatChanged = { [weak self] _ in self?.desktopCat.apply() }
+        panelState.onDesktopCatChanged = { [weak self] _ in self?.desktopCat.apply(); self?.agentSessions.apply() }
         panelState.onMenuBarPetChanged = { [weak self] in self?.updateCatImage() }
         cadence.petSpeed = { [weak self] in
             guard let self, self.panelState.menuBarLoadedPet != nil || self.panelState.desktopPet != nil else { return nil }
@@ -169,6 +171,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
         })
         sample()
         desktopCat.apply()
+        agentSessions.apply()
         updateCleaningHistory()
         sampleEnergy()
         startEnergyLoop()
@@ -435,6 +438,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
         proxyTrafficCoordinator?.stop()
         settingsWindow?.removeShortcutMonitor()
         cadence.stop()
+        agentSessions.stop()
         desktopCat.hide()
         energyLoop?.cancel()
         networkBridge?.stop()
