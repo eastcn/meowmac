@@ -59,6 +59,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
     public func applicationDidFinishLaunching(_ notification: Notification) {
         for reason in configResult.config.alertRules.diagnostics { logger.error("提醒规则读取：\(reason, privacy: .public)") }
         for reason in configResult.config.desktopCat.diagnostics { logger.error("桌面猫配置读取：\(reason, privacy: .public)") }
+        for reason in configResult.config.menuBarPetDiagnostics { logger.error("菜单栏形象配置读取：\(reason, privacy: .public)") }
         CatRuntime.initialize(state: panelState, store: catStore)
         startNotifications()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -139,6 +140,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
         panelState.onCatChanged = { [weak self] in self?.settingsWindow?.catDidChange() }
         panelState.onQuit = { NSApplication.shared.terminate(nil) }
         panelState.onDesktopCatChanged = { [weak self] _ in self?.desktopCat.apply() }
+        panelState.onMenuBarPetChanged = { [weak self] in self?.updateCatImage() }
         panelState.onOpenDesktopCatSettings = { [weak self] in
             self?.settingsWindow?.openDesktopCat()
             self?.popover?.performClose(nil)
@@ -383,7 +385,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
 
     private func updateCatImage() {
         let display = panelState.catDisplay()
-        if let button = statusItem?.button { menuBarImage.assign(to: button, cat: panelState.selectedCat, display: display, frame: cadence.frame) }
+        if let button = statusItem?.button { menuBarImage.assign(to: button, cat: panelState.selectedCat, pet: panelState.menuBarLoadedPet, display: display, frame: cadence.frame) }
         // 桌面猫与菜单栏同一帧号；关闭时控制器没有窗口，直接返回。
         desktopCat.updateFrame(cadence.frame, display: display)
     }

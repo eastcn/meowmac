@@ -34,6 +34,10 @@ public struct LocalConfig: Codable, Equatable {
     public var moPath = "/opt/homebrew/bin/mo"
     /// 桌面猫（D45）。本机配置，不进猫包。
     public var desktopCat = DesktopCatConfig()
+    /// 菜单栏的形象，缺省与桌面猫相同。本机配置，不进猫包。
+    public var menuBarPet = MenuBarPetConfig.desktop
+    /// 读取 `menuBarPet` 时的回退原因，不写回文件。
+    public var menuBarPetDiagnostics: [String] = []
 
     public init() {}
 
@@ -44,7 +48,7 @@ public struct LocalConfig: Codable, Equatable {
         case quotaRefreshSeconds, sessionPollSeconds, sessionFinishDelaySeconds, manualMergeSeconds
         case proxyTrafficEnabled, proxyTrafficExportDirectory
         case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath, cleanTerminal, aiAgent, aiDiagnosisEntry
-        case desktopCat
+        case desktopCat, menuBarPet
     }
 
     public init(from decoder: Decoder) throws {
@@ -87,6 +91,8 @@ public struct LocalConfig: Codable, Equatable {
         // 类型错误时整个桌面猫按默认值运行，不改写文件，直到用户在界面里修改（D8）。
         do { desktopCat = try fields.decodeIfPresent(DesktopCatConfig.self, forKey: .desktopCat) ?? DesktopCatConfig() }
         catch { desktopCat = DesktopCatConfig(diagnostics: ["桌面猫配置结构无效，已按默认值运行"]) }
+        do { menuBarPet = try fields.decodeIfPresent(MenuBarPetConfig.self, forKey: .menuBarPet) ?? .desktop }
+        catch { menuBarPet = .desktop; menuBarPetDiagnostics = ["菜单栏形象配置无效，已与桌面猫相同"] }
     }
 }
 

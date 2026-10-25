@@ -32,6 +32,64 @@ public extension PanelState {
 }
 
 public enum CatRenderer {
+    /// 菜单栏宠物要画的格子：正常和提醒都跑（D12），严重用倒地格。减少动态效果时定格第 1 格。
+    public static func petFrame(_ pet: LoadedCodexPet, display: CatDisplay, frame: Int) -> Int {
+        let row: CodexPetRow = display.level == .severe ? .failed : .runningRight
+        return CodexPetPose.frame(row: row, counter: frame, frameCount: pet.menuBarFrames(row).count, frozen: display.reducedMotion)
+    }
+
+    /// 菜单栏的宠物（plan P6）：高 `height`，宽按帧比例，左侧留出速度线的位置。保留原色；提醒整只橙色，
+    /// 严重整只红色并加 zz，速度线规则同彩色猫。
+    public static func petImage(_ pet: LoadedCodexPet, display: CatDisplay, index: Int, height: CGFloat = 18,
+                                observeDraw: ((TimeInterval) -> Void)? = nil) -> NSImage {
+        let level = display.level
+        let row: CodexPetRow = level == .severe ? .failed : .runningRight
+        let frames = pet.menuBarFrames(row)
+        let padding = height / 18
+        let frameSize = pet.menuBarFrameSize
+        let scale = (height - padding) / max(1, frameSize.height)
+        let drawn = CGSize(width: (frameSize.width * scale).rounded(), height: (frameSize.height * scale).rounded())
+        let lineRoom = 4 * padding
+        let size = CGSize(width: lineRoom + drawn.width, height: height)
+        let image = NSImage(size: size, flipped: false) { _ in
+            let started = observeDraw == nil ? nil : ProcessInfo.processInfo.systemUptime
+            defer { if let started { observeDraw?(ProcessInfo.processInfo.systemUptime - started) } }
+            guard let context = NSGraphicsContext.current?.cgContext, frames.indices.contains(index) else { return false }
+            context.saveGState()
+            defer { context.restoreGState() }
+            let rect = CGRect(x: lineRoom, y: 0, width: drawn.width, height: drawn.height)
+            context.interpolationQuality = .high
+            context.draw(frames[index], in: rect)
+            if level != .normal {
+                context.setBlendMode(.sourceIn)
+                context.setFillColor((level == .warn ? NSColor.systemOrange : NSColor.systemRed).cgColor)
+                context.fill(CGRect(origin: .zero, size: size))
+                context.setBlendMode(.normal)
+            }
+            if level == .severe {
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.systemFont(ofSize: height * 0.24, weight: .medium), .foregroundColor: NSColor.systemRed
+                ]
+                let zz = "zz" as NSString
+                let textSize = zz.size(withAttributes: attributes)
+                zz.draw(at: NSPoint(x: size.width - textSize.width, y: height * 0.98 - textSize.height), withAttributes: attributes)
+            } else if display.speedLines {
+                context.setStrokeColor((level == .warn ? NSColor.systemOrange : NSColor.labelColor).cgColor)
+                context.setLineWidth(padding)
+                context.setLineCap(.round)
+                for line in 0..<3 {
+                    let lineY = height * CGFloat(1 - (0.55 + Double(line) * 0.16))
+                    context.move(to: CGPoint(x: padding, y: lineY))
+                    context.addLine(to: CGPoint(x: 3 * padding, y: lineY))
+                }
+                context.strokePath()
+            }
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
     public static func image(cat: LoadedCat?, display: CatDisplay, frame: Int, size: CGSize = CGSize(width: 50, height: 18), observeDraw: ((TimeInterval) -> Void)? = nil) -> NSImage {
         guard let cat else { return image(frame: frame, level: display.level, load: display.load, reducedMotion: display.reducedMotion, size: size, observeDraw: observeDraw) }
         let package = cat.package

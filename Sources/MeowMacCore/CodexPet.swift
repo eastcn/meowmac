@@ -101,3 +101,58 @@ public enum CodexPetPose {
         return (counter % frameCount + frameCount) % frameCount
     }
 }
+
+/// 菜单栏的形象（`config.json` 的 `menuBarPet`）。缺省与桌面猫相同；也可固定用当前猫或某只宠物。
+public enum MenuBarPetConfig: Codable, Equatable, Sendable {
+    /// 与桌面猫的“形象”相同：桌面猫选了宠物就用宠物，否则用当前猫。桌面猫关闭时同样跟随。
+    case desktop
+    case cat
+    case pet(String)
+
+    /// 菜单栏实际要用的宠物；nil 表示用当前猫。
+    public func petID(desktop: String?) -> String? {
+        switch self {
+        case .desktop: return desktop
+        case .cat: return nil
+        case .pet(let id): return id
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case source, pet }
+
+    /// 坏值抛错，由 `LocalConfig` 回退到 `.desktop` 并记诊断。
+    public init(from decoder: Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        switch try fields.decode(String.self, forKey: .source) {
+        case "desktop": self = .desktop
+        case "cat": self = .cat
+        case "pet":
+            let id = try fields.decode(String.self, forKey: .pet)
+            guard CodexPetManifest.isValidDirectoryName(id) else { throw CodexPetError.invalid("宠物名无效") }
+            self = .pet(id)
+        default: throw CodexPetError.invalid("菜单栏形象无效")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var fields = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .desktop: try fields.encode("desktop", forKey: .source)
+        case .cat: try fields.encode("cat", forKey: .source)
+        case .pet(let id): try fields.encode("pet", forKey: .source); try fields.encode(id, forKey: .pet)
+        }
+    }
+
+    public func validated() throws -> Self {
+        if case .pet(let id) = self, !CodexPetManifest.isValidDirectoryName(id) { throw CodexPetError.invalid("宠物名无效") }
+        return self
+    }
+}
+
+public extension ConfigStore {
+    /// 只写 `menuBarPet` 字段，保留其他字段和未知字段。
+    static func saveMenuBarPet(_ config: MenuBarPetConfig, to url: URL = defaultURL) throws {
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(config.validated()))
+        try updateField("menuBarPet", value: object, at: url)
+    }
+}

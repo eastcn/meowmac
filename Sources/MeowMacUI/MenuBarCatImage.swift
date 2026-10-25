@@ -9,6 +9,7 @@ public final class MenuBarCatImage {
         let id: String
         let run: ObjectIdentifier?
         let severe: ObjectIdentifier?
+        let pet: ObjectIdentifier?
     }
     private struct Key: Equatable {
         let frame: Int
@@ -29,20 +30,24 @@ public final class MenuBarCatImage {
     public var count: Int { entries.count }
     public init() {}
 
-    public func image(cat: LoadedCat?, display: CatDisplay, frame: Int,
+    public func image(cat: LoadedCat?, pet: LoadedCodexPet? = nil, display: CatDisplay, frame: Int,
                       size: CGSize = CGSize(width: 50, height: 18),
                       appearance: NSAppearance, scale: CGFloat) -> NSImage {
         // 载入器每次接受新内容都会生成新 CGImage；逐帧不读文件或哈希猫包。
-        let next = Generation(id: cat?.id ?? "vector", run: cat.map { ObjectIdentifier($0.run) }, severe: cat.map { ObjectIdentifier($0.severe) })
+        let next = Generation(id: cat?.id ?? "vector", run: cat.map { ObjectIdentifier($0.run) }, severe: cat.map { ObjectIdentifier($0.severe) },
+                              pet: pet.map(ObjectIdentifier.init))
         if generation != next { entries.removeAll(); generation = next; sourceCat = cat }
-        let normalizedFrame = display.stopped || display.level == .severe ? 0 : display.frame(frame)
+        // 宠物按跑步行自己的帧数取格；猫按 5 帧。
+        let normalizedFrame = pet.map { CatRenderer.petFrame($0, display: display, frame: frame) }
+            ?? (display.stopped || display.level == .severe ? 0 : display.frame(frame))
         let key = Key(frame: normalizedFrame, level: display.level, rendering: display.rendering,
                       template: display.template, speedLines: display.speedLines, reducedMotion: display.reducedMotion,
                       width: size.width, height: size.height, appearance: appearance.name.rawValue, scale: scale)
         if let cached = entries.first(where: { $0.0 == key })?.1 { return cached }
         let started = ProcessInfo.processInfo.systemUptime
-        let source = CatRenderer.image(cat: cat, display: display, frame: normalizedFrame, size: size,
-            observeDraw: observe.map { observer in { observer("renderDraw", $0) } })
+        let observer = observe.map { observer in { observer("renderDraw", $0) } }
+        let source = pet.map { CatRenderer.petImage($0, display: display, index: normalizedFrame, height: size.height, observeDraw: observer) }
+            ?? CatRenderer.image(cat: cat, display: display, frame: normalizedFrame, size: size, observeDraw: observer)
         let prepared = Self.rasterize(source, appearance: appearance, scale: scale)
         if entries.count == Self.capacity { entries.removeFirst() }
         entries.append((key, prepared))
@@ -71,8 +76,8 @@ public final class MenuBarCatImage {
         return image
     }
 
-    public func assign(to button: NSStatusBarButton, cat: LoadedCat?, display: CatDisplay, frame: Int) {
-        let prepared = image(cat: cat, display: display, frame: frame, appearance: button.effectiveAppearance,
+    public func assign(to button: NSStatusBarButton, cat: LoadedCat?, pet: LoadedCodexPet? = nil, display: CatDisplay, frame: Int) {
+        let prepared = image(cat: cat, pet: pet, display: display, frame: frame, appearance: button.effectiveAppearance,
                              scale: button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1)
         if button.image !== prepared {
             let started = ProcessInfo.processInfo.systemUptime

@@ -182,6 +182,12 @@ public final class PanelState: ObservableObject {
     /// 桌面猫当前用的 Codex 宠物；nil 表示用当前猫（plan P1）。
     @Published public internal(set) var desktopPet: LoadedCodexPet?
     @Published public internal(set) var desktopPetError: String?
+    /// 菜单栏的形象设置与当前用的宠物；nil 表示用当前猫。
+    @Published public internal(set) var menuBarPet = MenuBarPetConfig.desktop
+    @Published public internal(set) var menuBarLoadedPet: LoadedCodexPet?
+    @Published public internal(set) var menuBarPetError: String?
+    @Published public internal(set) var menuBarPetSaveError: String?
+    public var onMenuBarPetChanged: () -> Void = {}
     public var codexPetsRoot: URL = CodexPetLibrary.defaultRoot()
     public var onDesktopCatChanged: (DesktopCatConfig) -> Void = { _ in }
     public var onOpenDesktopCatSettings: () -> Void = {}
@@ -294,6 +300,7 @@ public final class PanelState: ObservableObject {
         self.aiAgentPreference = configResult.config.aiAgent
         self.aiDiagnosisEntry = configResult.config.aiDiagnosisEntry
         self.desktopCat = configResult.config.desktopCat
+        self.menuBarPet = configResult.config.menuBarPet
     }
 
     public var health: HealthSummary {

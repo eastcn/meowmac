@@ -63,8 +63,8 @@ public final class DesktopCatController {
 
     /// 按当前配置显示或关闭。
     public func apply() {
-        guard state.desktopCat.enabled else { hide(); state.releaseDesktopPet(); return }
-        state.syncDesktopPet()
+        state.syncPets()
+        guard state.desktopCat.enabled else { hide(); return }
         show()
         // 换宠物或换回猫时立即重画，不等下一帧。
         if drawnPet != state.desktopPet.map(ObjectIdentifier.init) { updateFrame(lastFrame ?? 0, display: state.catDisplay()) }

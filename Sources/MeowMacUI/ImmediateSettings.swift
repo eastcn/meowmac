@@ -33,6 +33,34 @@ public struct ImmediateSettingsActions {
     public func detectAgents() { state.onDetectAIAgents() }
     public func setLogin(_ enabled: Bool) { state.onToggleLogin(enabled) }
     public func selectCat(_ id: String) { state.onSelectCat(id) }
+    /// 菜单栏形象选项：与桌面猫相同（默认）、当前猫、本机 Codex 宠物（plan P6）。
+    public struct MenuBarPetOption: Identifiable, Equatable {
+        public let id: String, title: String
+        public let value: MenuBarPetConfig
+    }
+    public var menuBarPetOptions: [MenuBarPetOption] {
+        let pets = CodexPetLibrary.list(root: state.codexPetsRoot)
+        func name(_ id: String) -> String { pets.first(where: { $0.id == id })?.name ?? id }
+        let shared = state.desktopCat.pet.map { "与桌面猫相同（当前：\(name($0))）" } ?? "与桌面猫相同（当前：猫）"
+        var options = [MenuBarPetOption(id: "desktop", title: shared, value: .desktop),
+                       MenuBarPetOption(id: "cat", title: "当前猫", value: .cat)]
+        options += pets.map { MenuBarPetOption(id: "pet:" + $0.id, title: $0.name == $0.id ? $0.name : "\($0.name)（\($0.id)）", value: .pet($0.id)) }
+        if case .pet(let current) = state.menuBarPet, !pets.contains(where: { $0.id == current }) {
+            options.append(MenuBarPetOption(id: "pet:" + current, title: "\(current)（不可用）", value: .pet(current)))
+        }
+        return options
+    }
+    public var menuBarPetSelection: String {
+        switch state.menuBarPet {
+        case .desktop: return "desktop"
+        case .cat: return "cat"
+        case .pet(let id): return "pet:" + id
+        }
+    }
+    public func selectMenuBarPet(_ id: String) {
+        guard let option = menuBarPetOptions.first(where: { $0.id == id }) else { return }
+        state.updateMenuBarPet(option.value)
+    }
     public func importHistory() { guard state.showsCodexBarImport else { return }; state.onImportCodexBarHistory() }
     public func setNotifications(_ enabled: Bool) { var next = state.notificationSettings; next.enabled = enabled; state.onSetNotificationSettings(next) }
     public func setCategory(_ category: NotificationCategory, enabled: Bool) {
@@ -154,6 +182,27 @@ struct ImmediateSettingsView: View {
                 Button("在访达中显示猫配置", action: state.onShowCats).buttonStyle(.link).accessibilityIdentifier("settings.show-cats")
             }
             Text("猫包里的布局在“外观 → 布局与显示”中调整。").font(.caption).foregroundStyle(.secondary)
+            Text("菜单栏形象").font(.headline).padding(.top, 6)
+            GroupBox {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("菜单栏显示")
+                        Text("默认与桌面猫的形象相同；也可单独选当前猫或 Codex 宠物").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Picker("菜单栏显示", selection: Binding(get: { actions.menuBarPetSelection }, set: actions.selectMenuBarPet)) {
+                        ForEach(actions.menuBarPetOptions) { Text($0.title).tag($0.id) }
+                    }
+                    .labelsHidden().pickerStyle(.menu).frame(maxWidth: 240)
+                    .accessibilityIdentifier("settings.menu-bar-pet")
+                }.padding(8)
+            }
+            Text("宠物只读 ~/.codex/pets。菜单栏的宠物照常奔跑，提醒整只变橙，严重变红并停在倒地的一帧。").font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let error = state.menuBarPetSaveError ?? state.menuBarPetError {
+                Text(error).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("settings.menu-bar-pet-error")
+            }
         }
     }
     private var notifications: some View {

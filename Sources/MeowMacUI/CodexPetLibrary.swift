@@ -12,12 +12,18 @@ public final class LoadedCodexPet {
     public let rows: [CodexPetRow: [CGImage]]
     /// 帧的像素尺寸。
     public let frameSize: CGSize
+    /// 菜单栏只用跑步和倒地两行，单独按这两行的共同范围裁剪，猫更大。
+    public let menuBarRows: [CodexPetRow: [CGImage]]
+    public let menuBarFrameSize: CGSize
 
-    init(id: String, name: String, rows: [CodexPetRow: [CGImage]], frameSize: CGSize) {
+    init(id: String, name: String, rows: [CodexPetRow: [CGImage]], frameSize: CGSize,
+         menuBarRows: [CodexPetRow: [CGImage]], menuBarFrameSize: CGSize) {
         self.id = id; self.name = name; self.rows = rows; self.frameSize = frameSize
+        self.menuBarRows = menuBarRows; self.menuBarFrameSize = menuBarFrameSize
     }
 
     public func frames(_ row: CodexPetRow) -> [CGImage] { rows[row] ?? [] }
+    public func menuBarFrames(_ row: CodexPetRow) -> [CGImage] { menuBarRows[row] ?? [] }
 }
 
 public struct CodexPetEntry: Equatable, Identifiable {
@@ -149,8 +155,7 @@ public enum CodexPetLibrary {
             }
             return (count, count == 0 ? .null : CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1))
         }
-        var columns: [CodexPetRow: [Int]] = [:]
-        var union = CGRect.null
+        var cells: [CodexPetRow: [(column: Int, rect: CGRect)]] = [:]
         for row in requiredRows {
             var used: [(column: Int, rect: CGRect)] = []
             for column in 0..<CodexPetAtlas.columns {
@@ -162,21 +167,26 @@ public enum CodexPetLibrary {
             if row == .failed, let flattest = used.max(by: { $0.rect.width / $0.rect.height < $1.rect.width / $1.rect.height }) {
                 used = [flattest]
             }
-            columns[row] = used.map(\.column)
-            for item in used { union = union.union(item.rect) }
+            cells[row] = used
         }
-        let crop = union.integral
-        var rows: [CodexPetRow: [CGImage]] = [:]
-        for (row, used) in columns {
-            rows[row] = try used.map { column in
-                let cell = CodexPetAtlas.cell(row: row.rawValue, column: column)
-                guard let image = atlas.cropping(to: crop.offsetBy(dx: CGFloat(cell.x), dy: CGFloat(cell.y))) else {
-                    throw CodexPetError.invalid("图集裁剪失败")
+        func cropped(_ rows: [CodexPetRow]) throws -> (rows: [CodexPetRow: [CGImage]], size: CGSize) {
+            let crop = rows.flatMap { cells[$0] ?? [] }.reduce(CGRect.null) { $0.union($1.rect) }.integral
+            var result: [CodexPetRow: [CGImage]] = [:]
+            for row in rows {
+                result[row] = try (cells[row] ?? []).map { item in
+                    let cell = CodexPetAtlas.cell(row: row.rawValue, column: item.column)
+                    guard let image = atlas.cropping(to: crop.offsetBy(dx: CGFloat(cell.x), dy: CGFloat(cell.y))) else {
+                        throw CodexPetError.invalid("图集裁剪失败")
+                    }
+                    return image
                 }
-                return image
             }
+            return (result, crop.size)
         }
-        return LoadedCodexPet(id: id, name: name, rows: rows, frameSize: crop.size)
+        let desktop = try cropped(requiredRows)
+        let menuBar = try cropped([.runningRight, .failed])
+        return LoadedCodexPet(id: id, name: name, rows: desktop.rows, frameSize: desktop.size,
+                              menuBarRows: menuBar.rows, menuBarFrameSize: menuBar.size)
     }
 
     static func rowTitle(_ row: CodexPetRow) -> String {
@@ -191,19 +201,51 @@ public enum CodexPetLibrary {
 }
 
 public extension PanelState {
-    /// 按配置加载桌面猫用的宠物。已是同一只就不重读；不可用时回到当前猫并记原因（plan P1）。
-    func syncDesktopPet() {
-        guard let id = desktopCat.pet else { desktopPet = nil; desktopPetError = nil; return }
-        if desktopPet?.id == id { return }
-        do {
-            desktopPet = try CodexPetLibrary.load(id, root: codexPetsRoot)
-            desktopPetError = nil
-        } catch {
-            desktopPet = nil
-            desktopPetError = "宠物“\(id)”不可用：\(error.localizedDescription)，已用当前猫"
+    /// 按配置加载桌面猫和菜单栏用的宠物（plan P1、P6）。同一只只读一次，两处共用；已加载的同一只不重读。
+    /// 桌面猫关闭时不留它的宠物；菜单栏与桌面猫相同时，桌面猫关闭也照样跟随它的形象。
+    func syncPets() {
+        let desktopID = desktopCat.enabled ? desktopCat.pet : nil
+        let menuID = menuBarPet.petID(desktop: desktopCat.pet)
+        var loaded: [String: Result<LoadedCodexPet, Error>] = [:]
+        for pet in [desktopPet, menuBarLoadedPet].compactMap({ $0 }) { loaded[pet.id] = .success(pet) }
+        func resolve(_ id: String) -> Result<LoadedCodexPet, Error> {
+            if let result = loaded[id] { return result }
+            let result = Result { try CodexPetLibrary.load(id, root: codexPetsRoot) }
+            loaded[id] = result
+            return result
         }
+        func message(_ id: String, _ error: Error) -> String { "宠物“\(id)”不可用：\(error.localizedDescription)，已用当前猫" }
+        var nextDesktop: LoadedCodexPet?, nextMenu: LoadedCodexPet?
+        var desktopError: String?, menuError: String?
+        if let id = desktopID {
+            switch resolve(id) { case .success(let pet): nextDesktop = pet; case .failure(let error): desktopError = message(id, error) }
+        }
+        if let id = menuID {
+            switch resolve(id) { case .success(let pet): nextMenu = pet; case .failure(let error): menuError = message(id, error) }
+        }
+        if desktopPet !== nextDesktop { desktopPet = nextDesktop }
+        if menuBarLoadedPet !== nextMenu { menuBarLoadedPet = nextMenu }
+        if desktopPetError != desktopError { desktopPetError = desktopError }
+        if menuBarPetError != menuError { menuBarPetError = menuError }
     }
 
-    /// 关闭桌面猫时释放宠物帧图。
-    func releaseDesktopPet() { if desktopPet != nil { desktopPet = nil } }
+    func syncDesktopPet() { syncPets() }
+
+    /// 菜单栏形象的即时写入：先只写 `menuBarPet` 字段，成功后才更新界面和猫图。
+    @discardableResult
+    func updateMenuBarPet(_ next: MenuBarPetConfig) -> Bool {
+        do {
+            let valid = try next.validated()
+            guard valid != menuBarPet else { menuBarPetSaveError = nil; return true }
+            try ConfigStore.saveMenuBarPet(valid, to: desktopCatConfigURL)
+            menuBarPet = valid
+            menuBarPetSaveError = nil
+            syncPets()
+            onMenuBarPetChanged()
+            return true
+        } catch {
+            menuBarPetSaveError = "保存失败，配置文件未改动"
+            return false
+        }
+    }
 }

@@ -19,6 +19,9 @@ enum CodexPetTests {
             ("UI.CodexPet/桌面猫按宠物绘制、缓存与投影", { render() }),
             ("UI.CodexPet/宠物不可用时回到当前猫", { fallback() }),
             ("UI.CodexPet/帧计数超过 5 继续递增", { counter() }),
+            ("Core.CodexPet/菜单栏形象配置往返与坏值回退", { menuBarConfig() }),
+            ("UI.CodexPet/菜单栏默认跟随桌面猫，也可单独选", { menuBarSync() }),
+            ("UI.CodexPet/菜单栏按宠物绘制、染色与缓存", { menuBarRender() }),
         ]
         if ProcessInfo.processInfo.environment["MEOWMAC_LIVE"] == "1" {
             all.append(("Live.CodexPet/本机宠物加载并渲染到 build/acceptance", { live() }))
@@ -56,6 +59,29 @@ enum CodexPetTests {
                 }
                 guard let tiff = strip.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return false }
                 try? png.write(to: output.appendingPathComponent("\(entry.id)-\(dark ? "dark" : "light").png"))
+            }
+            // 菜单栏：正常跑 8 格（负载 0.8 带速度线）、提醒、严重，浅深各一行，2 倍屏。
+            let menuCases = [display(level: .normal, load: 0.8), display(level: .warn, load: 0.1), display(level: .severe, load: 0.1)]
+            let menu = MenuBarCatImage()
+            var tiles: [[NSImage]] = []
+            for dark in [false, true] {
+                let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
+                tiles.append((0..<8).map { menu.image(cat: nil, pet: pet, display: menuCases[0], frame: $0, appearance: appearance, scale: 2) }
+                             + menuCases.dropFirst().map { menu.image(cat: nil, pet: pet, display: $0, frame: 0, appearance: appearance, scale: 2) })
+            }
+            let tile = tiles[0][0].size
+            let strip = NSImage(size: NSSize(width: (tile.width + 8) * 10, height: 24 * 2), flipped: true) { _ in
+                for (row, line) in tiles.enumerated() {
+                    (row == 0 ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.16, alpha: 1)).setFill()
+                    NSRect(x: 0, y: CGFloat(row) * 24, width: (tile.width + 8) * 10, height: 24).fill()
+                    for (index, image) in line.enumerated() {
+                        image.draw(in: NSRect(x: CGFloat(index) * (tile.width + 8) + 4, y: CGFloat(row) * 24 + 3, width: image.size.width, height: image.size.height))
+                    }
+                }
+                return true
+            }
+            if let tiff = strip.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                try? png.write(to: output.appendingPathComponent("\(entry.id)-menubar.png"))
             }
         }
         return true
@@ -250,7 +276,7 @@ enum CodexPetTests {
         let state = PanelPreviewRenderer.syntheticState()
         state.desktopCatConfigURL = url
         state.codexPetsRoot = root
-        guard state.updateDesktopCat({ $0.with(pet: "demo") }) else { return false }
+        guard state.updateDesktopCat({ $0.with(enabled: true).with(pet: "demo") }) else { return false }
         state.syncDesktopPet()
         guard let loaded = state.desktopPet, loaded.id == "demo", state.desktopPetError == nil else { return false }
         // 同一只不重读。
@@ -275,5 +301,93 @@ enum CodexPetTests {
             && moving.frame(7) == 2
             && display(level: .normal, load: 0.5, reducedMotion: true).nextFrame(6, sleeping: false) == 0
             && display(level: .severe, load: 0.5).nextFrame(6, sleeping: false) == 6
+    }
+
+    static func menuBarConfig() -> Bool {
+        let url = DesktopCatConfigTests.temporaryURL(); defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            try Data(#"{"schemaVersion":1,"futureField":[1]}"#.utf8).write(to: url)
+            guard ConfigStore.load(from: url).config.menuBarPet == .desktop else { return false }
+            for value in [MenuBarPetConfig.cat, .pet("demo"), .desktop] {
+                try ConfigStore.saveMenuBarPet(value, to: url)
+                guard ConfigStore.load(from: url).config.menuBarPet == value, DesktopCatConfigTests.json(url)?["futureField"] != nil else { return false }
+            }
+            guard (DesktopCatConfigTests.json(url)?["menuBarPet"] as? [String: Any])?["source"] as? String == "desktop",
+                  (try? ConfigStore.saveMenuBarPet(.pet("../x"), to: url)) == nil else { return false }
+            for bad in [#"{"source":"pet"}"#, #"{"source":"pet","pet":"../x"}"#, #"{"source":"other"}"#, #""cat""#] {
+                try Data(#"{"schemaVersion":1,"menuBarPet":"#.utf8 + Data(bad.utf8) + Data("}".utf8)).write(to: url)
+                let config = ConfigStore.load(from: url).config
+                guard config.menuBarPet == .desktop, config.menuBarPetDiagnostics == ["菜单栏形象配置无效，已与桌面猫相同"] else { return false }
+            }
+            return MenuBarPetConfig.desktop.petID(desktop: "a") == "a" && MenuBarPetConfig.desktop.petID(desktop: nil) == nil
+                && MenuBarPetConfig.cat.petID(desktop: "a") == nil && MenuBarPetConfig.pet("b").petID(desktop: "a") == "b"
+        } catch { return false }
+    }
+
+    static func menuBarSync() -> Bool {
+        let root = temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let url = DesktopCatConfigTests.temporaryURL(); defer { try? FileManager.default.removeItem(at: url) }
+        writePet(root, id: "a", name: "甲"); writePet(root, id: "b", name: "乙")
+        let state = PanelPreviewRenderer.syntheticState()
+        state.desktopCatConfigURL = url
+        state.codexPetsRoot = root
+        var changes = 0
+        state.onMenuBarPetChanged = { changes += 1 }
+        // 默认与桌面猫相同：桌面猫关闭时，菜单栏仍用它选的形象。
+        guard state.menuBarPet == .desktop, state.updateDesktopCat({ $0.with(enabled: false).with(pet: "a") }) else { return false }
+        state.syncPets()
+        guard state.desktopPet == nil, state.menuBarLoadedPet?.id == "a" else { return false }
+        // 打开桌面猫：两处共用同一份。
+        guard state.updateDesktopCat({ $0.with(enabled: true) }) else { return false }
+        state.syncPets()
+        guard let shared = state.desktopPet, shared === state.menuBarLoadedPet else { return false }
+        // 单独选：菜单栏用乙，桌面猫不变；再选当前猫。
+        guard state.updateMenuBarPet(.pet("b")), state.menuBarLoadedPet?.id == "b", state.desktopPet === shared, changes == 1 else { return false }
+        guard state.updateMenuBarPet(.cat), state.menuBarLoadedPet == nil, state.desktopPet === shared, changes == 2 else { return false }
+        guard ConfigStore.load(from: url).config.menuBarPet == .cat else { return false }
+        let actions = ImmediateSettingsActions(state: state)
+        guard actions.menuBarPetSelection == "cat", actions.menuBarPetOptions.first?.title == "与桌面猫相同（当前：甲）",
+              actions.menuBarPetOptions.map(\.id) == ["desktop", "cat", "pet:b", "pet:a"] else { return false }
+        actions.selectMenuBarPet("desktop")
+        guard state.menuBarPet == .desktop, state.menuBarLoadedPet === shared else { return false }
+        // 宠物不可用：菜单栏回到当前猫并写原因。
+        guard state.updateMenuBarPet(.pet("gone")), state.menuBarLoadedPet == nil,
+              state.menuBarPetError?.contains("“gone”不可用") == true,
+              ImmediateSettingsActions(state: state).menuBarPetOptions.last?.title == "gone（不可用）" else { return false }
+        return state.updateMenuBarPet(.desktop) && state.menuBarPetError == nil
+    }
+
+    static func menuBarRender() -> Bool {
+        let root = temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        writePet(root, id: "demo")
+        guard let pet = try? CodexPetLibrary.load("demo", root: root) else { return false }
+        // 菜单栏只按跑步和倒地格裁剪：跑步格 40～154、倒地格 20～180 → 160×120。
+        guard pet.menuBarFrames(.runningRight).count == 8, pet.menuBarFrames(.failed).count == 1,
+              pet.menuBarFrameSize == CGSize(width: 160, height: 120) else { return false }
+        let normal = display(level: .normal, load: 0.8)
+        let image = CatRenderer.petImage(pet, display: normal, index: 0)
+        // 高 18，帧缩到 17 pt 高、23 pt 宽，左边留 4 pt 画速度线。
+        guard image.size == CGSize(width: 27, height: 18), !image.isTemplate else { return false }
+        guard CatRenderer.petFrame(pet, display: normal, frame: 9) == 1,
+              CatRenderer.petFrame(pet, display: display(level: .normal, load: 0.1, reducedMotion: true), frame: 9) == 0,
+              CatRenderer.petFrame(pet, display: display(level: .severe, load: 0.8), frame: 9) == 0 else { return false }
+        func color(_ level: HealthLevel) -> NSColor? {
+            let source = CatRenderer.petImage(pet, display: display(level: level, load: 0.1), index: 0)
+            let prepared = MenuBarCatImage.rasterize(source, appearance: NSAppearance(named: .aqua)!, scale: 2)
+            guard let rep = prepared.representations.compactMap({ $0 as? NSBitmapImageRep }).first else { return nil }
+            // 左起 14 pt、下方四分之三处：跑步色块与倒地色块都覆盖这里。
+            return rep.colorAt(x: 28, y: rep.pixelsHigh * 3 / 4)?.usingColorSpace(.sRGB)
+        }
+        guard let warn = color(.warn), let original = color(.normal), let severe = color(.severe),
+              warn.alphaComponent > 0.9, original.alphaComponent > 0.9, severe.alphaComponent > 0.9,
+              abs(warn.greenComponent - NSColor.systemOrange.usingColorSpace(.sRGB)!.greenComponent) < 0.08,
+              severe.redComponent > 0.8, severe.greenComponent < 0.4 else { return false }
+        // 缓存：同一格不重复绘制；换宠物清空。
+        let cache = MenuBarCatImage()
+        let appearance = NSAppearance(named: .aqua)!
+        let first = cache.image(cat: nil, pet: pet, display: normal, frame: 1, appearance: appearance, scale: 2)
+        guard cache.image(cat: nil, pet: pet, display: normal, frame: 9, appearance: appearance, scale: 2) === first, cache.count == 1 else { return false }
+        _ = cache.image(cat: nil, display: normal, frame: 1, appearance: appearance, scale: 2)
+        return cache.count == 1 && first.size == image.size
     }
 }
