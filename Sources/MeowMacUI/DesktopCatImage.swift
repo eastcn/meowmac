@@ -24,8 +24,9 @@ public final class DesktopCatImage {
     public var count: Int { entries.count }
     public init() {}
 
-    public func image(cat: LoadedCat?, display: CatDisplay, frame: Int, dark: Bool, scale: CGFloat,
+    public func image(cat: LoadedCat?, pet: LoadedCodexPet? = nil, display: CatDisplay, frame: Int, dark: Bool, scale: CGFloat,
                       size: CGSize = DesktopCatLayout.catSize) -> NSImage {
+        if let pet { return image(pet: pet, display: display, frame: frame, dark: dark, scale: scale, size: size) }
         let normalized = display.stopped || display.level == .severe ? 0 : display.frame(frame)
         let key = Key(cat: cat?.id ?? "vector", run: cat.map { ObjectIdentifier($0.run) }, frame: normalized, level: display.level,
                       rendering: display.rendering, template: display.template, speedLines: display.speedLines,
@@ -41,11 +42,46 @@ public final class DesktopCatImage {
         return prepared
     }
 
+    /// 宠物帧：按 plan P4 选行和格子，等比缩放到格子高度，靠右放，不染色、不加速度线。
+    private func image(pet: LoadedCodexPet, display: CatDisplay, frame: Int, dark: Bool, scale: CGFloat, size: CGSize) -> NSImage {
+        let row = CodexPetPose.row(level: display.level, load: display.load)
+        let frames = pet.frames(row)
+        let index = CodexPetPose.frame(row: row, counter: frame, frameCount: frames.count, frozen: display.reducedMotion)
+        let key = Key(cat: "pet:" + pet.id, run: ObjectIdentifier(pet), frame: row.rawValue * 100 + index, level: display.level,
+                      rendering: "pet", template: false, speedLines: false, reducedMotion: display.reducedMotion, dark: dark,
+                      width: size.width, height: size.height, scale: scale)
+        if let cached = entries.first(where: { $0.0 == key })?.1 { return cached }
+        let drawSize = Self.petSize(pet, in: size)
+        let source = NSImage(cgImage: frames[index], size: drawSize)
+        let prepared = Self.compose(source, in: size, dark: dark, scale: scale)
+        rasterizations += 1
+        if entries.count == Self.capacity { entries.removeFirst() }
+        entries.append((key, prepared))
+        return prepared
+    }
+
+    /// 宠物帧在格子里的尺寸：先按高度缩放，太宽时再按宽度收。
+    public static func petSize(_ pet: LoadedCodexPet, in size: CGSize) -> CGSize {
+        let ratio = min(size.height / pet.frameSize.height, size.width / pet.frameSize.width)
+        return CGSize(width: (pet.frameSize.width * ratio).rounded(), height: (pet.frameSize.height * ratio).rounded())
+    }
+
+    /// 脚下投影的横向位置和宽度（pt）。猫用设计稿的固定值；宠物跟随帧宽，靠右放。
+    public func shadow(pet: LoadedCodexPet?, size: CGSize = DesktopCatLayout.catSize) -> DesktopCatShadow {
+        guard let pet else { return .cat }
+        let width = Self.petSize(pet, in: size).width
+        return DesktopCatShadow(x: size.width - width + width * 0.12, width: width * 0.76)
+    }
+
     private var trims: [(ObjectIdentifier, CGFloat)] = []
 
     /// 猫可见部分的左缘离格子左边多远（pt）：不带速度线时，跑动一周里最靠左的可见像素。
     /// 用一周的最小值而不是逐帧取，猫跑动时位置不抖；落在左边的角时用它让猫和气泡左对齐。
-    public func leadingTrim(cat: LoadedCat?, display: CatDisplay, dark: Bool, scale: CGFloat) -> CGFloat {
+    public func leadingTrim(cat: LoadedCat?, pet: LoadedCodexPet? = nil, display: CatDisplay, dark: Bool, scale: CGFloat) -> CGFloat {
+        if let pet {
+            // 宠物各帧按共同可见范围裁过，帧宽就是可见宽度，左缘固定。
+            return (DesktopCatLayout.catSize.width - Self.petSize(pet, in: DesktopCatLayout.catSize).width).rounded(.down)
+        }
         let reference = CatDisplay(id: display.id, name: display.name, rendering: display.rendering, level: display.level, load: display.load,
                                    frameInterval: display.frameInterval, speedLines: false, template: display.template,
                                    stopped: display.stopped, reducedMotion: display.reducedMotion)
@@ -106,4 +142,10 @@ public final class DesktopCatImage {
         image.addRepresentation(rep)
         return image
     }
+}
+
+/// 猫脚下的投影。
+public struct DesktopCatShadow: Equatable {
+    public let x: CGFloat, width: CGFloat
+    public static let cat = DesktopCatShadow(x: 18, width: DesktopCatLayout.catSize.width - 28)
 }

@@ -20,6 +20,7 @@ public final class DesktopCatViewModel: ObservableObject {
 public final class DesktopCatFrameModel: ObservableObject {
     @Published public var image: NSImage?
     @Published public var dark = false
+    @Published public var shadow = DesktopCatShadow.cat
     public init() {}
 }
 
@@ -50,8 +51,8 @@ struct DesktopCatFigure: View {
         ZStack(alignment: .topLeading) {
             // 脚下柔和的投影。
             Ellipse().fill(Color.black.opacity(model.dark ? 0.4 : 0.165)).blur(radius: 2)
-                .frame(width: DesktopCatLayout.catSize.width - 28, height: 7)
-                .offset(x: 18, y: DesktopCatLayout.catSize.height - 3)
+                .frame(width: model.shadow.width, height: 7)
+                .offset(x: model.shadow.x, y: DesktopCatLayout.catSize.height - 3)
             if let image = model.image {
                 Image(nsImage: image).renderingMode(.original).interpolation(.high)
                     .frame(width: DesktopCatLayout.catSize.width, height: DesktopCatLayout.catSize.height)

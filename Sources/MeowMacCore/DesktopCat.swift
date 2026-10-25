@@ -46,15 +46,17 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
     public var enabled = false
     public var metrics: [String] = DesktopCatConfig.defaultMetrics
     public var placement = DesktopCatPlacement()
+    /// 用哪只 Codex 宠物，存 `$CODEX_HOME/pets` 下的目录名；nil 表示跟随当前猫。
+    public var pet: String?
     /// 读取时的回退原因，不写回文件。
     public var diagnostics: [String] = []
 
     public init(enabled: Bool = false, metrics: [String] = DesktopCatConfig.defaultMetrics,
-                placement: DesktopCatPlacement = DesktopCatPlacement(), diagnostics: [String] = []) {
-        self.enabled = enabled; self.metrics = metrics; self.placement = placement; self.diagnostics = diagnostics
+                placement: DesktopCatPlacement = DesktopCatPlacement(), pet: String? = nil, diagnostics: [String] = []) {
+        self.enabled = enabled; self.metrics = metrics; self.placement = placement; self.pet = pet; self.diagnostics = diagnostics
     }
 
-    private enum CodingKeys: String, CodingKey { case enabled, metrics, placement }
+    private enum CodingKeys: String, CodingKey { case enabled, metrics, placement, pet }
     private enum PlacementKeys: String, CodingKey { case display, corner }
 
     /// 字段类型错误时抛错，由 `LocalConfig` 把整个桌面猫配置回退到默认值。
@@ -74,6 +76,10 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
             if cornerName != nil && corner == nil { notes.append("桌面猫的角无效，已放到右下角") }
             placement = DesktopCatPlacement(display: display?.isEmpty == true ? nil : display, corner: corner ?? .bottomRight)
         }
+        if let name = try fields.decodeIfPresent(String.self, forKey: .pet) {
+            if CodexPetManifest.isValidDirectoryName(name) { pet = name }
+            else { notes.append("桌面猫的宠物名无效，已跟随当前猫") }
+        }
         diagnostics = notes
     }
 
@@ -84,10 +90,11 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
         var placementFields = fields.nestedContainer(keyedBy: PlacementKeys.self, forKey: .placement)
         try placementFields.encodeIfPresent(placement.display, forKey: .display)
         try placementFields.encode(placement.corner.rawValue, forKey: .corner)
+        try fields.encodeIfPresent(pet, forKey: .pet)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.enabled == rhs.enabled && lhs.metrics == rhs.metrics && lhs.placement == rhs.placement
+        lhs.enabled == rhs.enabled && lhs.metrics == rhs.metrics && lhs.placement == rhs.placement && lhs.pet == rhs.pet
     }
 
     /// 未知 id 跳过，重复去重，多出的取前 4 项；全部无效时回到默认 4 项。
@@ -114,6 +121,7 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
                 throw DesktopCatError.invalid("显示器标识无效")
             }
         }
+        if let pet { guard CodexPetManifest.isValidDirectoryName(pet) else { throw DesktopCatError.invalid("宠物名无效") } }
         return self
     }
 
@@ -146,6 +154,7 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
 
     public func with(enabled: Bool) -> Self { var next = self; next.enabled = enabled; return next }
     public func with(placement: DesktopCatPlacement) -> Self { var next = self; next.placement = placement; return next }
+    public func with(pet: String?) -> Self { var next = self; next.pet = pet; return next }
 }
 
 public enum DesktopCatCategory: String, CaseIterable, Sendable {

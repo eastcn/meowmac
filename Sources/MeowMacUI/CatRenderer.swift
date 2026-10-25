@@ -13,8 +13,9 @@ public struct CatDisplay: Codable {
         self.stopped = stopped; self.reducedMotion = reducedMotion
     }
     public func frame(_ requested: Int) -> Int { stopped || reducedMotion ? 0 : (requested % 5 + 5) % 5 }
+    /// 帧计数在 5、6、7、8 的公倍数内循环：菜单栏取模 5，桌面宠物按各行帧数取模。
     public func nextFrame(_ current: Int, sleeping: Bool) -> Int {
-        sleeping || stopped ? current : frame(current + 1)
+        sleeping || stopped ? current : reducedMotion ? 0 : (current + 1) % 840
     }
 }
 public extension PanelState {

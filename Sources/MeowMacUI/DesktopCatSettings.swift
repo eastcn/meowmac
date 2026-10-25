@@ -45,6 +45,24 @@ public struct DesktopCatSettingsActions {
         guard let index = state.desktopCat.metrics.firstIndex(of: id) else { return }
         state.updateDesktopCat { try $0.moving(id, to: index + offset) }
     }
+    /// 形象选项：第一项“跟随当前猫”，其余是 `$CODEX_HOME/pets` 里清单有效的宠物（plan P1）。
+    /// 已选的宠物不在列表里时仍列出，标“不可用”，方便换回。
+    public struct PetOption: Equatable, Identifiable {
+        public let id: String, title: String
+        public let pet: String?
+    }
+    public static let followCatTitle = "跟随当前猫"
+    public var petOptions: [PetOption] {
+        var options = [PetOption(id: "", title: Self.followCatTitle, pet: nil)]
+        let pets = CodexPetLibrary.list(root: state.codexPetsRoot)
+        options += pets.map { PetOption(id: $0.id, title: $0.name == $0.id ? $0.name : "\($0.name)（\($0.id)）", pet: $0.id) }
+        if let current = state.desktopCat.pet, !pets.contains(where: { $0.id == current }) {
+            options.append(PetOption(id: current, title: "\(current)（不可用）", pet: current))
+        }
+        return options
+    }
+    public func setPet(_ id: String?) { state.updateDesktopCat { $0.with(pet: id) } }
+
     public var isDefaultPosition: Bool { state.desktopCat.placement == .default }
     /// 放回主屏右下角。
     public func resetPosition() { state.updateDesktopCat { $0.with(placement: .default) } }
@@ -82,6 +100,20 @@ struct DesktopCatSettingsView: View {
                         Spacer()
                         NativeSettingsSwitch(id: "desktop-cat.enabled", value: Binding(get: { state.desktopCat.enabled }, set: actions.setEnabled), enabled: true)
                             .frame(width: 38, height: 24)
+                    }.padding(8)
+                    Divider()
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("形象")
+                            Text("可选本机 Codex 宠物，只读 ~/.codex/pets").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Picker("形象", selection: Binding(get: { state.desktopCat.pet ?? "" },
+                                                        set: { actions.setPet($0.isEmpty ? nil : $0) })) {
+                            ForEach(actions.petOptions) { Text($0.title).tag($0.id) }
+                        }
+                        .labelsHidden().pickerStyle(.menu).frame(maxWidth: 200)
+                        .accessibilityIdentifier("desktop-cat.pet")
                     }.padding(8)
                     Divider()
                     HStack {
@@ -134,8 +166,12 @@ struct DesktopCatSettingsView: View {
                     }.padding(8)
                 }
             }
-            Text("“添加指标…”弹出与右键菜单相同的分组目录。只剩 1 项时减号变灰。用哪只猫跟随“猫”栏的当前选择。")
+            Text("“添加指标…”弹出与右键菜单相同的分组目录。只剩 1 项时减号变灰。形象选“跟随当前猫”时，用“猫”栏的当前选择。")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let error = state.desktopPetError {
+                Text(error).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("desktop-cat.pet-error")
+            }
             if let error = state.desktopCatError {
                 Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("desktop-cat.error")

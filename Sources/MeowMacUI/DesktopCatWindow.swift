@@ -30,6 +30,8 @@ public final class DesktopCatController {
     public private(set) var bubbleUpdates = 0
     public private(set) var frameUpdates = 0
     public private(set) var lastFrame: Int?
+    /// 上一次画的是哪只宠物，nil 表示猫。
+    private var drawnPet: ObjectIdentifier?
     public let images = DesktopCatImage()
     public var onOpenPanel: () -> Void
     /// 右键菜单，由应用按目录生成。
@@ -61,7 +63,11 @@ public final class DesktopCatController {
 
     /// 按当前配置显示或关闭。
     public func apply() {
-        if state.desktopCat.enabled { show() } else { hide() }
+        guard state.desktopCat.enabled else { hide(); state.releaseDesktopPet(); return }
+        state.syncDesktopPet()
+        show()
+        // 换宠物或换回猫时立即重画，不等下一帧。
+        if drawnPet != state.desktopPet.map(ObjectIdentifier.init) { updateFrame(lastFrame ?? 0, display: state.catDisplay()) }
     }
 
     func show() {
@@ -141,11 +147,15 @@ public final class DesktopCatController {
     public func updateFrame(_ frame: Int, display: CatDisplay) {
         guard let window else { return }
         let dark = window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        let image = images.image(cat: state.selectedCat, display: display, frame: drag?.moved == true ? 0 : frame, dark: dark,
+        let pet = state.desktopPet
+        drawnPet = pet.map(ObjectIdentifier.init)
+        let image = images.image(cat: state.selectedCat, pet: pet, display: display, frame: drag?.moved == true ? 0 : frame, dark: dark,
                                  scale: window.backingScaleFactor)
         if model.frame.image !== image { model.frame.image = image }
         if model.frame.dark != dark { model.frame.dark = dark }
-        let trim = images.leadingTrim(cat: state.selectedCat, display: display, dark: dark, scale: window.backingScaleFactor)
+        let shadow = images.shadow(pet: pet)
+        if model.frame.shadow != shadow { model.frame.shadow = shadow }
+        let trim = images.leadingTrim(cat: state.selectedCat, pet: pet, display: display, dark: dark, scale: window.backingScaleFactor)
         if model.catTrim != trim {
             model.catTrim = trim
             if model.corner.isLeft { position(animated: false) }
