@@ -41,6 +41,38 @@ public final class DesktopCatImage {
         return prepared
     }
 
+    private var trims: [(ObjectIdentifier, CGFloat)] = []
+
+    /// 猫可见部分的左缘离格子左边多远（pt）：不带速度线时，跑动一周里最靠左的可见像素。
+    /// 用一周的最小值而不是逐帧取，猫跑动时位置不抖；落在左边的角时用它让猫和气泡左对齐。
+    public func leadingTrim(cat: LoadedCat?, display: CatDisplay, dark: Bool, scale: CGFloat) -> CGFloat {
+        let reference = CatDisplay(id: display.id, name: display.name, rendering: display.rendering, level: display.level, load: display.load,
+                                   frameInterval: display.frameInterval, speedLines: false, template: display.template,
+                                   stopped: display.stopped, reducedMotion: display.reducedMotion)
+        let first = image(cat: cat, display: reference, frame: 0, dark: dark, scale: scale)
+        let id = ObjectIdentifier(first)
+        if let cached = trims.first(where: { $0.0 == id })?.1 { return cached }
+        let frames = reference.stopped || reference.reducedMotion || reference.level == .severe ? [0] : Array(0..<5)
+        let minimum = frames.map { Self.visibleMinX($0 == 0 ? first : image(cat: cat, display: reference, frame: $0, dark: dark, scale: scale)) }.min() ?? 0
+        // 取整到点：窗口位置按整点落位，带小数会被取整而错开半点。
+        let trim = minimum.rounded(.down)
+        if trims.count == Self.capacity { trims.removeFirst() }
+        trims.append((id, trim))
+        return trim
+    }
+
+    /// 第一列有不透明像素的位置（pt）；整张透明时为 0。
+    public static func visibleMinX(_ image: NSImage, threshold: UInt8 = 24) -> CGFloat {
+        guard let rep = image.representations.compactMap({ $0 as? NSBitmapImageRep }).first, let data = rep.bitmapData,
+              rep.bitsPerPixel == 32, rep.samplesPerPixel == 4, rep.pixelsWide > 0 else { return 0 }
+        for x in 0..<rep.pixelsWide {
+            for y in 0..<rep.pixelsHigh where data[y * rep.bytesPerRow + x * 4 + 3] > threshold {
+                return CGFloat(x) * rep.size.width / CGFloat(rep.pixelsWide)
+            }
+        }
+        return 0
+    }
+
     /// 单色模板在浅色外观染成近黑、深色外观染成近白；所有猫加 1 pt 反色描边，在任何壁纸上都看得见。
     static func compose(_ source: NSImage, in size: CGSize, dark: Bool, scale: CGFloat) -> NSImage {
         let pixelsWide = Int((size.width * scale).rounded()), pixelsHigh = Int((size.height * scale).rounded())

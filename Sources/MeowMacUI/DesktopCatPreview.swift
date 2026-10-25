@@ -71,7 +71,9 @@ public enum DesktopCatPreview {
         model.items = state.desktopCatItems
         model.corner = state.desktopCat.placement.corner
         model.frame.dark = dark
-        model.frame.image = cache.image(cat: state.selectedCat, display: state.catDisplay(reducedMotion: false), frame: frame, dark: dark, scale: scale)
+        let display = state.catDisplay(reducedMotion: false)
+        model.frame.image = cache.image(cat: state.selectedCat, display: display, frame: frame, dark: dark, scale: scale)
+        model.catTrim = cache.leadingTrim(cat: state.selectedCat, display: display, dark: dark, scale: scale)
         return model
     }
 

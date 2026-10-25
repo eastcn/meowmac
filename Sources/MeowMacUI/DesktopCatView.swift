@@ -8,9 +8,11 @@ public final class DesktopCatViewModel: ObservableObject {
     @Published public var items: [DesktopCatItem] = []
     @Published public var corner: DesktopCatCorner = .bottomRight
     @Published public var dragging = false
+    /// 当前猫图的可见左缘，见 `DesktopCatLayout.catTrim`。
+    @Published public var catTrim: CGFloat = 0
     public let frame = DesktopCatFrameModel()
     public init() {}
-    public var layout: DesktopCatLayout { DesktopCatLayout(count: items.count, corner: corner) }
+    public var layout: DesktopCatLayout { DesktopCatLayout(count: items.count, corner: corner, catTrim: catTrim) }
 }
 
 /// 逐帧更新的猫图。单独发布，换帧不重新计算气泡。

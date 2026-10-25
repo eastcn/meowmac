@@ -20,10 +20,12 @@ public enum DesktopCatGeometry {
 
     /// 窗口在屏幕上的位置。透明边距算在窗口里，边距要求只看猫和气泡。
     public static func windowFrame(layout: DesktopCatLayout, corner: DesktopCatCorner, visibleFrame: CGRect) -> CGRect {
-        let content = layout.contentSize, inset = DesktopCatLayout.inset
+        let content = layout.contentRect
         let x = corner.isLeft ? visibleFrame.minX + sideMargin : visibleFrame.maxX - sideMargin - content.width
         let y = corner.isTop ? visibleFrame.maxY - verticalMargin - content.height : visibleFrame.minY + verticalMargin
-        return CGRect(x: x - inset, y: y - inset, width: layout.windowSize.width, height: layout.windowSize.height)
+        // 窗口 y 向上：内容下沿离窗口下边 = 窗口高 − 内容下沿（y 向下）。
+        return CGRect(x: x - content.minX, y: y - (layout.windowSize.height - content.maxY),
+                      width: layout.windowSize.width, height: layout.windowSize.height)
     }
 
     /// 离窗口中心最近的角。正好在中线上时取右、下。

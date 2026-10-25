@@ -19,10 +19,15 @@ public struct DesktopCatLayout: Equatable {
 
     public let count: Int
     public let mirrored: Bool
+    /// 猫图格子左边到猫可见左缘的距离。落在左边的角时，猫图往左挪这么多，让可见的猫和气泡左对齐。
+    public let catTrim: CGFloat
 
-    public init(count: Int, corner: DesktopCatCorner) {
+    public init(count: Int, corner: DesktopCatCorner, catTrim: CGFloat = 0) {
         self.count = min(DesktopCatConfig.maxMetrics, max(1, count)); mirrored = corner.isLeft
+        self.catTrim = max(0, min(catTrim, Self.catSize.width))
     }
+    /// 左边的角时内容左侧多留的透明宽度，容纳猫图格子里猫左边的空白。
+    private var leading: CGFloat { mirrored ? catTrim : 0 }
 
     public var columns: Int { count == 1 ? 1 : 2 }
     public var rows: Int { (count + columns - 1) / columns }
@@ -35,9 +40,9 @@ public struct DesktopCatLayout: Equatable {
     public var contentSize: CGSize {
         CGSize(width: max(Self.catSize.width, bubbleSize.width), height: bubbleSize.height + Self.bubbleGap + Self.catSize.height)
     }
-    public var windowSize: CGSize { CGSize(width: contentSize.width + 2 * Self.inset, height: contentSize.height + 2 * Self.inset) }
+    public var windowSize: CGSize { CGSize(width: contentSize.width + 2 * Self.inset + leading, height: contentSize.height + 2 * Self.inset) }
     /// 内容在窗口里的位置（y 向下）。
-    public var contentRect: CGRect { CGRect(origin: CGPoint(x: Self.inset, y: Self.inset), size: contentSize) }
+    public var contentRect: CGRect { CGRect(origin: CGPoint(x: Self.inset + leading, y: Self.inset), size: contentSize) }
 
     /// 右边的角时右对齐，左边的角时左对齐。
     private func aligned(width: CGFloat) -> CGFloat {
@@ -46,8 +51,9 @@ public struct DesktopCatLayout: Equatable {
     public var bubbleRect: CGRect {
         CGRect(origin: CGPoint(x: aligned(width: bubbleSize.width), y: contentRect.minY), size: bubbleSize)
     }
+    /// 猫图格子。左边的角时左移 `catTrim`，可见的猫左缘与气泡左缘对齐。
     public var catRect: CGRect {
-        CGRect(origin: CGPoint(x: aligned(width: Self.catSize.width), y: contentRect.maxY - Self.catSize.height), size: Self.catSize)
+        CGRect(origin: CGPoint(x: aligned(width: Self.catSize.width) - leading, y: contentRect.maxY - Self.catSize.height), size: Self.catSize)
     }
     /// 尾巴三角形：底边贴气泡下沿，尖朝下指向猫头。
     public var tail: [CGPoint] {

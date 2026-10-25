@@ -139,6 +139,11 @@ public final class DesktopCatController {
                                  scale: window.backingScaleFactor)
         if model.frame.image !== image { model.frame.image = image }
         if model.frame.dark != dark { model.frame.dark = dark }
+        let trim = images.leadingTrim(cat: state.selectedCat, display: display, dark: dark, scale: window.backingScaleFactor)
+        if model.catTrim != trim {
+            model.catTrim = trim
+            if model.corner.isLeft { position(animated: false) }
+        }
         lastFrame = frame
         frameUpdates += 1
     }

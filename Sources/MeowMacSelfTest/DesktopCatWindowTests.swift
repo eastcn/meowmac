@@ -18,6 +18,7 @@ enum DesktopCatWindowTests {
             ("UI.DesktopCat/帧号与菜单栏一致且不重复光栅化", { await frameSync() }),
             ("UI.DesktopCat/拖动吸附存新屏与单击开面板", { await dragAndClick() }),
             ("UI.DesktopCat/按下点不在猫和气泡上时不拖不开面板", { await missedPress() }),
+            ("UI.DesktopCat/左边的角猫与气泡左对齐", { await leftAlignment() }),
             ("UI.DesktopCatWindow/真实屏幕窗口属性与右下角", { await foregroundWindow() }),
         ]
     }
@@ -26,7 +27,12 @@ enum DesktopCatWindowTests {
     static let main = DesktopCatScreen(id: "00000000-0000-0000-0000-0000000000A1", visibleFrame: CGRect(x: 0, y: 70, width: 1512, height: 879), isMain: true)
     static let side = DesktopCatScreen(id: "00000000-0000-0000-0000-0000000000B2", visibleFrame: CGRect(x: 1512, y: -200, width: 1920, height: 1056), isMain: false)
 
-    static func content(_ frame: CGRect) -> CGRect { frame.insetBy(dx: DesktopCatLayout.inset, dy: DesktopCatLayout.inset) }
+    /// 窗口里猫和气泡的外接区域（屏幕坐标）。不给版式时按没有左移的版式算。
+    static func content(_ frame: CGRect, _ layout: DesktopCatLayout? = nil) -> CGRect {
+        guard let layout else { return frame.insetBy(dx: DesktopCatLayout.inset, dy: DesktopCatLayout.inset) }
+        let c = layout.contentRect
+        return CGRect(x: frame.minX + c.minX, y: frame.maxY - c.maxY, width: c.width, height: c.height)
+    }
 
     static func nearestCorner() -> Bool {
         let layout = DesktopCatLayout(count: 4, corner: .bottomRight)
@@ -92,13 +98,13 @@ enum DesktopCatWindowTests {
         var screens = [main]
         controller.screens = { screens }
         controller.apply(); defer { controller.hide() }
-        guard let window = controller.window, content(window.frame).minX == main.visibleFrame.minX + 16,
-              content(window.frame).maxY == main.visibleFrame.maxY - 8,
+        guard let window = controller.window, content(window.frame, controller.model.layout).minX == main.visibleFrame.minX + 16,
+              content(window.frame, controller.model.layout).maxY == main.visibleFrame.maxY - 8,
               ConfigStore.load(from: url).config.desktopCat.placement == placement else { return false }
         screens = [main, side]
         NotificationCenter.default.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-        guard let expected = controller.targetFrame(), content(expected).minX == side.visibleFrame.minX + 16 else { return false }
+        guard let expected = controller.targetFrame(), content(expected, controller.model.layout).minX == side.visibleFrame.minX + 16 else { return false }
         return true
     }
 
@@ -236,8 +242,40 @@ enum DesktopCatWindowTests {
         let saved = ConfigStore.load(from: url).config.desktopCat.placement
         guard opened == 1, !controller.model.dragging, saved == DesktopCatPlacement(display: side.id, corner: .topLeft),
               state.desktopCat.placement == saved, controller.model.corner == .topLeft else { return false }
-        let c = content(window.frame)
+        let c = content(window.frame, controller.model.layout)
         return c.minX == side.visibleFrame.minX + 16 && c.maxY == side.visibleFrame.maxY - 8
+    }
+
+    /// 落在左边的角：猫的可见左缘与气泡左缘对齐，偏差不超过 2 pt；内容离屏幕左边仍是 16 pt。
+    static func leftAlignment() async -> Bool {
+        let (state, controller, url) = controller(enabled: true); defer { try? FileManager.default.removeItem(at: url) }
+        guard state.updateDesktopCat({ $0.with(placement: DesktopCatPlacement(corner: .bottomLeft)) }) else { return false }
+        controller.apply(); defer { controller.hide() }
+        guard let window = controller.window else { return false }
+        let layout = controller.model.layout
+        let bubbleLeft = layout.bubbleRect.minX
+        let c = content(window.frame, layout)
+        // 跑动一周：最靠左的一帧与气泡左缘对齐（≤ 2 pt），任何一帧都不越过气泡左缘。
+        var lefts: [CGFloat] = []
+        for frame in 0..<5 {
+            controller.updateFrame(frame, display: state.catDisplay(reducedMotion: false))
+            guard let current = controller.model.frame.image else { return false }
+            lefts.append(layout.catRect.minX + DesktopCatImage.visibleMinX(current) - bubbleLeft)
+        }
+        print("桌面猫左对齐：猫图左移 \(layout.catTrim) pt，各帧可见左缘减气泡左缘 \(lefts) pt")
+        guard layout.catTrim > 0, let leftmost = lefts.min(), abs(leftmost) <= 2, leftmost > -1, layout.catRect.minX >= 0,
+              window.frame.minX + bubbleLeft == main.visibleFrame.minX + 16, c.minY == main.visibleFrame.minY + 8 else { return false }
+        // 预览走同一条路径：最靠左的一帧同样对齐。
+        let previewState = DesktopCatPreview.state(.leftCorner), cache = DesktopCatImage()
+        let preview = DesktopCatPreview.model(state: previewState, cache: cache, dark: false)
+        let previewLefts = (0..<5).map { frame in
+            preview.layout.catRect.minX - preview.layout.bubbleRect.minX
+                + DesktopCatImage.visibleMinX(cache.image(cat: previewState.selectedCat, display: previewState.catDisplay(reducedMotion: false), frame: frame, dark: false, scale: 2))
+        }
+        print("桌面猫左对齐（预览）：各帧可见左缘减气泡左缘 \(previewLefts) pt")
+        guard let previewMin = previewLefts.min(), abs(previewMin) <= 2 else { return false }
+        let right = DesktopCatLayout(count: 4, corner: .bottomRight, catTrim: layout.catTrim)
+        return right.catRect.maxX == right.contentRect.maxX && right.windowSize == DesktopCatLayout(count: 4, corner: .bottomRight).windowSize
     }
 
     static func missedPress() async -> Bool {
