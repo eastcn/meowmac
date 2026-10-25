@@ -6,6 +6,133 @@
 
 <!-- 执行者：在这一行下面插入新的一轮，格式见 relay Skill 的 references/result-template.md「第 N 轮」 -->
 
+### 第 2 轮（2026-10-25，Claude Code 子 Agent · Claude Opus 5.5，高推理档位）
+
+**提交范围**：`f925c52..（本轮提交：docs: record desktop cat sessions round 2）`。条目提交：`2816785`（条目 3）、`686978f`（条目 4）、`9da581f`（条目 5）、`e26bda6`（条目 6）。
+
+说明：执行中途因额度中断一次，恢复后先用 `git diff` 核对工作区的未提交改动都是本轮的，再继续。本轮只暂存、提交自己的文件。
+
+**开工检查**：无人值守（规划者派发的子 Agent）；plan 复核：不需要（第 1 轮复审后当天执行）。
+
+**完成的条目**
+
+| 编号 | 提交 | 验收证据 |
+|---|---|---|
+| 3 | `2816785` | Core 新增 `AgentSessions.swift`（状态、快照、`AgentSessionParser.claude` / `codex` / `codexMeta`、`AgentSessionSummary.merge`）和 `AgentSessionNotices.swift`（`AgentSessionNotice`、`AgentSessionToast`、`AgentSessionNoticeBoard`）。纯函数，输入是文件尾部字节、修改时间和上次结果，不做 I/O。新套件 `Core.AgentSessions` 9 项全过：Claude 本轮结束 / 工具调用 / 新提问；侧链、标题、目录名与中断；Codex 轮次配对与 `turn_id` 不一致；子线程合并与名称回退；不完整行、坏行、超长行、空文件；时间戳、10 分钟停止与未确认；提示产生与去重（同一 `message.id` 写两行只提示一次）；合并、过期（5 分钟）、手动关闭；解析结果不含正文（夹具里的虚构正文不出现在任何输出字段）。`scripts/test.sh AgentSessions` 退出码 0，“自测完成：9 项，0 项失败”（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-item3-test.log`）。夹具全部虚构。 |
+| 4 | `686978f` | Quota 新增 `AgentSessionReader`：按修改时间筛选，每次最多读 20 个文件（两家共用，按新到旧），每个只读末尾 64 KB；没变的文件（inode、大小、修改时间都同）不重读；Codex 开头元数据每个文件只读一次；Codex 日期目录列表按目录修改时间缓存；不跟随符号链接；根目录不存在记 `missing`，读不了记 `unavailable`。Core 新增 `AgentSessionCadence`（未选不运行；没在跑 60 秒，有在跑 10 秒）和 `AgentSessionLog`（日志只含数字和状态）。UI 新增 `AgentSessionCoordinator`：唯一的一个可重排的一次性 `Timer`，休眠和屏幕关闭时暂停，唤醒立即检查，取消指标或关闭桌面猫时停掉计时器并清空快照和提示。`scripts/test.sh AgentSessions` 退出码 0，“自测完成：17 项，0 项失败”（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-item4-test.log`）。实机读取：`MEOWMAC_LIVE=1 scripts/test.sh Quota.Live.AgentSessions`，首次（含 Codex 开头）78.6 ms，重读尾部最慢 16.6 ms、平均 15.8 ms，全部命中缓存 15.6 ms，低于 plan 的 50 ms；原值只写在 `build/acceptance/desktop-cat-sessions/live-read-*.txt`，只有次数和耗时。 |
+| 5 | `9da581f` | 气泡里“AI 会话”显示“n 在跑”、灰色“空闲”或“—”，悬停写分项和“另有 n 个未确认”；读不了的目录写“X 记录读不了”。提示区：`DesktopCatLayout` 新增 `toastRect` 等，高 24 pt、间距 6 pt、最宽 220 pt、最多 2 条；下方的角在气泡上方，上方的角在猫下方，和气泡同侧对齐。玻璃胶囊（macOS 26 `glassEffect`，14～15 `.hudWindow`）。点提示只关这一条：不开面板，不开始拖动。没选这项时提示变化不触发重绘。新套件 `DesktopCatSessionTests` 7 项；第 1 轮复审 R6 已按真实提示版式改写 `DesktopCatSizeTests.anchors`（`toastWidths: [220, 220]`，36、52、104 pt × 四个角 × 两块屏都在可见区域内）。`scripts/test.sh DesktopCat` 退出码 0，“自测完成：47 项，0 项失败，2 项前台验收未执行”（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-item5-test.log`）。合成预览 18 张：`build/acceptance/desktop-cat-sessions/preview/desktop-cat-sessions{Running,Idle,One,Many,Single,TopLeft,TopRight,BottomLeft,BottomRight}-{light,dark}.png`（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-item5-preview.log`：“桌面猫合成预览：52 张”）。 |
+| 6 | `e26bda6` | 目录：`~/.claude/projects` 或 `~/.codex/sessions` 存在时，在“网络”之后列“AI 会话”一类；两个都不在时不列；已选但不在时列在末尾，写“AI 会话（暂无数据）”，可取消，气泡写“—”。满 8 项时它和其他未选项一样变灰；只剩它一项时不能取消。右键菜单和设置的“添加指标…”用同一个目录，点一下即加入并写配置，再点取消。配置里 `agent.sessions` 正常读写；重复去重、拼错的 id 跳过并记诊断（D45）。新增 3 个用例；`DesktopCatSettingsTests.state()` 固定 `agentSessionRootsExist = { false }`，原有断言不受本机是否装了 Claude 或 Codex 影响，断言本身没改。`scripts/test.sh DesktopCat` 退出码 0，“自测完成：50 项，0 项失败，2 项前台验收未执行”（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-item6-test.log`）。SPEC「桌面猫」补了五类目录、AI 会话和结束提示两段及视觉验收清单；设计稿 D46 节标题改为“2026-10-25 用户确认”；第 1 轮复审 R5 的“1～4 项”“最多 4 项”“已选 4 / 4”“已满 4 项”都改成 8 项口径，菜单示意加了“AI 会话”一类。 |
+
+与设计稿对照（「AI 会话（D46）」）：
+
+- 数值、灰色“空闲”、“—”、悬停文案和不画横线与设计稿一致。
+- 提示：玻璃胶囊、✓ 绿色、名称半粗、同侧对齐、上方的角提示放在猫下方、“另有 n 个会话完成”的位置，都与设计稿一致。
+- 偏差：耗时按 D3 用面板的时长格式，写“12 分钟”，设计稿写“12 分”。整条又限 220 pt，名称被挤到 57 pt 左右，虚构名称“notes-app”显示成“notes…”。见「技术更正与异议」。
+- 名称和“· 渠道”之间是 5 pt 的 HStack 间距加“·”前的空格，比“·”后的空格略宽。差别在 1～2 pt，未改。
+
+**缺陷扫描**
+
+扫描轮次：1。真实入口与环境：合成预览走 `DesktopCatContentView` 的真实路径（玻璃按既有规则用设计稿底色代替），逐张看了 18 张会话预览；`scripts/check.sh` 全量自测；实机只读读取用 `MEOWMAC_LIVE=1`。
+
+| 轮次 | 问题及证据 | 分类 | 修复与提交 | 复验结果 |
+|---|---|---|---|---|
+| 1 | Claude 同一次回复常写成 2 行，都带 `end_turn`，按行 uuid 去重会提示两次 | 范围内的缺陷 | 完成 ID 改用 `message.id`，没有时退回 uuid；`2816785` | `Core.AgentSessions/结束提示的产生与去重` 通过 |
+| 1 | Claude 父会话和子 Agent 路径在 `/var` 与 `/private/var` 下对不上，子 Agent 合并失败 | 范围内的缺陷 | 主会话按相对路径做键；`686978f` | `Quota.AgentSessions/子 Agent 与子线程合并到主会话` 通过 |
+| 1 | 带 `end_turn` 但缺时间戳的行被当成在跑 | 范围内的缺陷 | 先判 `end_turn` 再看时间戳；`2816785` | `Core.AgentSessions/时间戳、10 分钟停止与未确认` 通过 |
+| 1 | 设置测试的合成状态读本机真实目录，装了 Claude 的机器上菜单分组会多出“AI 会话” | 范围内的缺陷 | 测试状态固定为“没装”，“装了”的情况由新用例单独覆盖；`e26bda6` | `scripts/test.sh DesktopCat` 0 项失败 |
+| 1 | D3 时长格式加 220 pt 上限导致名称截断严重 | 涉及决策的事 | 未改，见「技术更正与异议」 | 预览 `desktop-cat-sessionsTopLeft-dark.png` |
+
+最终剩余：名称截断待规划者决定。
+
+**顺手修复**
+
+无。
+
+**自主决定**
+
+| 条目 | 选择 | 备选 | 理由 |
+|---|---|---|---|
+| 3 | Codex 没有会话标题，名称依次取 `session_meta` 的 cwd 目录名、`turn_context` 的 cwd 目录名，都没有时写“Codex 会话” | 只用 meta | meta 缺 cwd 或开头读不到时仍有可读的名称 |
+| 3 | 开始时间不明（本轮开头已滚出 64 KB）时，提示省略耗时 | 用文件创建时间估算 | 估算会给出错的数字 |
+| 3 | 完成时间已超过 10 分钟的不提示 | 照常提示 | 与“10 分钟停止”的口径一致，避免启动或唤醒后一次弹出很久以前的完成 |
+| 4 | 计时器只有一个，下一次触发取“下次检查”和“第一条提示到期”中较早的 | 检查和提示过期各一个计时器 | 符合项目专属自检“新增的计时器只有会话协调器这一个” |
+| 4 | 20 个文件的预算两家共用，按修改时间新到旧，Codex 开头元数据的读取也计入 | 每家各 20 个 | plan 写“每次最多读 20 个文件”，共用才不超 |
+| 5 | 名称最宽 96 pt，整条放不下时只缩名称 | 先缩耗时 | 设计稿名称是视觉重点但允许截断；状态和耗时要完整 |
+
+**技术更正与异议**
+
+| 类型 | 对象 | 证据 | 处理 | 影响 |
+|---|---|---|---|---|
+| 更正 | D5a 的“完成 ID 用行 uuid” | Claude 一次回复常写成 2 行，两行都带 `end_turn`（只看了字段名和类型） | 改用 `message.id`，缺失时退回 uuid；`2816785` | 同一次完成不会提示两次 |
+| 更正 | D5 的“Codex 以 `task_started` 判在跑” | 长轮次里 `task_started` 会滚出末尾 64 KB；`item_completed`、`token_usage_record`、`turn_context` 都带 `turn_id` | 带未完成 `turn_id` 的行也算在跑的证据；`2816785` | 长轮次不会误判为空闲 |
+| 更正 | 中断的判定 | Codex 有 `turn_aborted`；Claude 中断是一条用户文本块“[Request interrupted by user”（有时带“ for tool use]”） | Codex 按 `turn_aborted`，Claude 在原始行上按字节查这段标记，不解码正文；都记为停止、不提示；`2816785` | 中断不弹“已完成” |
+| 更正 | Claude 的非对话行 | `isMeta` 的用户行不是新提问；带 `isApiErrorMessage` 的助手行表示本轮出错结束 | 前者忽略，后者结束本轮但不产生完成；`2816785` | 不因元数据行误判在跑，出错不提示“已完成” |
+| 异议 | D3 的时长格式与 220 pt 上限 | 预览 `desktop-cat-sessionsTopLeft-dark.png`：“· Claude · 已完成 · 3 分钟”占约 125 pt，名称只剩约 57 pt，“notes-app”显示成“notes…” | 未改。建议二选一：提示里用短格式“3 分”“1 时 5 分”（与设计稿一致）；或把上限放宽到 260 pt | 真实项目名大多会被截断，用户较难认出是哪个会话 |
+
+**plan 勘误**
+
+无。
+
+**建议**
+
+- 第 3 轮实机验收时，在有 Claude 和 Codex 会话的情况下看 10 秒节奏下的 CPU 占用和提示出现的延迟。
+
+**外部写入**
+
+- 本地 git commit 5 次：`2816785`、`686978f`、`9da581f`、`e26bda6` 和本轮 docs 提交。没有推送。
+- 只读 `~/.claude/projects` 和 `~/.codex/sessions`：核实记录形态时只看字段名和类型；实机读取用例只读。没有写入这两个目录。
+- 写入 `build/acceptance/desktop-cat-sessions/`（预览和 `live-read-*.txt`，只有次数和耗时）和 `docs/plans/2026-10-25-desktop-cat-sessions/.relay/`（日志，已被 `.gitignore` 忽略）。
+- 没有改真实 `config.json`，没有调用 CodexBarCLI，没有改 Claude Code、Codex 的配置或 hook，没有修改 TunCanary。
+
+**跳过的决策点**
+
+- 条目 5：提示的时长格式与宽度上限，见「技术更正与异议」的异议。
+
+**未做**
+
+无。条目 7 按进度表属于第 3 轮。
+
+**偏离 plan 的地方**
+
+- 见「技术更正与异议」的 4 条更正：判定规则按真实记录形态做了细化，都在 D5、D5a 的意图之内。
+
+**未验证**
+
+- 真实液态玻璃下的提示外观、提示出现和消失时窗口是否跳动：子 Agent 没有 Computer Use，按 plan 由第 3 轮用户实机验收。
+- 真实会话结束时的提示延迟（最多 10 秒）和中断不提示：本机只读核实过字段形态，没有制造会话结束；由第 3 轮实机验收。
+- 前台用例（`MEOWMAC_UI_TESTS=1`）：按授权范围第 3 轮运行。
+
+**自检**
+
+| 项 | 结果 | 说明或证据 |
+|---|---|---|
+| 只做了执行清单、范围内缺陷修复和满足条件的顺手修复 | 是 | 只做条目 3～6，并处理第 1 轮复审并入的 R5、R6 |
+| 范围内缺陷已修复并重新验收；卡住或跳过的项已记录，未标成已完成 | 是 | 见「缺陷扫描」 |
+| 顺手修复不碰核心，不加依赖，行数在本档上限内 | 不适用 | 没有顺手修复 |
+| 顺手修复每项都有单独的 `fix:` 提交、理由、复验证据和 result 记录 | 不适用 | 同上 |
+| 没有改变核心；没有放宽安全 | 是 | 只读、预算、休眠暂停照做 |
+| 自主决定、技术更正与异议、plan 勘误都已记录并附理由或证据 | 是 | 见上 |
+| 已做交付前缺陷扫描，最多 2 轮；问题分类、修复、复验和剩余问题已写进 result | 是 | 1 轮 |
+| 验收的预览、截图和测试走真实路径；模拟证据仅作补充，未验证项已记录 | 是 | 预览走 `DesktopCatContentView`；玻璃材质交实机 |
+| 没有降低验收标准或放宽测试断言 | 是 | 原有断言没改；`DesktopCatSizeTests.anchors` 从预留尺寸改成真实提示版式（R6），条件更严；`DesktopCatSettingsTests.state()` 只固定了环境 |
+| 每个执行条目至少一个提交 | 是 | `git log --oneline f925c52..HEAD`：`e26bda6 feat: list agent sessions in the desktop cat catalog`、`9da581f feat: show agent sessions and finish notices on the desktop cat`、`686978f feat: read agent sessions on a 60/10 second cadence`、`2816785 feat: parse agent session tails and build finish notices`（另有本轮 docs 提交） |
+| 做过的条目都满足执行者要求；不满足的已跳过 | 是 | 条目 3～5 要求强推理模型：Claude Opus 5.5，高推理档位 |
+| 外部写入都在授权范围内 | 是 | 见「外部写入」 |
+| 用户可见的改动没有混进 refactor 提交 | 是 | 4 个 `feat:` 提交 |
+| 新增的后台任务、异常分支都有日志，没有静默吞掉异常 | 是 | 协调器用 `agent-sessions` 日志：状态变化记 `.notice`，每次检查记 `.debug`，内容只有数字和状态；读不了的根目录记 `unavailable` 并在悬停里显示 |
+| 临时文件、临时脚本都已清理，包括远端机器上的 | 是 | 临时脚本只在会话 scratchpad，不在仓库；`git status --short` 无未跟踪文件 |
+| `scripts/check.sh` 通过，`plan-baseline` 比对通过 | 是 | 退出码 0，“自测完成：463 项，0 项失败，52 项前台验收未执行”“check 通过”（`docs/plans/2026-10-25-desktop-cat-sessions/.relay/r2-check.log`） |
+| 没有修改 `../tuncanary` | 是 | 未触及 |
+| 没有写入 `~/.claude`、`~/.codex` | 是 | `git diff f925c52..HEAD -- Sources \| grep -nE 'createFile\|write\(\|FileHandle\(forWriting\|removeItem\|moveItem'` 新增的行都在 `AgentSessionReaderTests`（临时 home 目录下的虚构夹具；`write` 是测试辅助方法）、实机用例（写 `build/acceptance/`）和 `DesktopCatSessionTests`（临时配置文件）里；`AgentSessionReader` 本身没有写操作 |
+| 没有调用 CodexBarCLI 的 `sessions`；`AgentActivityScanner`、`SessionPoller` 和 D8 补刷的行为不变 | 是 | 未触及，原有用例全过 |
+| 新增的计时器只有会话协调器这一个，并且没选指标时不存在 | 是 | 新增 `Timer` 只有 `AgentSessionCoordinator` 里一处；`UI.AgentSessions/节奏：未选不运行…` 断言没选时不装计时器 |
+| 夹具和预览只用虚构数据；result、日志和提交里没有真实的会话标题、目录名或内容 | 是 | 夹具和预览名称为“示例项目”“notes-app”、`/Users/example/…`、`00000000-…` 等；日志只有数字 |
+
+**复审**
+
+<!-- 复审者只读，输出由调度者写入：relay-run 启动的由 relay-run 写入，子 Agent 的由规划者写入。执行者留空 -->
+
+
 ### 第 1 轮（2026-10-25，Claude Code 子 Agent · Claude Opus 5.5，高推理档位）
 
 **提交范围**：`339bbe4..（本轮提交：docs: record desktop cat size round 1）`。条目提交：`b74dec7`（条目 1）、`ca2152f`（条目 2）。
