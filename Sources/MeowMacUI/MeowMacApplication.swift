@@ -57,6 +57,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         for reason in configResult.config.alertRules.diagnostics { logger.error("提醒规则读取：\(reason, privacy: .public)") }
+        for reason in configResult.config.desktopCat.diagnostics { logger.error("桌面猫配置读取：\(reason, privacy: .public)") }
         CatRuntime.initialize(state: panelState, store: catStore)
         startNotifications()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)

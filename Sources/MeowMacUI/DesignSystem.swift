@@ -65,7 +65,7 @@ enum Design {
             }
         })
     }
-    static func quotaLevel(_ remaining: Double) -> HealthLevel { remaining >= 50 ? .normal : remaining >= 20 ? .warn : .severe }
+    static func quotaLevel(_ remaining: Double) -> HealthLevel { HealthLevel.quotaLevel(remaining: remaining) }
     static func networkColor(_ tone: NetworkTone) -> Color {
         switch tone { case .green: return state(.normal); case .yellow: return orange; case .red: return red; case .gray: return gray }
     }

@@ -175,6 +175,12 @@ public final class PanelState: ObservableObject {
     @Published public var availableCleanTerminals: Set<CleanTerminal> = []
     @Published public var aiAgentPreference: AIAgent
     @Published public var aiDiagnosisEntry: Bool
+    /// 桌面猫配置（D45）。只经 `updateDesktopCat` 修改，写入成功后才更新。
+    @Published public internal(set) var desktopCat: DesktopCatConfig
+    @Published public var desktopCatError: String?
+    public var desktopCatConfigURL: URL = ConfigStore.defaultURL
+    public var onDesktopCatChanged: (DesktopCatConfig) -> Void = { _ in }
+    public var onOpenDesktopCatSettings: () -> Void = {}
     @Published public var aiAgentInstallations: [AIAgentInstallation] = []
     @Published public var aiSettingsError: String?
     public var onSelectAIAgent: (AIAgent) -> Void = { _ in }
@@ -283,6 +289,7 @@ public final class PanelState: ObservableObject {
         self.cleanTerminalPreference = configResult.config.cleanTerminal
         self.aiAgentPreference = configResult.config.aiAgent
         self.aiDiagnosisEntry = configResult.config.aiDiagnosisEntry
+        self.desktopCat = configResult.config.desktopCat
     }
 
     public var health: HealthSummary {

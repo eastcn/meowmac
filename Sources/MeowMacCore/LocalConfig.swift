@@ -32,6 +32,8 @@ public struct LocalConfig: Codable, Equatable {
     public var aiAgent = AIAgent.automatic
     public var aiDiagnosisEntry = true
     public var moPath = "/opt/homebrew/bin/mo"
+    /// 桌面猫（D45）。本机配置，不进猫包。
+    public var desktopCat = DesktopCatConfig()
 
     public init() {}
 
@@ -42,6 +44,7 @@ public struct LocalConfig: Codable, Equatable {
         case quotaRefreshSeconds, sessionPollSeconds, sessionFinishDelaySeconds, manualMergeSeconds
         case proxyTrafficEnabled, proxyTrafficExportDirectory
         case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath, cleanTerminal, aiAgent, aiDiagnosisEntry
+        case desktopCat
     }
 
     public init(from decoder: Decoder) throws {
@@ -81,6 +84,9 @@ public struct LocalConfig: Codable, Equatable {
         aiAgent = try fields.decodeIfPresent(AIAgent.self, forKey: .aiAgent) ?? defaults.aiAgent
         aiDiagnosisEntry = try fields.decodeIfPresent(Bool.self, forKey: .aiDiagnosisEntry) ?? defaults.aiDiagnosisEntry
         moPath = try fields.decodeIfPresent(String.self, forKey: .moPath) ?? defaults.moPath
+        // 类型错误时整个桌面猫按默认值运行，不改写文件，直到用户在界面里修改（D8）。
+        do { desktopCat = try fields.decodeIfPresent(DesktopCatConfig.self, forKey: .desktopCat) ?? DesktopCatConfig() }
+        catch { desktopCat = DesktopCatConfig(diagnostics: ["桌面猫配置结构无效，已按默认值运行"]) }
     }
 }
 
@@ -114,6 +120,10 @@ public enum ConfigStore {
     }
 
     private static func saveField(_ key: String, value: Any, to url: URL) throws {
+        try updateObject(at: url) { $0[key] = value }
+    }
+
+    static func updateField(_ key: String, value: Any, at url: URL) throws {
         try updateObject(at: url) { $0[key] = value }
     }
 
