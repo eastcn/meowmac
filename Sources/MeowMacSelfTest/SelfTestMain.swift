@@ -364,6 +364,7 @@ enum SelfTestMain {
         }
         tests.append(contentsOf: DesktopCatConfigTests.tests)
         tests.append(contentsOf: DesktopCatViewTests.tests)
+        tests.append(contentsOf: DesktopCatWindowTests.tests)
         tests.append(contentsOf: ProxyTrafficCoreTests.tests())
         tests.append(contentsOf: ProxyTrafficSummaryTests.tests.map { name, run in (name, { @MainActor in run() }) })
         tests.append(("ProxyTraffic.Preview/补充全页浅深合成布局", { ProxyTrafficNativeTests.supplementalPreviews() }))

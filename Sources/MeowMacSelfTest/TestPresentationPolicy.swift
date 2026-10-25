@@ -8,7 +8,8 @@ enum TestPresentationPolicy {
     static let foregroundGroups = [
         "UI.NetworkSettings/", "UI.QuotaSettings/", "QuotaSettings.Live/",
         "UI.AppearanceSettings/", "UI.StyleSettings/", "UI.LayoutSettings/",
-        "UI.AIDiagnosis/", "UI.AIAgentSettings/", "UI.AIAgent.Live/", "UI.Cleaning.Live/"
+        "UI.AIDiagnosis/", "UI.AIAgentSettings/", "UI.AIAgent.Live/", "UI.Cleaning.Live/",
+        "UI.DesktopCatWindow/"
     ]
     static let foregroundCases: Set<String> = [
         "UI.QuotaAlertChannel/原生渠道开关与阈值保存", "Backlog.Network/真实入口展开收起与隐藏卡片",

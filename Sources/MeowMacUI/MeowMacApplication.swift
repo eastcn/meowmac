@@ -37,6 +37,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
     private var hasSystemBaseline = false
     private var energyLoop: EnergyLoopControl?
     private let menuBarImage = MenuBarCatImage()
+    private lazy var desktopCat = DesktopCatController(state: panelState, onOpenPanel: { [weak self] in self?.showPanel() })
     private lazy var cadence = ApplicationCadence(
         display: { [weak self] in self?.panelState.catDisplay() ?? PanelState(configResult: ConfigLoadResult(config: LocalConfig(), error: nil)).catDisplay() },
         updateImage: { [weak self] _ in self?.updateCatImage() },
@@ -137,6 +138,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
         panelState.onImportCodexBarHistory = { [weak self] in self?.importCodexBarHistory() }
         panelState.onCatChanged = { [weak self] in self?.settingsWindow?.catDidChange() }
         panelState.onQuit = { NSApplication.shared.terminate(nil) }
+        panelState.onDesktopCatChanged = { [weak self] _ in self?.desktopCat.apply() }
         panelState.loginEnabled = loginItem.status == .enabled
         panelState.onToggleLogin = { [weak self] enabled in
             guard let self else { return }
@@ -151,6 +153,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
             Task { @MainActor [weak self] in self?.sample(thermalChanged: true) }
         })
         sample()
+        desktopCat.apply()
         updateCleaningHistory()
         sampleEnergy()
         startEnergyLoop()
@@ -289,26 +292,22 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
     }
 
     private func openPanel(at tab: PanelTab) {
-        guard let button = statusItem?.button, let popover else { return }
-        if !popover.isShown {
-            proxyTrafficCoordinator?.setPanelVisible(true)
-            panelState.open()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        showPanel()
         panelState.showingReminders = false
         panelState.select(tab)
     }
 
+    /// 菜单栏猫、通知和桌面猫共用的开面板入口；已打开时不重复打开。
+    private func showPanel() {
+        guard let button = statusItem?.button, let popover, !popover.isShown else { return }
+        proxyTrafficCoordinator?.setPanelVisible(true)
+        panelState.open()
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     @objc private func togglePopover() {
-        guard let button = statusItem?.button, let popover else { return }
-        if popover.isShown { popover.performClose(nil) }
-        else {
-            proxyTrafficCoordinator?.setPanelVisible(true)
-            panelState.open()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        if popover?.isShown == true { popover?.performClose(nil) } else { showPanel() }
     }
 
     private func updateCleaningHistory() {
@@ -375,7 +374,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
     }
 
     private func updateCatImage() {
-        if let button = statusItem?.button { menuBarImage.assign(to: button, cat: panelState.selectedCat, display: panelState.catDisplay(), frame: cadence.frame) }
+        let display = panelState.catDisplay()
+        if let button = statusItem?.button { menuBarImage.assign(to: button, cat: panelState.selectedCat, display: display, frame: cadence.frame) }
+        // 桌面猫与菜单栏同一帧号；关闭时控制器没有窗口，直接返回。
+        desktopCat.updateFrame(cadence.frame, display: display)
     }
 
     private func selectCat(_ id: String) {
@@ -417,6 +419,7 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
         proxyTrafficCoordinator?.stop()
         settingsWindow?.removeShortcutMonitor()
         cadence.stop()
+        desktopCat.hide()
         energyLoop?.cancel()
         networkBridge?.stop()
         quotaCoordinator?.stop()
