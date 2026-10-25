@@ -6,6 +6,87 @@
 
 <!-- 执行者：在这一行下面插入新的一轮，格式见 relay Skill 的 references/result-template.md「第 N 轮」 -->
 
+### 第 2 轮（2026-10-25，Claude Code 子 Agent · Claude Sonnet 5.5）
+
+**提交范围**：`c1bbc37..`（本轮只有文档提交，应用代码未改）
+
+**开工检查**：无人值守；只做条目 5 的验证。原值和日志在 `build/acceptance/desktop-cat/`（已忽略）：`build.log`、`install.log`、`ui-*.log`、`live-off.json`、`live-on.json`、`config.json.bak`、`config.json.after-measure`。
+
+**完成的条目**
+
+| 编号 | 提交 | 验收证据 |
+|---|---|---|
+| 5 | 本节所在提交 | 见下 |
+
+1. 构建与安装：基于 `c1bbc37`，`scripts/build-app.sh` 退出码 0，`scripts/install.sh` 退出码 0。`build/MeowMac.app` 与 `~/Applications/MeowMac.app` 主可执行文件 SHA-256 相同（前 16 位 `b517ef6b18619ca0`）。
+2. 前台用例（`MEOWMAC_UI_TESTS=1`），全部退出码 0、0 项失败、0 项前台未执行：
+   - `scripts/test.sh DesktopCat`：33 项通过，含 `UI.DesktopCatWindow/真实屏幕窗口属性与右下角`（内容右边距 16.0，下边距 8.0）、`UI.DesktopCatWindow/桌面猫设置定位外观栏分组`、`UI.DesktopCat/拖动时显示落点框松手消失`、`按下点不在猫和气泡上时不拖不开面板`、`左边的角猫与气泡左对齐`。
+   - `SettingsWindow` 4 项、`外观` 2 项、`布局` 4 项、`PanelLayout` 13 项，均通过。
+3. 性能（`scripts/profile-self.sh live --seconds 600 --repeats 1`，主进程身份与读数校验通过）：
+   - 关闭桌面猫（`desktopCat` 只含 `enabled: false`）：`scripts/install.sh` 重启后，`CGWindowListCopyWindowInfo` 按 MeowMac 主进程 pid 查到 0 个窗口，桌面猫窗口不在屏，面板关闭。
+   - 开启（`enabled: true`，其余默认）：重启后查到 1 个窗口，层级 3（`.floating`），在屏，位于主屏右下角；弹出面板窗口不在屏。
+   - 两次测量期间没有打开面板，没有改其他配置。
+   - 平均自身 CPU：开启比关闭低 0.014 个百分点（两边都在 0.1% 以下），**达标**（上限 +1 个百分点）。
+4. `config.json` 恢复：除 `desktopCat` 外各字段与备份一致。测量结束后用户（或其操作）把猫拖到了左下角并打开了设置窗口，`desktopCat` 随之变化（`config.json.after-measure`），该变化在两次测量结束之后。从备份还原后 `cmp` 通过，再 `scripts/install.sh` 重启，`cmp` 仍通过。
+
+**缺陷扫描**
+
+扫描轮次：1。本轮只读验证，未发现新缺陷。
+
+最终剩余：无。
+
+**自主决定**
+
+| 条目 | 选择 | 备选 | 理由 |
+|---|---|---|---|
+| 5 | 窗口核实按主进程 pid 过滤，不按 owner 名 | 按 owner 名 | 关闭时 owner 名过滤也是 0 个，但 pid 更精确 |
+| 5 | 每种状态各测 1 次 600 秒 | 多次重复 | plan 只要求各测一次 |
+
+**技术更正与异议**
+
+无。
+
+**plan 勘误**
+
+无。
+
+**建议**
+
+- 关闭状态下 MeowMac 在窗口列表里 0 个窗口（菜单栏图标窗口也不在其中），核实“无桌面猫窗口”靠“数量为 0”，开启后出现层级 3 的窗口；判断足够，但无法单独区分菜单栏窗口。
+- 用户实机验收清单见 plan 条目 5「用户实机验收」，仍需用户做。
+
+**外部写入**
+
+- `~/Library/Application Support/MeowMac/config.json` 临时改 `desktopCat`，已逐字节恢复。无推送，未改 `../tuncanary`。
+
+**跳过的决策点**
+
+无。
+
+**未做**
+
+- 用户实机验收（材质、拖动手感、点击穿透、全屏 App、多屏、程序坞变化后的落位、非前台悬停提示）：按 plan 属规划者与用户，标“需规划者实测”。
+
+**偏离 plan 的地方**
+
+无。
+
+**未验证**
+
+- 同上“用户实机验收”各项。
+
+**自检**
+
+| 项 | 结果 | 说明或证据 |
+|---|---|---|
+| 没有改应用代码 | 是 | `git diff c1bbc37 -- Sources` 为空 |
+| 前台用例通过，未放宽断言 | 是 | 见上 |
+| 开启比关闭的 CPU 不超过 1 个百分点 | 是 | 低 0.014 个百分点 |
+| `config.json` 恢复后与备份逐字节一致 | 是 | `cmp` 通过 |
+| 没有修改 `../tuncanary`、没有推送、没有结束进程 | 是 | 重启只用 `scripts/install.sh` |
+| 真实读数只在 `build/acceptance/` | 是 | 本节只写差值 |
+| `scripts/check.sh` 通过 | 是 | 退出码 0，413 项 0 失败，52 项前台未执行（默认不开前台），“check 通过” |
+
 ### 第 1 轮（2026-10-25，Claude Code 子 Agent · Claude Opus 5.5，高）
 
 **提交范围**：`d4f857c..`（本轮提交：`3efd63a` `d9eeca7` `d61dafa` `13612ba` `98be03d`，外加本节所在的 `docs: record desktop cat round 1 result`，提交号由复审者补）
