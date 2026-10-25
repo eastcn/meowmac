@@ -19,6 +19,8 @@ public enum SettingsMenu {
             (destination ?? menu).addItem(item)
         }
         add("设置…", key: ",") { state.onOpenSettings(nil) }
+        // 打勾表示桌面猫开着（D45）。
+        add("显示桌面猫", checked: state.desktopCat.enabled) { state.updateDesktopCat { $0.with(enabled: !$0.enabled) } }
         menu.addItem(.separator())
         add("打开配置文件…", action: state.onOpenConfig)
         add("在访达中显示配置目录", action: state.onShowConfigFolder)

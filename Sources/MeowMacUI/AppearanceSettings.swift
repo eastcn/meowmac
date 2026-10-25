@@ -7,6 +7,8 @@ public final class AppearanceSettingsModel: ObservableObject, SettingsDraftSessi
     public let style: StyleSettingsModel
     @Published public private(set) var layout: LayoutSettingsModel?
     @Published private var saveStatus: String?
+    /// 每次加 1 表示要滚动到“桌面猫”分组（右键菜单的“桌面猫设置…”）。
+    @Published public var desktopCatFocus = 0
     private let state: PanelState
     private var observations: Set<AnyCancellable> = []
 
@@ -71,6 +73,7 @@ public struct AppearanceSettingsView: View {
     public init(model: AppearanceSettingsModel, state: PanelState) { self.model = model; self.state = state }
 
     public var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
@@ -88,9 +91,16 @@ public struct AppearanceSettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("appearance.no-cat")
                 }
+                Divider()
+                // 即时生效，不参与上面的草稿和“恢复默认…”（D6）。
+                DesktopCatSettingsView(state: state).id(Self.desktopCatAnchor)
             }.padding(24)
         }
+        .onAppear { if model.desktopCatFocus > 0 { proxy.scrollTo(Self.desktopCatAnchor, anchor: .top) } }
+        .onChange(of: model.desktopCatFocus) { _, _ in proxy.scrollTo(Self.desktopCatAnchor, anchor: .top) }
+        }
     }
+    static let desktopCatAnchor = "appearance.desktop-cat"
 }
 
 @MainActor

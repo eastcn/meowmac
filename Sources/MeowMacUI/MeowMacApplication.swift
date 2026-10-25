@@ -139,6 +139,14 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
         panelState.onCatChanged = { [weak self] in self?.settingsWindow?.catDidChange() }
         panelState.onQuit = { NSApplication.shared.terminate(nil) }
         panelState.onDesktopCatChanged = { [weak self] _ in self?.desktopCat.apply() }
+        panelState.onOpenDesktopCatSettings = { [weak self] in
+            self?.settingsWindow?.openDesktopCat()
+            self?.popover?.performClose(nil)
+        }
+        desktopCat.makeMenu = { [weak self] in
+            guard let self else { return nil }
+            return DesktopCatMenu.make(state: self.panelState, openPanel: { [weak self] in self?.showPanel() })
+        }
         panelState.loginEnabled = loginItem.status == .enabled
         panelState.onToggleLogin = { [weak self] enabled in
             guard let self else { return }

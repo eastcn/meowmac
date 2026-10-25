@@ -315,10 +315,10 @@ enum SelfTestMain {
             state.onOpenSettings = { opened = $0 == nil }
             state.onOpenConfig = { config = true }; state.onShowConfigFolder = { folder = true }; state.onQuit = { quit = true }
             let menu = SettingsMenu.make(state: state)
-            guard menu.items.map(\.title) == ["设置…", "", "打开配置文件…", "在访达中显示配置目录", "", "关于 MeowMac", "退出 MeowMac"],
-                  menu.items[0].keyEquivalent == ",", menu.items[6].keyEquivalent == "q", menu.items.allSatisfy({ $0.submenu == nil }),
-                  menu.items[1].isSeparatorItem, menu.items[4].isSeparatorItem else { return false }
-            for index in [0, 2, 3, 6] {
+            guard menu.items.map(\.title) == ["设置…", "显示桌面猫", "", "打开配置文件…", "在访达中显示配置目录", "", "关于 MeowMac", "退出 MeowMac"],
+                  menu.items[0].keyEquivalent == ",", menu.items[7].keyEquivalent == "q", menu.items.allSatisfy({ $0.submenu == nil }),
+                  menu.items[2].isSeparatorItem, menu.items[5].isSeparatorItem else { return false }
+            for index in [0, 3, 4, 7] {
                 let item = menu.items[index]
                 guard let action = item.action, NSApplication.shared.sendAction(action, to: item.target, from: item) else { return false }
             }
@@ -365,6 +365,7 @@ enum SelfTestMain {
         tests.append(contentsOf: DesktopCatConfigTests.tests)
         tests.append(contentsOf: DesktopCatViewTests.tests)
         tests.append(contentsOf: DesktopCatWindowTests.tests)
+        tests.append(contentsOf: DesktopCatSettingsTests.tests)
         tests.append(contentsOf: ProxyTrafficCoreTests.tests())
         tests.append(contentsOf: ProxyTrafficSummaryTests.tests.map { name, run in (name, { @MainActor in run() }) })
         tests.append(("ProxyTraffic.Preview/补充全页浅深合成布局", { ProxyTrafficNativeTests.supplementalPreviews() }))

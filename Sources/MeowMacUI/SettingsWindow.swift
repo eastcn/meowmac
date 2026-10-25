@@ -175,6 +175,11 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         if let section { request(.section(section)) }
     }
+    /// 打开外观栏并滚动到“桌面猫”分组。
+    public func openDesktopCat() {
+        open(section: .appearance)
+        appearance.desktopCatFocus += 1
+    }
     public private(set) var alertRules: AlertRuleSettingsModel!
     public var alertConfigURL: URL = ConfigStore.defaultURL
     private func resetSessions(load: Bool) {
