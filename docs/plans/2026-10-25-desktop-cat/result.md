@@ -26,7 +26,7 @@
    - 关闭桌面猫（`desktopCat` 只含 `enabled: false`）：`scripts/install.sh` 重启后，`CGWindowListCopyWindowInfo` 按 MeowMac 主进程 pid 查到 0 个窗口，桌面猫窗口不在屏，面板关闭。
    - 开启（`enabled: true`，其余默认）：重启后查到 1 个窗口，层级 3（`.floating`），在屏，位于主屏右下角；弹出面板窗口不在屏。
    - 两次测量期间没有打开面板，没有改其他配置。
-   - 平均自身 CPU：开启比关闭低 0.014 个百分点（两边都在 0.1% 以下），**达标**（上限 +1 个百分点）。
+   - 平均自身 CPU：关闭约 2.96%，开启约 2.37%，开启比关闭低约 0.59 个百分点（单次 600 秒，差值主要是噪声），**达标**（上限 +1 个百分点）。注：原读数未乘 `mach_timebase_info`（本机 125/3），已按复审 R2 换算后改正（规划者修，第 2 轮复审 R1）。
 4. `config.json` 恢复：除 `desktopCat` 外各字段与备份一致。测量结束后用户（或其操作）把猫拖到了左下角并打开了设置窗口，`desktopCat` 随之变化（`config.json.after-measure`），该变化在两次测量结束之后。从备份还原后 `cmp` 通过，再 `scripts/install.sh` 重启，`cmp` 仍通过。
 
 **缺陷扫描**
@@ -81,11 +81,27 @@
 |---|---|---|
 | 没有改应用代码 | 是 | `git diff c1bbc37 -- Sources` 为空 |
 | 前台用例通过，未放宽断言 | 是 | 见上 |
-| 开启比关闭的 CPU 不超过 1 个百分点 | 是 | 低 0.014 个百分点 |
+| 开启比关闭的 CPU 不超过 1 个百分点 | 是 | 低约 0.59 个百分点（换算后，见上） |
 | `config.json` 恢复后与备份逐字节一致 | 是 | `cmp` 通过 |
 | 没有修改 `../tuncanary`、没有推送、没有结束进程 | 是 | 重启只用 `scripts/install.sh` |
 | 真实读数只在 `build/acceptance/` | 是 | 本节只写差值 |
 | `scripts/check.sh` 通过 | 是 | 退出码 0，413 项 0 失败，52 项前台未执行（默认不开前台），“check 通过” |
+
+**复审**
+
+复审者：Claude Code 全新子 Agent（Opus 5.5），只读，2026-10-25。输入：plan 条目 5、本节、`git diff c1bbc37..62dbee1`、`build/acceptance/desktop-cat/`。
+
+结论：收工。没有 `阻断`；`一般` 3 条，`记录` 2 条。CPU 达标结论在单位修正后仍成立。
+
+| 编号 | 问题 | 证据 | 根因 | 去向 | 用户决定 | 级别 |
+|---|---|---|---|---|---|---|
+| R1 | result 的 CPU 数值未换算单位，小约 41.7 倍；换算后关闭约 2.96%（与 2026-10-23 参考 2.9% 吻合），开启约 2.37% | `build/acceptance/desktop-cat/live-{off,on}.json` | 执行 | 复审者修 | 已修：规划者改正本节第 3 点与自检表 | 一般 |
+| R2 | 性能工具把 `proc_pid_rusage` 的 tick 当纳秒，未乘 `mach_timebase_info`；自 `b6dda21` 起 live 与 matrix 的绝对 CPU 百分比都偏小，相对比值不受影响 | `Sources/MeowMacSelfTest/SelfPerformanceMetrics.swift:25,36`；`scripts/self-performance.py:148,195,206` | 环境 | 遗留，另立任务 | | 一般 |
+| R3 | 窗口核实输出未落盘，无法从原始证据确认 | `build/acceptance/desktop-cat/` 清单 | 执行 | 遗留 | | 记录 |
+| R4 | 后台命令 `cat > /tmp/x` 卡住未退出，往仓库外写过文件（已删）；不影响验收链 | `ps`、`lsof` | 执行 | 遗留，是否停止由用户决定 | | 一般 |
+| R5 | 按 plan 逐字节恢复 `config.json`，丢掉了测量后用户对 `desktopCat` 的改动（猫在左下角） | `config.json.after-measure` 与备份对比 | 执行 | 遗留，告知用户 | | 记录 |
+
+逐项核对：live 模式 PID 与已安装可执行文件一致、覆盖 600 秒；两段测量不重叠；`config.json` 与备份 `cmp` 一致；前台用例 33 + 4 + 2 + 4 + 13 项 0 失败；构建与安装产物哈希一致；未推送、TunCanary 干净、`plan-baseline` 未动、`config.json` 只改 `desktopCat`、重启为正常退出。
 
 ### 第 1 轮（2026-10-25，Claude Code 子 Agent · Claude Opus 5.5，高）
 
