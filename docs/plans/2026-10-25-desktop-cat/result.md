@@ -8,6 +8,9 @@
 
 ### 第 2 轮（2026-10-25，Claude Code 子 Agent · Claude Sonnet 5.5）
 
+**用户实机验收**：2026-10-25 用户回复“全部通过”，覆盖 plan 条目 5 的六个步骤和第 1 轮遗留的观感项（上方落点框位置、左侧的角对齐、非前台悬停提示、沿用现有数字格式）。第 1 轮 R7、第 2 轮需规划者实测的各项随之关闭。
+
+
 **提交范围**：`c1bbc37..`（本轮只有文档提交，应用代码未改）
 
 **开工检查**：无人值守；只做条目 5 的验证。原值和日志在 `build/acceptance/desktop-cat/`（已忽略）：`build.log`、`install.log`、`ui-*.log`、`live-off.json`、`live-on.json`、`config.json.bak`、`config.json.after-measure`。
