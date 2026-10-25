@@ -275,16 +275,21 @@ enum AgentSessionTests {
         var board = AgentSessionNoticeBoard(startedAt: base)
         board.update([session("a", .finished, completion: "a1", at: 10, name: "示例项目", now: 20)], now: base.addingTimeInterval(20))
         guard board.toasts.count == 1, case .single = board.toasts[0],
-              board.toasts[0].text == "✓ 示例项目 · Codex · 已完成 · 12 分钟" else { return false }
+              board.toasts[0].text == "✓ 示例项目 · Codex · 已完成 · 12 分" else { return false }
         board.update([session("b", .finished, completion: "b1", at: 30, name: "notes-app", provider: .claude, duration: 180, now: 40)], now: base.addingTimeInterval(40))
         // 2 条：新的在第 0 条（贴着气泡）。
-        guard board.toasts.map(\.text) == ["✓ notes-app · Claude · 已完成 · 3 分钟", "✓ 示例项目 · Codex · 已完成 · 12 分钟"] else { return false }
+        guard board.toasts.map(\.text) == ["✓ notes-app · Claude · 已完成 · 3 分", "✓ 示例项目 · Codex · 已完成 · 12 分"] else { return false }
         // 3 条以上：离猫远的那条合并成“另有 n 个会话完成”。
         board.update([session("c", .finished, completion: "c1", at: 50, name: "示例三", duration: nil, now: 60),
                       session("d", .finished, completion: "d1", at: 55, name: "示例四", duration: 3900, now: 60)], now: base.addingTimeInterval(60))
         let toasts = board.toasts
-        guard toasts.count == 2, toasts[0].text == "✓ 示例四 · Codex · 已完成 · 1 小时 5 分", toasts[1].text == "另有 3 个会话完成",
+        guard toasts.count == 2, toasts[0].text == "✓ 示例四 · Codex · 已完成 · 1 时 5 分", toasts[1].text == "另有 3 个会话完成",
               toasts[1].ids.count == 3 else { return false }
+        // 短时长（D17）：不足 1 分记 1 分，满 60 分写“h 时 m 分”。
+        guard AgentSessionNotice.shortDuration(0) == "1 分", AgentSessionNotice.shortDuration(59) == "1 分",
+              AgentSessionNotice.shortDuration(60 * 59 + 59) == "59 分", AgentSessionNotice.shortDuration(3600) == "1 时 0 分",
+              AgentSessionNotice.shortDuration(3900) == "1 时 5 分", AgentSessionNotice.shortDuration(26 * 3600 + 60) == "26 时 1 分",
+              MetricFormat.duration(720) == "12 分钟" else { return false }
         // 手动关闭：只关这一条；关掉合并的那条，它包含的全部关掉。
         board.dismiss(toasts[0].ids)
         guard board.toasts.map(\.text) == ["✓ 示例三 · Codex · 已完成", "另有 2 个会话完成"] else { return false }

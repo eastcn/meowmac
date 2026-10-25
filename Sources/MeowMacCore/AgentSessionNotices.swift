@@ -14,9 +14,15 @@ public struct AgentSessionNotice: Equatable, Identifiable, Sendable {
         self.id = id; self.provider = provider; self.name = name; self.duration = duration
         self.completedAt = completedAt; self.shownAt = shownAt
     }
-    /// 名称之后的部分，例如“· Codex · 已完成 · 12 分钟”。耗时格式同面板（`MetricFormat.duration`）；不知道耗时就不写。
+    /// 名称之后的部分，例如“· Codex · 已完成 · 12 分”。耗时用提示专用的短格式（D17）；不知道耗时就不写。
     public var detail: String {
-        "· " + provider.displayName + " · 已完成" + (duration.map { " · " + MetricFormat.duration($0) } ?? "")
+        "· " + provider.displayName + " · 已完成" + (duration.map { " · " + Self.shortDuration($0) } ?? "")
+    }
+
+    /// 结束提示的短时长（D17）：不足 1 分记 1 分，例如“12 分”；满 60 分写“1 时 5 分”。面板仍用 `MetricFormat.duration`。
+    public static func shortDuration(_ seconds: TimeInterval) -> String {
+        let minutes = max(1, Int(max(0, seconds) / 60))
+        return minutes >= 60 ? "\(minutes / 60) 时 \(minutes % 60) 分" : "\(minutes) 分"
     }
 }
 
