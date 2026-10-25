@@ -124,3 +124,18 @@
 
 **复审**
 
+复审者：Claude Code 全新子 Agent（Opus 5.5），只读，2026-10-25。输入：plan、本节、`git diff d4f857c..82a83c6`。
+
+结论：下一轮。没有 `阻断`；`一般` 3 条（R1～R3），`记录` 4 条（R4～R7）。根因：执行 5 条，规划 1 条，环境 1 条。复审者重跑 `scripts/check.sh`：退出码 0，409 项 0 失败，52 项前台未执行。
+
+| 编号 | 问题 | 证据 | 根因 | 去向 | 用户决定 | 级别 |
+|---|---|---|---|---|---|---|
+| R1 | 两处设计稿要求被记为异议未实现：拖动时四角落点框（设计稿拖动态，D1 按方案 A）；悬停 0.6 秒提示（条目 3 改法）用了系统默认延迟。SPEC 也随实现删去了这两项。 | `mini-window.html:59`、`:209`；`DesktopCatView.swift:171`；diff `docs/design/SPEC.md` | 执行 | 待用户决策 | 用户 2026-10-25：补做落点框；悬停提示用系统默认延迟（plan D14）。本轮内修 | 一般 |
+| R2 | 应用不在前台时悬停提示可能不显示：nonactivating panel 未设 `allowsToolTipsWhenApplicationIsInactive`。推断，未实测。 | `DesktopCatWindow.swift:65-80` | 执行 | 复审者修 | | 一般 |
+| R3 | 左侧的角时猫与气泡没有左对齐：猫图在 120 pt 格子里靠右画，可见左缘偏 20 pt 以上；result 未记录。 | `DesktopCatImage.swift:35,53`；`DesktopCatLayout.swift:43-51`；`preview/desktop-cat-leftCorner-light.png` | 执行 | 复审者修 | | 一般 |
+| R4 | 其余异议可接受，交用户实机看：速度线沿用共用 `CatRenderer`；`↑128.0K` 复用总览口径；尾巴差在 2 pt 内；严重态去附注符合 D7。plan D9 未写设计稿目录表与总览口径冲突时的优先级。 | `preview/desktop-cat-longSpeed-dark.png`；`DesktopCatConfigTests.swift:260` | 规划 | 待用户决策（并入第 2 轮实机验收；D9 补“冲突时以总览口径为准”） | 规划者已补 plan D15；格式偏差留第 2 轮用户实机验收 | 记录 |
+| R5 | 代理流量 `1.20 GB`（设计稿 `1.2 G`）、DeepSeek 余额 `¥23.40`（设计稿 `¥23.4`）复用现有格式，result 漏记。 | `DesktopCat.swift:485`、`:453` | 执行 | 复审者修（补记到「技术更正与异议」） | | 记录 |
+| R6 | `mouseDown` 未复核命中：从猫移到透明处、mouseMoved 未到时按下会误开面板。 | `DesktopCatWindow.swift:181-184`、`:226-232` | 执行 | 复审者修 | | 记录 |
+| R7 | 点击穿透、全屏显示、程序坞变化后的重新落位只有离线证据；`didChangeScreenParametersNotification` 在程序坞自动隐藏或改尺寸时是否触发未知。 | `DesktopCatWindow.swift:83-86` | 环境 | 并入第 2 轮用户实机验收 | | 记录 |
+
+重点核对：六条状态路径齐全，坏配置不改写文件（`DesktopCatConfigTests.swift:31-152`）；D10 无新增计时器，关闭时不建窗口、不渲染，有计数器断言；D11 采用退路方案（命中函数 + `ignoresMouseEvents`），坐标与 alpha 掩码正确；D13 找不到屏时只读不写标识；分层、受保护文件、TunCanary、虚构夹具、真实 `config.json` 未被写入均核对通过。
