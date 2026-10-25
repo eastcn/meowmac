@@ -5,7 +5,12 @@ import MeowMacCore
 @MainActor
 public final class ApplicationCadence {
     public var frame = 0
+    /// 宠物的帧计数，按 `petSpeed` 倍速前进；没有宠物时与猫同步。
+    public var petFrame = 0
     public var frameInterval = 0.5
+    /// 正在显示宠物时返回速度倍数，否则 nil。
+    public var petSpeed: () -> Double? = { nil }
+    private var clock = FrameClock()
     public var screenSleeping = false
     public var observe: ((String) -> Void)?
     private var frameTimer: Timer?
@@ -28,13 +33,17 @@ public final class ApplicationCadence {
     }
     public func scheduleFrame() {
         frameTimer?.invalidate()
-        frameTimer = Timer.scheduledTimer(withTimeInterval: frameInterval, repeats: false) { [weak self] _ in
+        let speed = petSpeed()
+        let interval = FrameClock.tick(frameInterval: frameInterval, petSpeed: speed)
+        frameTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.observe?("frameTimer")
                 let display = self.display()
-                self.frame = display.nextFrame(self.frame, sleeping: self.screenSleeping)
-                self.updateImage(self.frame)
+                let steps = self.clock.advance(elapsed: interval, frameInterval: self.frameInterval, petSpeed: speed)
+                for _ in 0..<min(steps.cat, 8) { self.frame = display.nextFrame(self.frame, sleeping: self.screenSleeping) }
+                for _ in 0..<min(steps.pet, 8) { self.petFrame = display.nextFrame(self.petFrame, sleeping: self.screenSleeping) }
+                if steps.cat > 0 || steps.pet > 0 { self.updateImage(self.frame) }
                 self.scheduleFrame()
             }
         }

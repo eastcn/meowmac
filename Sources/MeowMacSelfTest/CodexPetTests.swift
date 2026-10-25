@@ -22,6 +22,8 @@ enum CodexPetTests {
             ("Core.CodexPet/菜单栏形象配置往返与坏值回退", { menuBarConfig() }),
             ("UI.CodexPet/菜单栏默认跟随桌面猫，也可单独选", { menuBarSync() }),
             ("UI.CodexPet/菜单栏按宠物绘制、染色与缓存", { menuBarRender() }),
+            ("Core.CodexPet/宠物动画速度配置与取整", { speedConfig() }),
+            ("Core.CodexPet/帧时钟让猫和宠物各自计帧", { frameClock() }),
         ]
         if ProcessInfo.processInfo.environment["MEOWMAC_LIVE"] == "1" {
             all.append(("Live.CodexPet/本机宠物加载并渲染到 build/acceptance", { live() }))
@@ -388,6 +390,57 @@ enum CodexPetTests {
         let first = cache.image(cat: nil, pet: pet, display: normal, frame: 1, appearance: appearance, scale: 2)
         guard cache.image(cat: nil, pet: pet, display: normal, frame: 9, appearance: appearance, scale: 2) === first, cache.count == 1 else { return false }
         _ = cache.image(cat: nil, display: normal, frame: 1, appearance: appearance, scale: 2)
-        return cache.count == 1 && first.size == image.size
+        // 菜单栏里宠物按 22 pt 高画：帧缩到 21 pt 高、28 pt 宽，左边留 4 pt 多画速度线。
+        return cache.count == 1 && first.size.height == MenuBarCatImage.petHeight
+            && first.size == CatRenderer.petImage(pet, display: normal, index: 0, height: MenuBarCatImage.petHeight).size
+            && first.size.width > image.size.width
+    }
+
+    static func speedConfig() -> Bool {
+        let url = DesktopCatConfigTests.temporaryURL(); defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            try Data(#"{"schemaVersion":1}"#.utf8).write(to: url)
+            guard ConfigStore.load(from: url).config.petAnimationSpeed == 1.6 else { return false }
+            for (raw, expected, noted) in [("2.5", 2.5, false), ("0.1", 1.6, true), ("9", 1.6, true), (#""fast""#, 1.6, true)] {
+                try Data(#"{"schemaVersion":1,"petAnimationSpeed":"#.utf8 + Data(raw.utf8) + Data("}".utf8)).write(to: url)
+                let config = ConfigStore.load(from: url).config
+                guard config.petAnimationSpeed == expected, config.menuBarPetDiagnostics.contains("宠物动画速度无效，已用默认值") == noted else { return false }
+            }
+            guard (try? ConfigStore.savePetAnimationSpeed(5, to: url)) == nil,
+                  abs(PetAnimationSpeed.clamped(1.63) - 1.6) < 1e-9, PetAnimationSpeed.clamped(9) == 3, PetAnimationSpeed.clamped(.nan) == 1.6,
+                  PetAnimationSpeed.title(1.6) == "1.6×" else { return false }
+            let state = PanelPreviewRenderer.syntheticState()
+            state.desktopCatConfigURL = url
+            var changes = 0
+            state.onPetAnimationSpeedChanged = { changes += 1 }
+            guard state.updatePetAnimationSpeed(2.04), abs(state.petAnimationSpeed - 2.0) < 1e-9, changes == 1,
+                  state.updatePetAnimationSpeed(2.0), changes == 1 else { return false }
+            return abs(ConfigStore.load(from: url).config.petAnimationSpeed - 2.0) < 1e-9
+        } catch { return false }
+    }
+
+    static func frameClock() -> Bool {
+        // 没有宠物：每次计时猫走一帧，间隔同猫。
+        var clock = FrameClock()
+        guard FrameClock.tick(frameInterval: 0.5, petSpeed: nil) == 0.5,
+              clock.advance(elapsed: 0.5, frameInterval: 0.5, petSpeed: nil) == (1, 1) else { return false }
+        // 宠物 2 倍：计时间隔减半，宠物每次一帧，猫两次一帧。
+        clock = FrameClock()
+        let tick = FrameClock.tick(frameInterval: 0.5, petSpeed: 2)
+        guard tick == 0.25 else { return false }
+        var cat = 0, pet = 0
+        for _ in 0..<8 { let step = clock.advance(elapsed: tick, frameInterval: 0.5, petSpeed: 2); cat += step.cat; pet += step.pet }
+        guard cat == 4, pet == 8 else { return false }
+        // 宠物 1.6 倍：10 秒里猫 20 帧、宠物 32 帧。
+        clock = FrameClock(); cat = 0; pet = 0
+        let fast = FrameClock.tick(frameInterval: 0.5, petSpeed: 1.6)
+        for _ in 0..<Int((10 / fast).rounded()) { let step = clock.advance(elapsed: fast, frameInterval: 0.5, petSpeed: 1.6); cat += step.cat; pet += step.pet }
+        guard cat == 20, pet == 32 else { return false }
+        // 宠物慢于猫：间隔同猫，宠物两次一帧。
+        clock = FrameClock(); pet = 0
+        guard FrameClock.tick(frameInterval: 0.5, petSpeed: 0.5) == 0.5 else { return false }
+        for _ in 0..<4 { pet += clock.advance(elapsed: 0.5, frameInterval: 0.5, petSpeed: 0.5).pet }
+        // 满载 3 倍：不快于 30 帧每秒。
+        return pet == 2 && FrameClock.tick(frameInterval: 0.05, petSpeed: 3) == PetAnimationSpeed.minimumTick
     }
 }

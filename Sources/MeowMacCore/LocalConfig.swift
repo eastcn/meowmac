@@ -38,6 +38,8 @@ public struct LocalConfig: Codable, Equatable {
     public var menuBarPet = MenuBarPetConfig.desktop
     /// 读取 `menuBarPet` 时的回退原因，不写回文件。
     public var menuBarPetDiagnostics: [String] = []
+    /// Codex 宠物的播放速度，相对猫的帧速度的倍数（菜单栏和桌面猫共用）。
+    public var petAnimationSpeed = PetAnimationSpeed.defaultValue
 
     public init() {}
 
@@ -48,7 +50,7 @@ public struct LocalConfig: Codable, Equatable {
         case quotaRefreshSeconds, sessionPollSeconds, sessionFinishDelaySeconds, manualMergeSeconds
         case proxyTrafficEnabled, proxyTrafficExportDirectory
         case costRefreshSeconds, processSampleSeconds, quotaHistoryDays, codexBarCLIPath, moPath, cleanTerminal, aiAgent, aiDiagnosisEntry
-        case desktopCat, menuBarPet
+        case desktopCat, menuBarPet, petAnimationSpeed
     }
 
     public init(from decoder: Decoder) throws {
@@ -93,6 +95,9 @@ public struct LocalConfig: Codable, Equatable {
         catch { desktopCat = DesktopCatConfig(diagnostics: ["桌面猫配置结构无效，已按默认值运行"]) }
         do { menuBarPet = try fields.decodeIfPresent(MenuBarPetConfig.self, forKey: .menuBarPet) ?? .desktop }
         catch { menuBarPet = .desktop; menuBarPetDiagnostics = ["菜单栏形象配置无效，已与桌面猫相同"] }
+        let speed = (try? fields.decodeIfPresent(Double.self, forKey: .petAnimationSpeed)) ?? nil
+        if let speed, PetAnimationSpeed.range.contains(speed) { petAnimationSpeed = speed }
+        else if speed != nil || fields.contains(.petAnimationSpeed) { menuBarPetDiagnostics.append("宠物动画速度无效，已用默认值") }
     }
 }
 

@@ -248,4 +248,21 @@ public extension PanelState {
             return false
         }
     }
+
+    /// 宠物动画速度的即时写入：先按 0.1 取整并只写 `petAnimationSpeed` 字段，成功后才生效。
+    @discardableResult
+    func updatePetAnimationSpeed(_ value: Double) -> Bool {
+        let next = PetAnimationSpeed.clamped(value)
+        guard abs(next - petAnimationSpeed) > 1e-9 else { return true }
+        do {
+            try ConfigStore.savePetAnimationSpeed(next, to: desktopCatConfigURL)
+            petAnimationSpeed = next
+            menuBarPetSaveError = nil
+            onPetAnimationSpeedChanged()
+            return true
+        } catch {
+            menuBarPetSaveError = "保存失败，配置文件未改动"
+            return false
+        }
+    }
 }

@@ -188,6 +188,8 @@ public final class PanelState: ObservableObject {
     @Published public internal(set) var menuBarPetError: String?
     @Published public internal(set) var menuBarPetSaveError: String?
     public var onMenuBarPetChanged: () -> Void = {}
+    @Published public internal(set) var petAnimationSpeed = PetAnimationSpeed.defaultValue
+    public var onPetAnimationSpeedChanged: () -> Void = {}
     public var codexPetsRoot: URL = CodexPetLibrary.defaultRoot()
     public var onDesktopCatChanged: (DesktopCatConfig) -> Void = { _ in }
     public var onOpenDesktopCatSettings: () -> Void = {}
@@ -301,6 +303,7 @@ public final class PanelState: ObservableObject {
         self.aiDiagnosisEntry = configResult.config.aiDiagnosisEntry
         self.desktopCat = configResult.config.desktopCat
         self.menuBarPet = configResult.config.menuBarPet
+        self.petAnimationSpeed = configResult.config.petAnimationSpeed
     }
 
     public var health: HealthSummary {

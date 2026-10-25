@@ -196,8 +196,10 @@ struct ImmediateSettingsView: View {
                     .labelsHidden().pickerStyle(.menu).frame(maxWidth: 240)
                     .accessibilityIdentifier("settings.menu-bar-pet")
                 }.padding(8)
+                Divider()
+                PetSpeedRow(state: state).padding(8)
             }
-            Text("宠物只读 ~/.codex/pets。菜单栏的宠物照常奔跑，提醒整只变橙，严重变红并停在倒地的一帧。").font(.caption).foregroundStyle(.secondary)
+            Text("宠物只读 ~/.codex/pets。菜单栏的宠物照常奔跑，提醒整只变橙，严重变红并停在倒地的一帧。动画速度对菜单栏和桌面猫的宠物都生效，仍随负载变快。").font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let error = state.menuBarPetSaveError ?? state.menuBarPetError {
                 Text(error).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
@@ -264,4 +266,32 @@ struct NativeSettingsSwitch: NSViewRepresentable {
         return control
     }
     func updateNSView(_ control: NSSwitch, context: Context) { context.coordinator.binding = $value; control.state = value ? .on : .off; control.isEnabled = enabled }
+}
+
+/// 宠物动画速度：拖动时只改显示，松手才写配置。
+private struct PetSpeedRow: View {
+    @ObservedObject var state: PanelState
+    @State private var draft: Double?
+    var body: some View {
+        let value = draft ?? state.petAnimationSpeed
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("宠物动画速度")
+                Text("相对猫的帧速度；默认 \(PetAnimationSpeed.title(PetAnimationSpeed.defaultValue))，一步与猫等长").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Slider(value: Binding(get: { value }, set: { draft = PetAnimationSpeed.clamped($0) }),
+                   in: PetAnimationSpeed.range, step: PetAnimationSpeed.step) { editing in
+                guard !editing, let draft else { return }
+                state.updatePetAnimationSpeed(draft)
+                self.draft = nil
+            }
+            .frame(width: 160)
+            .accessibilityIdentifier("settings.pet-speed")
+            Text(PetAnimationSpeed.title(value)).monospacedDigit().frame(width: 40, alignment: .trailing)
+            Button("默认") { state.updatePetAnimationSpeed(PetAnimationSpeed.defaultValue) }
+                .disabled(abs(state.petAnimationSpeed - PetAnimationSpeed.defaultValue) < 1e-9)
+                .accessibilityIdentifier("settings.pet-speed.reset")
+        }
+    }
 }

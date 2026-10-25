@@ -156,3 +156,51 @@ public extension ConfigStore {
         try updateField("menuBarPet", value: object, at: url)
     }
 }
+
+/// 宠物动画速度（`config.json` 的 `petAnimationSpeed`）：宠物帧速度相对猫帧速度的倍数，仍随负载变化（D11）。
+/// 默认 1.6：宠物跑一步 8 帧，猫 5 帧，1.6 倍时一步的时长与猫相同。
+public enum PetAnimationSpeed {
+    public static let defaultValue = 1.6
+    public static let range = 0.5...3.0
+    public static let step = 0.1
+    /// 帧计时最短间隔，约 30 帧每秒。
+    public static let minimumTick = 1.0 / 30
+
+    public static func clamped(_ value: Double) -> Double {
+        guard value.isFinite else { return defaultValue }
+        return (min(range.upperBound, max(range.lowerBound, value)) / step).rounded() * step
+    }
+
+    public static func title(_ value: Double) -> String { String(format: "%.1f×", value) }
+}
+
+public extension ConfigStore {
+    static func savePetAnimationSpeed(_ value: Double, to url: URL = defaultURL) throws {
+        guard value.isFinite, PetAnimationSpeed.range.contains(value) else { throw CodexPetError.invalid("宠物动画速度无效") }
+        try updateField("petAnimationSpeed", value: value, at: url)
+    }
+}
+
+/// 猫和宠物共用一个帧计时器、各自计帧（不新增计时器）。按经过的时间累计，各自满一帧才前进。
+public struct FrameClock: Equatable {
+    public private(set) var cat = 0.0
+    public private(set) var pet = 0.0
+    public init() {}
+
+    /// 下一次计时的间隔：没有宠物时同猫；有宠物时取两者较快的，不短于 `minimumTick`。
+    public static func tick(frameInterval: Double, petSpeed: Double?) -> Double {
+        guard let petSpeed, petSpeed > 1 else { return frameInterval }
+        return max(frameInterval / petSpeed, PetAnimationSpeed.minimumTick)
+    }
+
+    /// 经过 `elapsed` 秒后，猫和宠物各前进几帧。
+    public mutating func advance(elapsed: Double, frameInterval: Double, petSpeed: Double?) -> (cat: Int, pet: Int) {
+        guard elapsed > 0, frameInterval > 0 else { return (0, 0) }
+        let tolerance = 1e-6
+        cat += elapsed / frameInterval
+        pet += elapsed * (petSpeed ?? 1) / frameInterval
+        let catSteps = Int((cat + tolerance).rounded(.down)), petSteps = Int((pet + tolerance).rounded(.down))
+        cat = max(0, cat - Double(catSteps)); pet = max(0, pet - Double(petSteps))
+        return (catSteps, petSteps)
+    }
+}

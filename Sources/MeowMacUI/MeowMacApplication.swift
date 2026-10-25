@@ -141,6 +141,11 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
         panelState.onQuit = { NSApplication.shared.terminate(nil) }
         panelState.onDesktopCatChanged = { [weak self] _ in self?.desktopCat.apply() }
         panelState.onMenuBarPetChanged = { [weak self] in self?.updateCatImage() }
+        cadence.petSpeed = { [weak self] in
+            guard let self, self.panelState.menuBarLoadedPet != nil || self.panelState.desktopPet != nil else { return nil }
+            return self.panelState.petAnimationSpeed
+        }
+        panelState.onPetAnimationSpeedChanged = { [weak self] in self?.scheduleFrame() }
         panelState.onOpenDesktopCatSettings = { [weak self] in
             self?.settingsWindow?.openDesktopCat()
             self?.popover?.performClose(nil)
@@ -385,9 +390,10 @@ public final class MeowMacApplication: NSObject, NSApplicationDelegate, NSPopove
 
     private func updateCatImage() {
         let display = panelState.catDisplay()
-        if let button = statusItem?.button { menuBarImage.assign(to: button, cat: panelState.selectedCat, pet: panelState.menuBarLoadedPet, display: display, frame: cadence.frame) }
+        if let button = statusItem?.button { menuBarImage.assign(to: button, cat: panelState.selectedCat, pet: panelState.menuBarLoadedPet, display: display,
+                                                                     frame: panelState.menuBarLoadedPet == nil ? cadence.frame : cadence.petFrame) }
         // 桌面猫与菜单栏同一帧号；关闭时控制器没有窗口，直接返回。
-        desktopCat.updateFrame(cadence.frame, display: display)
+        desktopCat.updateFrame(panelState.desktopPet == nil ? cadence.frame : cadence.petFrame, display: display)
     }
 
     private func selectCat(_ id: String) {
