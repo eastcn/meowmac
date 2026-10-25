@@ -13,6 +13,18 @@ struct PerformanceReading: Codable {
     let residentBytes: UInt64
     let footprintBytes: UInt64
 
+    /// `ri_user_time` 和 `ri_system_time` 是 mach 绝对时间刻度，不是纳秒。
+    /// Apple Silicon 的 timebase 是 125/3，Intel 是 1/1。
+    static let timebase: (numer: UInt32, denom: UInt32) = {
+        var info = mach_timebase_info_data_t()
+        guard mach_timebase_info(&info) == KERN_SUCCESS, info.numer > 0, info.denom > 0 else { return (1, 1) }
+        return (info.numer, info.denom)
+    }()
+    static func nanoseconds(_ ticks: UInt64, timebase: (numer: UInt32, denom: UInt32)) -> UInt64 {
+        let product = ticks.multipliedFullWidth(by: UInt64(timebase.numer))
+        guard product.high < UInt64(timebase.denom) else { return UInt64.max }
+        return UInt64(timebase.denom).dividingFullWidth(product).quotient
+    }
     static func read(_ pid: Int32) throws -> Self {
         var value = rusage_info_v6()
         let code = withUnsafeMutablePointer(to: &value) { pointer in
@@ -22,7 +34,8 @@ struct PerformanceReading: Codable {
         }
         guard code == 0 else { throw PerformanceError.invalid("proc_pid_rusage pid=\(pid) errno=\(errno)") }
         return Self(pid: pid, identity: value.ri_proc_start_abstime, uptime: ProcessInfo.processInfo.systemUptime,
-            userNS: value.ri_user_time, systemNS: value.ri_system_time,
+            userNS: nanoseconds(value.ri_user_time, timebase: timebase),
+            systemNS: nanoseconds(value.ri_system_time, timebase: timebase),
             packageIdleWakeups: value.ri_pkg_idle_wkups, interruptWakeups: value.ri_interrupt_wkups,
             residentBytes: value.ri_resident_size, footprintBytes: value.ri_phys_footprint)
     }
@@ -65,6 +78,24 @@ enum SelfPerformanceMetricsTests {
             try process.run(); process.waitUntilExit()
             return process.terminationStatus == 0
         } catch { print("性能比较器未运行：\(error)"); return false }
+    }
+    static func timebase() -> Bool {
+        // 伪造 timebase：125/3 时 24 个刻度是 1000 纳秒；1/1 时原样返回；中间乘积超过 64 位也不溢出。
+        let silicon = (numer: UInt32(125), denom: UInt32(3)), identity = (numer: UInt32(1), denom: UInt32(1))
+        let ticks: UInt64 = 24_000_000
+        guard PerformanceReading.nanoseconds(24, timebase: silicon) == 1000,
+              PerformanceReading.nanoseconds(ticks, timebase: silicon) == 1_000_000_000,
+              PerformanceReading.nanoseconds(ticks, timebase: identity) == ticks,
+              PerformanceReading.nanoseconds(3 << 56, timebase: silicon) == 125 << 56 else { return false }
+        let start = PerformanceReading(pid: 42, identity: 10, uptime: 5, userNS: 0, systemNS: 0,
+            packageIdleWakeups: 0, interruptWakeups: 0, residentBytes: 0, footprintBytes: 0)
+        let end = PerformanceReading(pid: 42, identity: 10, uptime: 7,
+            userNS: PerformanceReading.nanoseconds(ticks, timebase: silicon), systemNS: 0,
+            packageIdleWakeups: 0, interruptWakeups: 0, residentBytes: 0, footprintBytes: 0)
+        // 1 秒 CPU / 2 秒墙钟 = 50%；按刻度直接除 1e9 只会得到 1.2%。
+        guard let delta = try? start.delta(to: end), abs(delta.cpuPercent - 50) < 1e-9 else { return false }
+        let host = PerformanceReading.timebase
+        return host.numer > 0 && host.denom > 0
     }
     static func readings() -> Bool {
         let start = PerformanceReading(pid: 42, identity: 10, uptime: 5, userNS: 100, systemNS: 100,

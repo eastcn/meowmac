@@ -29,6 +29,7 @@ enum SelfTestMain {
             ("UI.Performance/系统更新与失败语义", { ApplicationCadenceTests.systemUpdate() }),
             ("Core.Performance/固定比较门槛与负控", { SelfPerformanceMetricsTests.comparator() }),
             ("Core.Performance/差分与缺测拒绝", { SelfPerformanceMetricsTests.readings() }),
+            ("Core.Performance/CPU 刻度按 timebase 换算", { SelfPerformanceMetricsTests.timebase() }),
             ("Core.Smoke/版本号", { AppIdentity.version == "0.1.0" }),
             ("Core.Config/文件不存在", { SelfTestMain.missingConfig() }),
             ("Core.Config/部分字段", { SelfTestMain.partialConfig() }),
