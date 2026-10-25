@@ -172,7 +172,8 @@ enum DesktopCatWindowTests {
         guard let window = controller.window, !window.isVisible, window.level == .floating,
               window.collectionBehavior.isSuperset(of: [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]),
               !window.isOpaque, !window.hasShadow, !window.canBecomeKey, !window.canBecomeMain, !window.hidesOnDeactivate,
-              window.styleMask.contains(.nonactivatingPanel), window.backgroundColor == .clear, window.ignoresMouseEvents else { return false }
+              window.styleMask.contains(.nonactivatingPanel), window.backgroundColor == .clear, window.ignoresMouseEvents,
+              window.allowsToolTipsWhenApplicationIsInactive else { return false }
         let c = content(window.frame)
         guard c.maxX == main.visibleFrame.maxX - 16, c.minY == main.visibleFrame.minY + 8,
               controller.model.items.map(\.id) == DesktopCatConfig.defaultMetrics else { return false }

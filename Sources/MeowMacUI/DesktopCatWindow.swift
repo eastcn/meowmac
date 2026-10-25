@@ -73,6 +73,8 @@ public final class DesktopCatController {
             panel.isReleasedWhenClosed = false
             panel.isMovable = false
             panel.becomesKeyOnlyIfNeeded = true
+            // 应用不在前台时也显示指标的悬停提示（plan D14：原生提示，系统默认延迟）。
+            panel.allowsToolTipsWhenApplicationIsInactive = true
             // 透明处的点击穿过去；鼠标移到猫或气泡上时才接收（见 `updateMouseThrough`）。
             panel.ignoresMouseEvents = true
             let host = DesktopCatHostingView(rootView: DesktopCatContentView(model: model))
