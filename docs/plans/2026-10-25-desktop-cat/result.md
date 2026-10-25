@@ -132,12 +132,12 @@
 
 | 编号 | 问题 | 证据 | 根因 | 去向 | 用户决定 | 级别 |
 |---|---|---|---|---|---|---|
-| R1 | 两处设计稿要求被记为异议未实现：拖动时四角落点框（设计稿拖动态，D1 按方案 A）；悬停 0.6 秒提示（条目 3 改法）用了系统默认延迟。SPEC 也随实现删去了这两项。 | `mini-window.html:59`、`:209`；`DesktopCatView.swift:171`；diff `docs/design/SPEC.md` | 执行 | 待用户决策 | 用户 2026-10-25：补做落点框；悬停提示用系统默认延迟（plan D14）。本轮内修 | 一般 |
-| R2 | 应用不在前台时悬停提示可能不显示：nonactivating panel 未设 `allowsToolTipsWhenApplicationIsInactive`。推断，未实测。 | `DesktopCatWindow.swift:65-80` | 执行 | 复审者修 | | 一般 |
-| R3 | 左侧的角时猫与气泡没有左对齐：猫图在 120 pt 格子里靠右画，可见左缘偏 20 pt 以上；result 未记录。 | `DesktopCatImage.swift:35,53`；`DesktopCatLayout.swift:43-51`；`preview/desktop-cat-leftCorner-light.png` | 执行 | 复审者修 | | 一般 |
+| R1 | 两处设计稿要求被记为异议未实现：拖动时四角落点框（设计稿拖动态，D1 按方案 A）；悬停 0.6 秒提示（条目 3 改法）用了系统默认延迟。SPEC 也随实现删去了这两项。 | `mini-window.html:59`、`:209`；`DesktopCatView.swift:171`；diff `docs/design/SPEC.md` | 执行 | 待用户决策 | 用户 2026-10-25：补做落点框；悬停提示用系统默认延迟（plan D14）。已修：`498de4b`、`0c472fc` | 一般 |
+| R2 | 应用不在前台时悬停提示可能不显示：nonactivating panel 未设 `allowsToolTipsWhenApplicationIsInactive`。推断，未实测。 | `DesktopCatWindow.swift:65-80` | 执行 | 复审者修 | 已修：`281a120` | 一般 |
+| R3 | 左侧的角时猫与气泡没有左对齐：猫图在 120 pt 格子里靠右画，可见左缘偏 20 pt 以上；result 未记录。 | `DesktopCatImage.swift:35,53`；`DesktopCatLayout.swift:43-51`；`preview/desktop-cat-leftCorner-light.png` | 执行 | 复审者修 | 已修：`8f36d0d` | 一般 |
 | R4 | 其余异议可接受，交用户实机看：速度线沿用共用 `CatRenderer`；`↑128.0K` 复用总览口径；尾巴差在 2 pt 内；严重态去附注符合 D7。plan D9 未写设计稿目录表与总览口径冲突时的优先级。 | `preview/desktop-cat-longSpeed-dark.png`；`DesktopCatConfigTests.swift:260` | 规划 | 待用户决策（并入第 2 轮实机验收；D9 补“冲突时以总览口径为准”） | 规划者已补 plan D15；格式偏差留第 2 轮用户实机验收 | 记录 |
-| R5 | 代理流量 `1.20 GB`（设计稿 `1.2 G`）、DeepSeek 余额 `¥23.40`（设计稿 `¥23.4`）复用现有格式，result 漏记。 | `DesktopCat.swift:485`、`:453` | 执行 | 复审者修（补记到「技术更正与异议」） | | 记录 |
-| R6 | `mouseDown` 未复核命中：从猫移到透明处、mouseMoved 未到时按下会误开面板。 | `DesktopCatWindow.swift:181-184`、`:226-232` | 执行 | 复审者修 | | 记录 |
+| R5 | 代理流量 `1.20 GB`（设计稿 `1.2 G`）、DeepSeek 余额 `¥23.40`（设计稿 `¥23.4`）复用现有格式，result 漏记。 | `DesktopCat.swift:485`、`:453` | 执行 | 复审者修（补记到「技术更正与异议」） | 已修：`9b265c0` | 记录 |
+| R6 | `mouseDown` 未复核命中：从猫移到透明处、mouseMoved 未到时按下会误开面板。 | `DesktopCatWindow.swift:181-184`、`:226-232` | 执行 | 复审者修 | 已修：`6c4b392` | 记录 |
 | R7 | 点击穿透、全屏显示、程序坞变化后的重新落位只有离线证据；`didChangeScreenParametersNotification` 在程序坞自动隐藏或改尺寸时是否触发未知。 | `DesktopCatWindow.swift:83-86` | 环境 | 并入第 2 轮用户实机验收 | | 记录 |
 
 重点核对：六条状态路径齐全，坏配置不改写文件（`DesktopCatConfigTests.swift:31-152`）；D10 无新增计时器，关闭时不建窗口、不渲染，有计数器断言；D11 采用退路方案（命中函数 + `ignoresMouseEvents`），坐标与 alpha 掩码正确；D13 找不到屏时只读不写标识；分层、受保护文件、TunCanary、虚构夹具、真实 `config.json` 未被写入均核对通过。
@@ -159,3 +159,17 @@
 - 修复后的全量检查：`scripts/check.sh` 退出码 0，输出“自测完成：413 项，0 项失败，52 项前台验收未执行”“check 通过”。日志在 `docs/plans/2026-10-25-desktop-cat/.relay/check-r1-fix.log`。
 - 预览：`MEOWMAC_RENDER_DIR=$PWD/build/acceptance/desktop-cat/preview scripts/test.sh UI.DesktopCat` 退出码 0，输出“桌面猫合成预览：16 张”。
 - 计时器检查：`git diff 45709f2 -- Sources` 中没有新增 `Timer.scheduledTimer`、`DispatchSourceTimer`、`asyncAfter` 或 `DispatchQueue.main.async`。
+
+**修复复核**
+
+复核者：Claude Code 全新子 Agent（Opus 5.5），只读，2026-10-25。输入：`git diff 45709f2..9b265c0`、R1/R2/R3/R5/R6 原文、修复记录、plan D4/D10/D14/D15。重跑 `scripts/check.sh`：退出码 0，413 项 0 失败，52 项前台未执行。
+
+| 编号 | 结论 | 证据 | 级别 |
+|---|---|---|---|
+| R1 | 已解决 | 落点框只在 `mouseDragged` 中显示，不新增计时器；只在窗口中心所在屏；`mouseUp`、`hide()` 释放；覆盖窗不抢焦点、`ignoresMouseEvents`；样式与设计稿 `.target` 一致；用例 `UI.DesktopCat/拖动时显示落点框松手消失` 通过。上方两个框画在猫实际落位处（气泡下方），与 D14“落点”一致 | 记录：第 2 轮用户实机看 |
+| R2 | 已解决 | 设了 `allowsToolTipsWhenApplicationIsInactive`，属性断言通过；非前台时是否真的显示待上屏 | 记录：并入第 2 轮 |
+| R3 | 已解决 | 按跑动一周最靠左的一帧与气泡左缘对齐（0.5 pt）；尾巴摆动使其他帧偏右 3～21.5 pt；逐帧对齐会左右抖动。备选：按中位帧对齐，只改一个取值 | 记录：第 2 轮用户实机观察 |
+| R5 | 已解决 | 「技术更正与异议」已补两行 | — |
+| R6 | 已解决 | `mouseDown` 先判命中；用例通过。副作用：透明处首次按下被吞一次；`rightMouseDown` 未做同样复核 | 记录 |
+
+总体结论：本轮通过，没有剩余 `阻断`。
