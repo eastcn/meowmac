@@ -54,6 +54,12 @@ code{font-size:11.5px}
 .hoverbubble{position:absolute;right:-2px;bottom:62px;border-radius:14px;padding:8px 11px 9px;display:grid;grid-template-columns:repeat(2,66px);gap:7px 12px}
 .hoverbubble:after{content:"";position:absolute;right:30px;bottom:-6px;width:12px;height:12px;background:inherit;transform:rotate(45deg)}
 .cursor{position:absolute;width:14px;height:20px;pointer-events:none}
+#bigger .screen{height:360px}
+/* AI 会话（D46）：结束提示在气泡上方，与气泡同侧对齐 */
+.stack{position:absolute;right:-2px;bottom:62px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.stack .bubble{position:relative;right:auto;bottom:auto}
+.toast{height:24px;max-width:220px;border-radius:12px;padding:0 10px;display:flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap;overflow:hidden}
+.toast .ok{color:var(--green);font-weight:700}.toast .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;max-width:96px}.toast .s{color:var(--sub)}
 
 /* 拖动 */
 .target{position:absolute;width:128px;height:58px;border:1.5px dashed color-mix(in srgb,var(--ink) 35%,transparent);border-radius:16px}
@@ -104,6 +110,20 @@ table.cat th,table.cat td{border-bottom:1px solid #e3e5ea;padding:5px 8px;text-a
 </header>
 
 <section class="block" id="variants"></section>
+
+<section class="block">
+<h2>更多指标与猫的大小（D47，待用户确认）</h2>
+<p>指标上限从 4 项放宽到 8 项，仍是 2 列，最多 4 行；气泡向远离屏幕角的方向长（下方的角向上，上方的角向下）。右键菜单末行写“已选 n / 8”，设置里满 8 项时“添加指标…”变灰。默认仍是 4 项。</p>
+<p>猫的高度可在 36～104 pt 之间调，默认 52 pt，拖到 49～55 pt 时吸附回 52 pt。只缩放猫和它的投影、速度线；气泡的版式和字号不变，气泡仍在猫头顶 10 pt。鼠标停在猫身上时，猫朝屏幕内侧的上角出现一个 12 pt 的圆形把手；拖把手缩放，松手才写配置。猫在下方的角时，猫的外侧下角不动，猫和气泡向上长；猫在上方的角时，气泡的外侧上角不动，猫向下长。把手只在悬停时显示，拖动把手不会移动猫，也不算单击。设置的桌面猫分组里另有“大小”滑块和“恢复默认大小”。</p>
+<div class="grid" id="bigger"></div>
+</section>
+
+<section class="block">
+<h2>AI 会话（D46，待用户确认）</h2>
+<p>指标目录新增“AI 会话”一类，只有一项。数值是 Claude 和 Codex 正在跑的主会话总数，悬停提示写分项，例如“Claude 2 个在跑，Codex 1 个 · 14:02 更新”；有记录读不出状态的会话时追加“另有 n 个未确认”，这些不计入数值。没有会话在跑时写灰色“空闲”；两个记录目录都读不了时写“—”。不画横线（同“今日花费”）。</p>
+<p>选了这项指标，某个会话本轮结束时，气泡上方弹出一条玻璃提示：“✓ 名称 · 渠道 · 已完成 · 耗时”。名称取会话标题，没有就取项目目录名，太长时在末尾截断。最多叠 2 条，新的贴着气泡；更多时离猫远的那条改成“另有 n 个会话完成”。猫在上方的角时，气泡顶着屏幕上沿，提示改放在猫的下方，新的贴着猫。点提示只关掉这一条，不打开面板；5 分钟后自动消失。提示和气泡同侧对齐，猫在左边的角时左对齐。名称都是虚构的。</p>
+<div class="grid" id="sessions"></div>
+</section>
 
 <section class="block">
 <h2>拎起与落位</h2>
@@ -170,6 +190,13 @@ const M={
  net:{lab:'网络',val:'↓2.4M',bar:100,c:'green',side:'↑128K'},
  netBad:{lab:'网络',val:'异常',bar:100,c:'red',vc:'t-red',side:'DNS'},
  none:{lab:'电池',val:'—',bar:null,missing:true},
+ ai:{lab:'AI 会话',val:'3 在跑',bar:null},
+ ai1:{lab:'AI 会话',val:'1 在跑',bar:null},
+ aiIdle:{lab:'AI 会话',val:'空闲',bar:null,missing:true},
+ power:{lab:'功耗',val:'8.6 W',bar:22,c:'teal'},
+ disk:{lab:'磁盘',val:'196 G',bar:61,c:'gray',side:'可用'},
+ codex:{lab:'Codex',val:'64%',bar:64,c:'green',side:'5h'},
+ cost:{lab:'花费',val:'$3.42',bar:null,side:'今日'},
 };
 const m=k=>{const x=M[k];return `<div class="m"><div class="lab">${x.lab}${x.side?`<b>${x.side}</b>`:''}</div><div class="val ${x.missing?'missing':''}" style="${x.vc?`color:var(--${x.vc})`:''}">${x.val}</div>${x.bar===null?'<div class="bar none"></div>':`<div class="bar"><i style="width:${x.bar}%;background:var(--${x.c})"></i></div>`}</div>`};
 const cat=(st,extra='')=>`<div class="body"><div class="shadow"></div><canvas class="cat" width="360" height="156" data-state="${st}" ${extra}></canvas></div>`;
@@ -199,6 +226,27 @@ const V=[
   render:(k,st,i)=>C(k,st,i===0?{}:i===1?{badge:'Claude 剩 14%'}:i===2?{badge:'网络异常 · DNS'}:{hover:true}),notes:['一切正常时只有猫。','提醒时头顶小牌子写最要紧的一项，状态色文字。','严重时牌子用红色文字。','鼠标停在猫身上，弹出全部指标。']},
 ];
 document.getElementById('variants').innerHTML=V.map(v=>`<div class="variant"><h2>${v.name}${v.tag?`<span class="tag">${v.tag}</span>`:''}</h2><p>${v.desc}</p><div class="grid">${STATES.map(([t,th,k,st],i)=>`<div class="cell"><h3>${t}</h3>${screen(v.render(k,st,i),th)}<p class="note">${v.notes[i]}</p></div>`).join('')}</div><div class="pc"><div>${v.pro}</div><div>${v.con}</div></div></div>`).join('');
+
+// 更多指标与大小
+const sized=(keys,h,handle)=>{const w=Math.round(120*h/52);return `<div class="pet"><div class="body" style="width:${w}px;height:${h}px;margin-left:auto"><div class="shadow"></div><canvas class="cat" width="${w*3}" height="${h*3}" data-state="normal" style="width:${w}px;height:${h}px"></canvas>${handle?`<div style="position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:1.5px solid var(--blue);box-shadow:0 1px 3px #0003"></div>`:''}</div><div class="bubble glass ${keys.length===1?'one':''}" style="bottom:${h+10}px">${keys.map(m).join('')}</div></div>`};
+document.getElementById('bigger').innerHTML=[
+ ['8 项','',sized(['cpu','mem','power','disk','claude','codex','cost','net'],52),'2 列 × 4 行，气泡约 170 × 178 pt。'],
+ ['悬停出把手 · 默认 52 pt','',sized(['cpu','mem','claude','net'],52,true)+cursor('right:118px;bottom:92px'),'把手在猫朝屏幕内侧的上角，拖它缩放。'],
+ ['放大到 104 pt · 深色','dark',sized(['cpu','claude'],104),'猫放大，气泡字号不变，仍在猫头顶 10 pt。'],
+ ['缩小到 36 pt','',sized(['cpu','mem','claude','net'],36),'最小 36 pt，比菜单栏的 18 pt 大一倍。'],
+].map(([t,th,inner,n])=>`<div class="cell"><h3>${t}</h3>${screen(inner,th)}<p class="note">${n}</p></div>`).join('');
+
+// AI 会话
+const toast=t=>`<div class="toast glass">${t.more?`<span class="s">另有 ${t.more} 个会话完成</span>`:`<span class="ok">✓</span><span class="n">${t.name}</span><span class="s">· ${t.p} · 已完成 · ${t.d}</span>`}</div>`;
+const S=(keys,st,toasts=[])=>`<div class="pet"><div class="body"><div class="shadow"></div><canvas class="cat" width="360" height="156" data-state="${st}"></canvas></div><div class="stack">${toasts.map(toast).join('')}<div class="bubble glass ${keys.length===1?'one':''}">${keys.map(m).join('')}</div></div></div>`;
+document.getElementById('sessions').innerHTML=[
+ ['有会话在跑','',S(['cpu','mem','claude','ai'],'normal'),'第 4 项是 AI 会话：3 个主会话在跑。子 Agent 不单独计数。'],
+ ['没有会话在跑 · 深色','dark',S(['cpu','mem','claude','aiIdle'],'normal'),'“空闲”用灰色，和缺数据的“—”区分。'],
+ ['一个会话结束','',S(['cpu','mem','claude','ai1'],'normal',[{name:'示例项目',p:'Codex',d:'12 分'}]),'提示贴在气泡上方 6 pt；点一下关掉，5 分钟后自动消失。'],
+ ['连续结束多个 · 深色','dark',S(['cpu','ai'],'normal',[{name:'notes-app',p:'Claude',d:'3 分'},{more:2}]),'最多 2 条，多出的合并成“另有 n 个会话完成”。'],
+ ['只选 1 项','',S(['ai1'],'normal',[{name:'一个名字很长的示例会话标题',p:'Claude',d:'1 时 5 分'}]),'提示宽度按内容，最宽 220 pt，名称过长在末尾截断。'],
+ ['右上角 · 2 条','',`<div class="pet" style="top:32px;bottom:auto"><div class="bubble glass" style="position:relative;right:auto;bottom:auto;margin-bottom:10px">${['cpu','ai'].map(m).join('')}</div><div class="body" style="margin-left:auto"><div class="shadow"></div><canvas class="cat" width="360" height="156" data-state="normal"></canvas></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-top:6px">${[{name:'示例项目',p:'Codex',d:'12 分'},{name:'notes-app',p:'Claude',d:'3 分'}].map(toast).join('')}</div></div>`,'上方的角：气泡贴着屏幕上沿，提示放到猫下方，新的贴着猫。'],
+].map(([t,th,inner,n])=>`<div class="cell"><h3>${t}</h3>${screen(inner,th)}<p class="note">${n}</p></div>`).join('');
 
 // 拖动
 function dragScene(){
@@ -232,7 +280,7 @@ function renderSettings(){const rows=[['CPU','24%'],['内存压力','55%'],['Cla
 renderSettings();
 
 // 目录
-const CAT=[['系统','CPU','CPU','24%','蓝色，长度=使用率'],['系统','内存压力','内存','55%（同总览口径）','状态色，长度=压力'],['系统','整机功耗','功耗','8.6 W','systemTeal，0–40 W'],['系统','磁盘剩余','磁盘 · 可用','196 G','systemGray，长度=已用；可用低于 10% 时橙色'],['传感器与电池','SoC 温度','温度','42 °C','systemIndigo，30–100 °C'],['传感器与电池','风扇','风扇','0 rpm','systemBrown，长度=占最大转速'],['传感器与电池','电池电量','电池 · 放电 / ⚡ / 接电源','62%','systemGray，20% 及以下橙色'],['额度','渠道 · 窗口剩余','Claude · 5h','72%','状态色，规则同总览额度'],['额度','余额型渠道余额','DeepSeek','¥23.4（低于阈值时橙色文字）','无'],['额度','今日花费（Claude + Codex）','花费 · 今日','$3.42','无'],['网络','网速','网络 · ↑上行','↓下行','满长，TunCanary 结论色'],['网络','网络状态','网络 · 原因','正常 / 提醒 / 异常','满长，结论色'],['网络','今日代理流量','代理 · 今日','1.2 G','无']];
+const CAT=[['系统','CPU','CPU','24%','蓝色，长度=使用率'],['系统','内存压力','内存','55%（同总览口径）','状态色，长度=压力'],['系统','整机功耗','功耗','8.6 W','systemTeal，0–40 W'],['系统','磁盘剩余','磁盘 · 可用','196 G','systemGray，长度=已用；可用低于 10% 时橙色'],['传感器与电池','SoC 温度','温度','42 °C','systemIndigo，30–100 °C'],['传感器与电池','风扇','风扇','0 rpm','systemBrown，长度=占最大转速'],['传感器与电池','电池电量','电池 · 放电 / ⚡ / 接电源','62%','systemGray，20% 及以下橙色'],['额度','渠道 · 窗口剩余','Claude · 5h','72%','状态色，规则同总览额度'],['额度','余额型渠道余额','DeepSeek','¥23.4（低于阈值时橙色文字）','无'],['额度','今日花费（Claude + Codex）','花费 · 今日','$3.42','无'],['网络','网速','网络 · ↑上行','↓下行','满长，TunCanary 结论色'],['网络','网络状态','网络 · 原因','正常 / 提醒 / 异常','满长，结论色'],['网络','今日代理流量','代理 · 今日','1.2 G','无'],['AI 会话','AI 会话（D46）','AI 会话','3 在跑 / 空闲','无']];
 document.getElementById('catalog').innerHTML=CAT.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
 
 document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#theme button').forEach(x=>x.classList.toggle('active',x===b));document.body.classList.toggle('dark',b.dataset.t==='dark');renderMenu();renderSettings();});
