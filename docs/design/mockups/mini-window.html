@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MeowMac · 桌面猫设计稿</title>
+<style>
+:root{--ink:#222326;--sub:#707177;--line:#d2d4d9;--fill:#e3e5ea;--glass:rgba(250,251,253,.78);--glass-edge:rgba(255,255,255,.8);--shadow:0 8px 24px #00000026,0 1px 3px #0000001c;--blue:#007aff;--teal:#239cac;--gray:#8e8e93;--green:#34c759;--orange:#ff9500;--red:#ff3b30;--t-orange:#b25000;--t-red:#d70015;--wall:linear-gradient(135deg,#9fc3e6 0%,#d6c6e6 48%,#f3c9a8 100%);--menubar:rgba(246,246,248,.7);--menu:#f4f4f6f0;--sel:#0a63d8;--field:#fff;--surface:#f7f7f9;--titlebar:#ececef;--catink:#222326}
+.dark{--ink:#f0f1f4;--sub:#a3a5ac;--line:#46484e;--fill:#3a3c42;--glass:rgba(40,41,46,.7);--glass-edge:rgba(255,255,255,.14);--shadow:0 8px 24px #00000066,0 1px 3px #00000055;--blue:#0a84ff;--teal:#3ecbd6;--gray:#a0a2aa;--green:#30d158;--orange:#ff9f0a;--red:#ff453a;--t-orange:#ff9f0a;--t-red:#ff453a;--wall:linear-gradient(135deg,#1c2a44 0%,#3a2d4d 50%,#5a3b2c 100%);--menubar:rgba(30,30,34,.6);--menu:#2b2b2ff2;--field:#202022;--surface:#252527;--titlebar:#303033;--catink:#f0f1f4}
+*{box-sizing:border-box}
+body{margin:0;padding:28px;background:#dddfe4;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;color:#222326;-webkit-font-smoothing:antialiased}
+header,.block,.callout{max-width:1180px;margin:0 auto 26px}
+h1{font-size:22px;font-weight:600;margin:0 0 8px}h2{font-size:15px;font-weight:600;margin:0 0 6px;color:#303238}
+header p,.block>p{font-size:13px;color:#60636b;margin:6px 0;line-height:1.6}
+code{font-size:11.5px}
+.controls{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;align-items:center}.controls span{font-size:12px;color:#60636b;margin-right:4px}.controls button{cursor:pointer;border:1px solid #babec7;border-radius:30px;background:#f9fafc;padding:6px 12px;color:#444;font-family:inherit;font-size:12px}.controls button.active{background:#303238;color:#fff;border-color:#303238}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(370px,100%),1fr));gap:18px}
+.cell h3{font-size:12px;font-weight:500;margin:0 0 8px;color:#5d6068}.cell .note{font-size:11px;color:#5d6068;line-height:1.6;margin-top:8px}
+.variant{background:#e9ebef;border-radius:14px;padding:16px 16px 6px;margin-bottom:18px}
+.variant h2 .tag{font-size:11px;font-weight:500;background:#303238;color:#fff;border-radius:20px;padding:2px 8px;margin-left:8px;vertical-align:2px}
+.variant>p{font-size:12.5px;color:#4f525a;line-height:1.65;margin:4px 0 12px}
+.variant .pc{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;color:#4f525a;line-height:1.6;margin:10px 0 8px}
+.variant .pc b{color:#2c2e33}
+
+/* 假桌面 */
+.screen{position:relative;height:260px;border-radius:12px;overflow:hidden;background:var(--wall);border:1px solid #b7bbc3;color:var(--ink)}
+.screen .menubar{position:absolute;inset:0 0 auto 0;height:24px;background:var(--menubar);backdrop-filter:blur(20px);display:flex;align-items:center;padding:0 10px;font-size:12px;gap:14px}
+.screen .menubar .r{margin-left:auto;display:flex;gap:12px;align-items:center}
+.screen .doc{position:absolute;left:20px;top:46px;width:190px;height:130px;border-radius:10px;background:var(--surface);opacity:.92;box-shadow:var(--shadow)}
+.screen .doc:before{content:"";display:block;height:22px;border-bottom:1px solid var(--line);background:var(--titlebar);border-radius:10px 10px 0 0}
+.screen .dock{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);width:46%;height:30px;border-radius:12px;background:color-mix(in srgb,var(--surface) 55%,transparent);backdrop-filter:blur(16px);border:.5px solid var(--glass-edge)}
+
+/* 宠物：窗口本身透明，只画猫和挂件 */
+.pet{position:absolute;right:16px;bottom:44px;color:var(--ink);font-variant-numeric:tabular-nums;user-select:none}
+.pet .body{position:relative;width:120px;height:52px}
+.pet canvas.cat{width:120px;height:52px;display:block;filter:drop-shadow(0 1px 0 color-mix(in srgb,var(--surface) 70%,transparent))}
+.pet .shadow{position:absolute;left:18px;right:10px;bottom:-4px;height:7px;border-radius:50%;background:#0000002a;filter:blur(2px)}
+.dark .pet .shadow{background:#00000066}
+.glass{background:var(--glass);backdrop-filter:blur(22px) saturate(1.6);-webkit-backdrop-filter:blur(22px) saturate(1.6);border:.5px solid var(--glass-edge);box-shadow:var(--shadow)}
+/* A 气泡 */
+.bubble{position:absolute;right:-2px;bottom:62px;border-radius:14px;padding:8px 11px 9px;display:grid;grid-template-columns:repeat(2,66px);gap:7px 12px}
+.bubble.one{grid-template-columns:66px}
+.bubble:after{content:"";position:absolute;right:30px;bottom:-6px;width:12px;height:12px;background:inherit;border-right:.5px solid var(--glass-edge);border-bottom:.5px solid var(--glass-edge);transform:rotate(45deg);backdrop-filter:none}
+.m .lab{font-size:10px;line-height:12px;color:var(--sub);display:flex;white-space:nowrap}.m .lab b{font-weight:400;margin-left:auto}
+.m .val{font-size:15px;line-height:18px;font-weight:600;white-space:nowrap}
+.m .val.missing{color:var(--sub);font-weight:500}
+.m .bar{height:2px;border-radius:2px;background:var(--fill);margin-top:3px;overflow:hidden}.m .bar i{display:block;height:100%}.m .bar.none{background:transparent}
+/* B 小台子 */
+.plank{position:absolute;right:0;bottom:-42px;height:40px;border-radius:12px;padding:0 12px;display:flex;align-items:center;gap:10px}
+.pet.b .body{margin-right:auto}
+.pet.b{bottom:86px}.pet.b .shadow{display:none}
+.plank .m{width:60px}.plank .m .val{font-size:14px;line-height:17px}
+/* C 纯宠物 */
+.badge{position:absolute;right:4px;top:-26px;border-radius:12px;padding:3px 8px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge.alert{color:var(--t-orange)}.badge.severe{color:var(--t-red)}
+.hoverbubble{position:absolute;right:-2px;bottom:62px;border-radius:14px;padding:8px 11px 9px;display:grid;grid-template-columns:repeat(2,66px);gap:7px 12px}
+.hoverbubble:after{content:"";position:absolute;right:30px;bottom:-6px;width:12px;height:12px;background:inherit;transform:rotate(45deg)}
+.cursor{position:absolute;width:14px;height:20px;pointer-events:none}
+
+/* 拖动 */
+.target{position:absolute;width:128px;height:58px;border:1.5px dashed color-mix(in srgb,var(--ink) 35%,transparent);border-radius:16px}
+.target.hit{border-style:solid;border-color:var(--blue);background:color-mix(in srgb,var(--blue) 14%,transparent)}
+
+/* 右键菜单 */
+.menuwrap{position:relative;height:540px;background:var(--wall);border-radius:12px;border:1px solid #b7bbc3;overflow:hidden}
+.nsmenu{position:absolute;min-width:200px;padding:5px;border-radius:9px;background:var(--menu);backdrop-filter:blur(30px);border:.5px solid var(--glass-edge);box-shadow:0 12px 32px #00000035;font-size:13px;color:var(--ink)}
+.nsmenu .mi{display:flex;align-items:center;height:22px;padding:0 10px 0 22px;border-radius:5px;position:relative;white-space:nowrap}
+.nsmenu .mi .k{margin-left:auto;color:var(--sub);padding-left:24px}
+.nsmenu .mi.on{background:var(--sel);color:#fff}.nsmenu .mi.on .k{color:#fff}
+.nsmenu .mi.chk:before{content:"✓";position:absolute;left:7px;font-size:12px}
+.nsmenu .mi.dis{color:color-mix(in srgb,var(--ink) 35%,transparent)}
+.nsmenu .hd{font-size:11px;color:var(--sub);padding:5px 10px 2px 10px;font-weight:500}
+.nsmenu hr{border:0;border-top:1px solid var(--line);margin:5px 8px}
+.nsmenu .foot{font-size:11px;color:var(--sub);padding:4px 10px 2px 10px;max-width:220px;line-height:1.45;white-space:normal}
+
+/* 设置 */
+.settings{max-width:760px;border:1px solid #b7bbc3;border-radius:12px;overflow:hidden;background:var(--surface);color:var(--ink);font-size:13px;display:grid;grid-template-columns:190px 1fr;box-shadow:0 12px 28px #0000001c}
+.settings .side{background:color-mix(in srgb,var(--titlebar) 70%,transparent);padding:44px 10px 10px;border-right:1px solid var(--line)}
+.settings .side div{padding:5px 10px;border-radius:6px;margin-bottom:2px}.settings .side .on{background:color-mix(in srgb,var(--blue) 16%,transparent);font-weight:600}
+.settings .main{padding:20px 24px 18px}
+.settings .gh{font-size:11px;color:var(--sub);margin:16px 0 6px;font-weight:500;display:flex}.settings .gh:first-child{margin-top:0}
+.settings .box{border:1px solid var(--line);border-radius:8px;background:var(--field)}
+.settings .row{display:flex;align-items:center;gap:10px;min-height:38px;padding:6px 12px}.settings .row+.row{border-top:1px solid var(--line)}
+.settings .row .s{color:var(--sub);font-size:11px}.settings .r{margin-left:auto;display:flex;gap:8px;align-items:center}
+.toggle{width:32px;height:19px;border-radius:10px;background:var(--green);position:relative;flex:none}.toggle:after{content:"";position:absolute;right:2px;top:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0004}
+.toggle.off{background:var(--fill)}.toggle.off:after{right:auto;left:2px}
+.grip{color:var(--sub);width:14px;text-align:center}
+.minus{width:18px;height:18px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--sub);font-size:13px;line-height:1}
+.btn{border:1px solid var(--line);border-radius:6px;padding:2px 10px;background:var(--surface);font-size:12px}.btn.dis{opacity:.45}
+.settings .fold{color:var(--sub);font-size:12px;padding:8px 12px}
+.settings .bottom{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.settings .hint{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.5}
+
+.callout{font-size:12.5px;color:#4a4d55;line-height:1.75;background:#eef0f4;border-radius:10px;padding:14px 18px}
+.callout b{color:#2c2e33}
+table.cat{border-collapse:collapse;font-size:12px;margin:6px 0 10px;width:100%;background:#fff;border-radius:8px;overflow:hidden}
+table.cat th,table.cat td{border-bottom:1px solid #e3e5ea;padding:5px 8px;text-align:left;vertical-align:top}table.cat th{background:#f4f5f8;font-weight:600;color:#3a3c42}
+</style>
+
+<header>
+<h1>桌面猫</h1>
+<p>把当前的猫放到桌面上，像桌面宠物一样蹲在屏幕角落：猫是主角，窗口本身透明，看不到方框。跑得快慢表示负载，颜色和姿态表示健康，规则和菜单栏的猫相同。用户选的 1～4 项指标挂在猫身边。</p>
+<p>猫始终置顶，所有桌面空间和全屏 App 上都显示。可以拎起来拖动，松手落到最近的屏幕角；单击打开菜单栏面板；右键菜单选指标或让猫回去。只有猫和气泡的不透明部分接收鼠标，透明处的点击穿过去。2026-10-25 用户选定方案 A：猫 + 气泡，实现以方案 A 为准；方案 B、C 只作对比保留。所有数值都是合成数据。</p>
+<div class="controls" id="theme"><span>外观</span><button data-t="light" class="active">浅色</button><button data-t="dark">深色</button></div>
+<div class="controls" id="load"><span>负载</span><button data-l=".1">10%</button><button data-l=".24" class="active">24%</button><button data-l=".55">55%</button><button data-l=".85">85%（速度线）</button></div>
+</header>
+
+<section class="block" id="variants"></section>
+
+<section class="block">
+<h2>拎起与落位</h2>
+<p>按住猫或气泡拖动：猫停在第 1 帧，略微放大，气泡跟着走。松手后落到所在屏幕最近的一个角，贴着程序坞或屏幕底边上方 8 pt、右侧或左侧 16 pt；落在左边的角时猫的朝向不变，气泡和尾巴镜像到另一侧。移动不到 4 pt 算单击。</p>
+<div class="grid" id="drag"></div>
+</section>
+
+<section class="block">
+<h2>右键菜单</h2>
+<p>原生 <code>NSMenu</code>。指标子菜单按四类分组，已选项打勾，点一下就加或减，立即生效。已选满 4 项时其余项变灰；只剩 1 项时不能取消。</p>
+<div id="menu"></div>
+</section>
+
+<section class="block">
+<h2>设置 › 外观 › 桌面猫</h2>
+<p>放在外观栏现有内容的下面。这一组的修改即时生效，不进外观栏的“取消 / 保存”草稿。</p>
+<div id="settings"></div>
+</section>
+
+<div class="callout">
+<b>口径</b><br>
+· <b>窗口</b>：无边框、背景透明的 <code>NSPanel</code>，<code>nonactivatingPanel</code>，不抢焦点；层级 <code>.floating</code>；<code>collectionBehavior</code> 含 <code>canJoinAllSpaces</code>、<code>fullScreenAuxiliary</code>、<code>stationary</code>，不进 ⌘Tab 和调度中心。透明像素不接收鼠标，点击穿过去。<br>
+· <b>猫</b>：当前猫的帧图放大到高 52 pt（菜单栏是 18 pt），共同尺度和头部锚点按帧图合同。正常奔跑、提醒整只橙色、严重换睡姿并停止，速度和速度线按 D11 与 SPEC「菜单栏猫」。单色猫在浅色外观是近黑，深色外观是近白，并加 1 pt 反色描边，保证在任何壁纸上看得见；彩色猫保留原色。脚下一块柔和的投影。开启“减少动态效果”时定格第 1 帧。<br>
+· <b>气泡</b>：在猫的头顶，右边缘与猫对齐（左边的角时左对齐），离猫 10 pt，尾巴指向猫头。圆角 14 pt，内边距 8 × 11 pt；指标 2 列，每项宽 66 pt，列距 12 pt，行距 7 pt；1 项时 1 列。每项是标签 10 pt、数值 15 pt 半粗、2 pt 横线。用液态玻璃（macOS 26 <code>glassEffect</code>；macOS 14～15 用 <code>.hudWindow</code> 材质加 0.5 pt 描边），不叠加面板的暖色渐变。<br>
+· <b>位置</b>：只存“哪块屏幕 + 哪个角”，不存坐标。找不到这块屏幕时放到主屏同一个角，屏幕回来后不自动搬回。分辨率、程序坞或菜单栏变化时按新的可见区域重新落位。<br>
+· <b>刷新</b>：数值跟随已有数据，不新增采集。系统指标随约 2 秒一次的系统快照更新；额度、网络、电池、代理流量随各自已有的节奏。桌面猫关闭时不渲染、不计时。<br>
+· <b>数值不截断</b>：值放不下时等比缩小字号，最小 12 pt，不出现省略号。标签放不下时先去掉右侧附注，名称不截断。<br>
+· <b>缺数据</b>：已选指标暂时没有数据，这一项显示灰色“—”，横线留空，不自动换成别的指标。<br>
+· <b>性能</b>：桌面猫开启、面板关闭，10 分钟平均的自身 CPU 比关闭时高出不超过 1 个百分点。<br>
+· <b>素材</b>：只用现有的 5 帧奔跑和严重睡姿，不新增姿态。“坐着”“打哈欠”这类待机动作需要另出帧图，本次不做。<br>
+<b>指标目录</b>（只用现有采集，不新增数据源）
+<table class="cat"><thead><tr><th>分类</th><th>指标</th><th>标签</th><th>数值</th><th>横线</th></tr></thead><tbody id="catalog"></tbody></table>
+默认选 CPU、内存压力、Claude 5 小时、网速，与总览一致。最多 4 项，至少 1 项；顺序即显示顺序。额度类按已启用的渠道和该渠道实际返回的窗口生成。
+</div>
+
+<script>
+// ---------- 猫 ----------
+const RUN={sheet:'../cat/animation/slim-run-sheet-v2.png',canvas:[451,191],nose:411,top:4,frames:[[22,275,443,187,429],[489,275,398,187,885],[924,275,330,187,1249],[1301,275,368,187,1667],[1728,275,417,187,2125]]};
+const SLEEP={img:'../cat/animation/slim-severe-v6.png',b:[464,266,1000,383]};
+const runImg=new Image();runImg.src=RUN.sheet;const sleepImg=new Image();sleepImg.src=SLEEP.img;
+let load=.24,frame=0;
+function drawCat(cv){
+ const st=cv.dataset.state,dark=!!cv.closest('.dark'),W=cv.width,H=cv.height,ctx=cv.getContext('2d');
+ ctx.clearRect(0,0,W,H);
+ const ink=st==='alert'?(dark?'#ff9f0a':'#ff9500'):st==='severe'?(dark?'#ff453a':'#ff3b30'):(dark?'#f0f1f4':'#222326');
+ const frozen=cv.dataset.freeze!==undefined;
+ if(st==='severe'){if(!sleepImg.complete)return;const [x,y,w,h]=SLEEP.b,s=Math.min(W/w,H/h);ctx.drawImage(sleepImg,x,y,w,h,(W-w*s)/2,(H-h*s),w*s,h*s);}
+ else{if(!runImg.complete)return;const f=RUN.frames[frozen?0:frame%5],s=Math.min(W/RUN.canvas[0],H/RUN.canvas[1]);const dx=W-RUN.canvas[0]*s+(RUN.nose-(f[4]-f[0]))*s;
+  if(load>=.7&&!frozen){ctx.strokeStyle=ink;ctx.lineWidth=H*.04;ctx.lineCap='round';[.32,.5,.68].forEach((yy,i)=>{ctx.beginPath();ctx.moveTo(dx+W*.0-i%2*W*.03,H*yy);ctx.lineTo(dx-W*.13,H*yy);ctx.stroke();});}
+  ctx.drawImage(runImg,f[0],f[1],f[2],f[3],dx,H-f[3]*s,f[2]*s,f[3]*s);}
+ ctx.globalCompositeOperation='source-in';ctx.fillStyle=ink;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';
+}
+const frameSeconds=L=>L<=.5?.5+(L/.5)*(.185-.5):.185+((L-.5)/.5)*(.05-.185);
+let last=0;function tick(t){if(t-last>=frameSeconds(load)*1000){frame++;last=t;}document.querySelectorAll('canvas.cat').forEach(drawCat);requestAnimationFrame(tick)}
+requestAnimationFrame(tick);
+
+// ---------- 指标 ----------
+const M={
+ cpu:{lab:'CPU',val:'24%',bar:24,c:'blue'},
+ mem:{lab:'内存',val:'55%',bar:55,c:'green'},
+ memHi:{lab:'内存',val:'78%',bar:78,c:'orange',vc:'t-orange'},
+ claude:{lab:'Claude',val:'72%',bar:72,c:'green',side:'5h'},
+ claudeLow:{lab:'Claude',val:'14%',bar:14,c:'red',side:'5h',vc:'t-red'},
+ net:{lab:'网络',val:'↓2.4M',bar:100,c:'green',side:'↑128K'},
+ netBad:{lab:'网络',val:'异常',bar:100,c:'red',vc:'t-red',side:'DNS'},
+ none:{lab:'电池',val:'—',bar:null,missing:true},
+};
+const m=k=>{const x=M[k];return `<div class="m"><div class="lab">${x.lab}${x.side?`<b>${x.side}</b>`:''}</div><div class="val ${x.missing?'missing':''}" style="${x.vc?`color:var(--${x.vc})`:''}">${x.val}</div>${x.bar===null?'<div class="bar none"></div>':`<div class="bar"><i style="width:${x.bar}%;background:var(--${x.c})"></i></div>`}</div>`};
+const cat=(st,extra='')=>`<div class="body"><div class="shadow"></div><canvas class="cat" width="360" height="156" data-state="${st}" ${extra}></canvas></div>`;
+const cursor=(style)=>`<svg class="cursor" style="${style}" viewBox="0 0 14 20"><path d="M1 1v15l4-4 3 7 2-1-3-7h6z" fill="#fff" stroke="#000" stroke-width="1"/></svg>`;
+function screen(inner,theme){return `<div class="${theme}"><div class="screen"><div class="menubar"><span>访达</span><span>文件</span><span>编辑</span><div class="r"><span>14:02</span></div></div><div class="doc"></div><div class="dock"></div>${inner}</div></div>`}
+
+// 三种挂法
+const A=(keys,st)=>`<div class="pet">${cat(st)}<div class="bubble glass ${keys.length===1?'one':''}">${keys.map(m).join('')}</div></div>`;
+const B=(keys,st)=>`<div class="pet b" style="width:${keys.length*70+14}px">${cat(st)}<div class="plank glass" style="width:${keys.length*70+14}px">${keys.map(m).join('')}</div></div>`;
+const C=(keys,st,{badge,hover}={})=>`<div class="pet">${cat(st)}${badge?`<div class="badge glass ${st}">${badge}</div>`:''}${hover?`<div class="hoverbubble glass">${keys.map(m).join('')}</div>${cursor('left:64px;top:20px')}`:''}</div>`;
+
+const STATES=[
+ ['一切正常','',['cpu','mem','claude','net'],'normal'],
+ ['提醒 · 深色','dark',['cpu','memHi','claudeLow','net'],'alert'],
+ ['严重','',['cpu','claude','netBad'],'severe'],
+ ['2 项 · 缺数据 · 深色','dark',['claude','none'],'normal'],
+];
+const V=[
+ {id:'A',name:'方案 A　猫 + 气泡',tag:'已选定 · 2026-10-25',desc:'猫蹲在角落，头顶常驻一个玻璃气泡，里面是选定的指标，2 列排开（1 项时 1 列）。像宠物在“说话”，指标一直可见，猫和数字的关系最直观。',
+  pro:'<b>优点</b>：指标常驻，一眼能看全；气泡尾巴指向猫，宠物感强；占地紧凑（4 项约 170 × 140 pt）。',con:'<b>缺点</b>：气泡比猫大，遮挡面积比方案 C 多；猫跑起来时气泡不动，略有“贴纸感”。',
+  render:(k,st)=>A(k,st),notes:['默认 4 项，2 × 2。','提醒时猫变橙，触发提醒的数值用状态色。','严重时猫换睡姿停下。','选 2 项时气泡一行两列（1 项时一列）；没有电池时写“—”，横线留空。']},
+ {id:'B',name:'方案 B　猫 + 小台子',tag:'未采用',desc:'猫站在一块玻璃小台子上，指标横着写在台子上，像店门口的招牌。猫在台子左端，台子长度随项数变化。',
+  pro:'<b>优点</b>：数字横排，和面板总览的读法一致；台子给猫一个“落脚处”，在任何壁纸上都不显得飘。',con:'<b>缺点</b>：4 项时台子较宽（约 300 pt）；更像小组件，宠物感不如 A 和 C。',
+  render:(k,st)=>B(k,st),notes:['默认 4 项横排。','提醒。','严重。','台子长度随项数变化；没有电池时写“—”。']},
+ {id:'C',name:'方案 C　纯宠物，悬停看数',tag:'未采用',desc:'平时桌面上只有一只猫，没有数字。有提醒时头顶冒出一个小牌子，写最要紧的一项；鼠标停在猫身上 0.4 秒弹出气泡，显示选定的全部指标。',
+  pro:'<b>优点</b>：最不挡东西，最像桌面宠物；猫的速度和颜色本身就是“指标”。',con:'<b>缺点</b>：要看具体数字得把鼠标挪过去；和“显示选定的少量指标”的原目标偏离最多。',
+  render:(k,st,i)=>C(k,st,i===0?{}:i===1?{badge:'Claude 剩 14%'}:i===2?{badge:'网络异常 · DNS'}:{hover:true}),notes:['一切正常时只有猫。','提醒时头顶小牌子写最要紧的一项，状态色文字。','严重时牌子用红色文字。','鼠标停在猫身上，弹出全部指标。']},
+];
+document.getElementById('variants').innerHTML=V.map(v=>`<div class="variant"><h2>${v.name}${v.tag?`<span class="tag">${v.tag}</span>`:''}</h2><p>${v.desc}</p><div class="grid">${STATES.map(([t,th,k,st],i)=>`<div class="cell"><h3>${t}</h3>${screen(v.render(k,st,i),th)}<p class="note">${v.notes[i]}</p></div>`).join('')}</div><div class="pc"><div>${v.pro}</div><div>${v.con}</div></div></div>`).join('');
+
+// 拖动
+function dragScene(){
+ const tg=[['left:12px;top:32px'],['right:12px;top:32px'],['left:12px;bottom:40px'],['right:12px;bottom:40px','hit']].map(([p,h])=>`<div class="target ${h||''}" style="${p}"></div>`).join('');
+ const pet=`<div class="pet" style="right:110px;bottom:92px;transform:scale(1.06) rotate(-4deg)">${cat('normal','data-freeze')}<div class="bubble glass">${['cpu','mem','claude','net'].map(m).join('')}</div></div>`;
+ return screen(tg+pet+cursor('right:150px;bottom:110px'),'');
+}
+document.getElementById('drag').innerHTML=`<div class="cell"><h3>拎起中</h3>${dragScene()}<p class="note">猫停在第 1 帧，放大 6%、微微倾斜；四个角显示落点，最近的变蓝色实线。</p></div><div class="cell"><h3>落位后</h3>${screen(A(['cpu','mem','claude','net'],'normal'),'')}<p class="note">0.2 秒落到右下角，站在程序坞上方。开启“减少动态效果”时直接出现在落点。</p></div>`;
+
+// 菜单
+function menuScene(theme){
+ const main=`<div class="nsmenu" style="right:200px;top:170px"><div class="mi">打开面板</div><hr><div class="mi on">指标<span class="k">▸</span></div><div class="mi">桌面猫设置…</div><hr><div class="mi">让猫回去</div></div>`;
+ const sub=`<div class="nsmenu" style="right:-10px;top:20px;min-width:210px"><div class="hd">系统</div><div class="mi chk">CPU</div><div class="mi chk">内存压力</div><div class="mi dis">整机功耗</div><div class="mi dis">磁盘剩余</div><div class="hd">传感器与电池</div><div class="mi dis">SoC 温度</div><div class="mi dis">风扇</div><div class="mi dis">电池电量</div><div class="hd">额度</div><div class="mi chk">Claude · 5 小时</div><div class="mi dis">Claude · 7 天</div><div class="mi dis">Codex · 5 小时</div><div class="mi dis">Codex · 7 天</div><div class="mi dis">DeepSeek · 余额</div><div class="mi dis">今日花费</div><div class="hd">网络</div><div class="mi chk">网速</div><div class="mi dis">网络状态</div><div class="mi dis">今日代理流量</div><hr><div class="foot">已选 4 / 4，先取消一项再添加</div></div>`;
+ return `<div class="${theme}"><div class="menuwrap"><div class="pet" style="left:40px;right:auto;bottom:60px">${cat('normal')}<div class="bubble glass" style="left:-2px;right:auto">${['cpu','mem','claude','net'].map(m).join('')}</div></div><div style="position:absolute;left:170px;top:0;bottom:0;right:0">${main}${sub}</div></div></div>`;
+}
+const renderMenu=()=>document.getElementById('menu').innerHTML=menuScene(document.body.classList.contains('dark')?'dark':'')+`<p class="note" style="font-size:11px;color:#5d6068">“让猫回去”等同于在设置里关掉开关；重新打开从底部设置菜单的“显示桌面猫”或设置窗口。猫在左边的角时，气泡和菜单镜像到右侧。</p>`;
+renderMenu();
+
+// 设置
+function renderSettings(){const rows=[['CPU','24%'],['内存压力','55%'],['Claude · 5 小时','72%'],['网速','↓2.4M ↑128K']];
+ document.getElementById('settings').innerHTML=`<div class="${document.body.classList.contains('dark')?'dark':''}"><div class="settings"><div class="side"><div>通用</div><div class="on">外观</div><div>猫</div><div>网络</div><div>额度源</div><div>提醒</div></div><div class="main">
+ <div class="gh">样式 · 布局与显示</div><div class="box"><div class="fold">（现有内容不变，此处省略）</div></div>
+ <div class="gh">桌面猫 · 即时生效</div>
+ <div class="box"><div class="row">显示桌面猫<span class="s">当前的猫蹲在屏幕角落，所有桌面空间可见</span><span class="r"><span class="toggle"></span></span></div>
+ <div class="row">位置<span class="s">内建显示器 · 右下角</span><span class="r"><span class="btn">放回右下角</span></span></div></div>
+ <div class="gh">指标<span style="margin-left:auto">已选 4 / 4 · 拖动调整顺序</span></div>
+ <div class="box">${rows.map(([n,v])=>`<div class="row"><span class="grip">⋮⋮</span>${n}<span class="r"><span class="s">${v}</span><span class="minus">−</span></span></div>`).join('')}<div class="row"><span class="btn dis">添加指标…</span><span class="s">已满 4 项</span></div></div>
+ <div class="hint">“添加指标…”弹出与右键菜单相同的分组目录。只剩 1 项时减号变灰。用哪只猫跟随“猫”栏的当前选择。</div>
+ <div class="bottom"><span class="btn">恢复默认…</span><span class="btn dis">取消</span><span class="btn dis">保存</span></div>
+ <div class="hint">底部的取消和保存只管样式与布局，与桌面猫分组无关。</div></div></div></div>`;}
+renderSettings();
+
+// 目录
+const CAT=[['系统','CPU','CPU','24%','蓝色，长度=使用率'],['系统','内存压力','内存','55%（同总览口径）','状态色，长度=压力'],['系统','整机功耗','功耗','8.6 W','systemTeal，0–40 W'],['系统','磁盘剩余','磁盘 · 可用','196 G','systemGray，长度=已用；可用低于 10% 时橙色'],['传感器与电池','SoC 温度','温度','42 °C','systemIndigo，30–100 °C'],['传感器与电池','风扇','风扇','0 rpm','systemBrown，长度=占最大转速'],['传感器与电池','电池电量','电池 · 放电 / ⚡ / 接电源','62%','systemGray，20% 及以下橙色'],['额度','渠道 · 窗口剩余','Claude · 5h','72%','状态色，规则同总览额度'],['额度','余额型渠道余额','DeepSeek','¥23.4（低于阈值时橙色文字）','无'],['额度','今日花费（Claude + Codex）','花费 · 今日','$3.42','无'],['网络','网速','网络 · ↑上行','↓下行','满长，TunCanary 结论色'],['网络','网络状态','网络 · 原因','正常 / 提醒 / 异常','满长，结论色'],['网络','今日代理流量','代理 · 今日','1.2 G','无']];
+document.getElementById('catalog').innerHTML=CAT.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
+
+document.querySelectorAll('#theme button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#theme button').forEach(x=>x.classList.toggle('active',x===b));document.body.classList.toggle('dark',b.dataset.t==='dark');renderMenu();renderSettings();});
+document.querySelectorAll('#load button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#load button').forEach(x=>x.classList.toggle('active',x===b));load=Number(b.dataset.l)});
+</script>
+</html>
