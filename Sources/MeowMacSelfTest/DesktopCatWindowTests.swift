@@ -17,6 +17,7 @@ enum DesktopCatWindowTests {
             ("UI.DesktopCat/窗口属性与右下角落位", { await window() }),
             ("UI.DesktopCat/帧号与菜单栏一致且不重复光栅化", { await frameSync() }),
             ("UI.DesktopCat/拖动吸附存新屏与单击开面板", { await dragAndClick() }),
+            ("UI.DesktopCat/按下点不在猫和气泡上时不拖不开面板", { await missedPress() }),
             ("UI.DesktopCatWindow/真实屏幕窗口属性与右下角", { await foregroundWindow() }),
         ]
     }
@@ -236,6 +237,28 @@ enum DesktopCatWindowTests {
               state.desktopCat.placement == saved, controller.model.corner == .topLeft else { return false }
         let c = content(window.frame)
         return c.minX == side.visibleFrame.minX + 16 && c.maxY == side.visibleFrame.maxY - 8
+    }
+
+    static func missedPress() async -> Bool {
+        let (_, controller, url) = controller(enabled: true); defer { try? FileManager.default.removeItem(at: url) }
+        var opened = 0
+        controller.onOpenPanel = { opened += 1 }
+        controller.apply(); defer { controller.hide() }
+        guard let window = controller.window else { return false }
+        let home = window.frame
+        // 窗口左下角的透明边距：鼠标在窗口里，但不在猫或气泡上。
+        var mouse = CGPoint(x: home.minX + 3, y: home.minY + 3)
+        controller.mouseLocation = { mouse }
+        window.ignoresMouseEvents = false
+        controller.mouseDown(); controller.mouseUp()
+        guard opened == 0, window.ignoresMouseEvents else { return false }
+        controller.mouseDown(); mouse.x += 200; controller.mouseDragged(); controller.mouseUp()
+        guard opened == 0, !controller.model.dragging, window.frame == home else { return false }
+        // 气泡中间：照常单击打开面板。
+        let bubble = controller.model.layout.bubbleRect
+        mouse = CGPoint(x: home.minX + bubble.midX, y: home.maxY - bubble.midY)
+        controller.mouseDown(); controller.mouseUp()
+        return opened == 1
     }
 
     /// 前台用例（第 2 轮 `MEOWMAC_UI_TESTS=1` 运行）：真实屏幕上的窗口属性和落位。

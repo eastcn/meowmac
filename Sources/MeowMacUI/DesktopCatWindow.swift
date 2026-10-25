@@ -178,8 +178,10 @@ public final class DesktopCatController {
 
     // MARK: - 鼠标
 
+    /// 按下时再判断一次命中：鼠标刚从猫移到透明处、mouseMoved 还没到时，不进入拖动或单击。
     public func mouseDown() {
         guard let window else { return }
+        guard isMouseInside(window) else { window.ignoresMouseEvents = true; return }
         drag = (mouseLocation(), window.frame.origin, false)
     }
 
@@ -225,10 +227,13 @@ public final class DesktopCatController {
     /// 鼠标在猫的不透明像素或气泡里时接收点击，其余时候穿过去（D11 的退路，不轮询）。
     public func updateMouseThrough() {
         guard let window, drag == nil else { return }
-        let local = window.convertPoint(fromScreen: mouseLocation())
-        let point = CGPoint(x: local.x, y: window.frame.height - local.y)
-        let inside = hitShape().contains(point)
+        let inside = isMouseInside(window)
         if window.ignoresMouseEvents == inside { window.ignoresMouseEvents = !inside }
+    }
+
+    private func isMouseInside(_ window: NSWindow) -> Bool {
+        let local = window.convertPoint(fromScreen: mouseLocation())
+        return hitShape().contains(CGPoint(x: local.x, y: window.frame.height - local.y))
     }
 
     public func hitShape() -> DesktopCatHitShape {
