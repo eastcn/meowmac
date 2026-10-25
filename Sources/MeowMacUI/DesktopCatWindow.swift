@@ -29,6 +29,8 @@ public final class DesktopCatController {
     /// 气泡数值实际更新的次数、猫图换帧的次数，供测试断言。
     public private(set) var bubbleUpdates = 0
     public private(set) var frameUpdates = 0
+    /// 结束提示实际更新的次数，供测试断言（没选“AI 会话”时提示列表变化不触发渲染）。
+    public private(set) var toastUpdates = 0
     public private(set) var lastFrame: Int?
     /// 上一次画的是哪只宠物，nil 表示猫。
     private var drawnPet: ObjectIdentifier?
@@ -49,6 +51,8 @@ public final class DesktopCatController {
     private var drag: (start: CGPoint, origin: CGPoint, moved: Bool)?
     /// 拖把手缩放：按下时的鼠标位置和猫的高度（plan D15）。
     private var resize: (start: CGPoint, height: CGFloat)?
+    /// 按在结束提示上：松手时关掉这一条，不拖动，不开面板（plan D3）。
+    private var pressedToast: String?
     /// 鼠标离开猫和把手后 0.3 秒隐藏把手。一次性的延迟任务，不是计时器；回到猫身上即取消。
     private var handleHide: DispatchWorkItem?
     public static let handleHideDelay: TimeInterval = 0.3
@@ -121,7 +125,8 @@ public final class DesktopCatController {
         refreshPending = false
         observers.forEach { NotificationCenter.default.removeObserver($0) }; observers.removeAll()
         monitors.forEach { NSEvent.removeMonitor($0) }; monitors.removeAll()
-        drag = nil; model.dragging = false; mask = nil
+        drag = nil; model.dragging = false; mask = nil; pressedToast = nil
+        if !model.toasts.isEmpty { model.toasts = [] }
         resize = nil; handleHide?.cancel(); handleHide = nil; model.handleVisible = false
         if resizeCursorShown { NSCursor.arrow.set(); resizeCursorShown = false }
         hideDropTargets()
@@ -151,8 +156,16 @@ public final class DesktopCatController {
         // 拖把手时以拖动中的高度为准，松手写入配置后再跟随配置。
         let height = DesktopCatSize.rendered(state.desktopCat.catHeight)
         let sized = resize == nil && height != model.catHeight
-        let resized = items.count != model.items.count || corner != model.corner || sized
+        // 只在选了“AI 会话”时显示结束提示（D46）。
+        let toasts = AgentSessionCadence.wanted(state.desktopCat) ? state.agentSessionToasts : []
+        let toastsChanged = toasts != model.toasts
+        let resized = items.count != model.items.count || corner != model.corner || sized || toastsChanged
         if items != model.items { model.items = items; bubbleUpdates += 1 }
+        if toastsChanged {
+            model.toasts = toasts; toastUpdates += 1
+            // 先让内容按新版式排好再改窗口大小，避免提示出现和消失时闪一帧。
+            window?.contentView?.layoutSubtreeIfNeeded()
+        }
         if corner != model.corner { model.corner = corner }
         if sized { model.catHeight = height }
         if resized { position(animated: false) }
@@ -222,8 +235,14 @@ public final class DesktopCatController {
     public func mouseDown() {
         guard let window else { return }
         guard isMouseInside(window) else { window.ignoresMouseEvents = true; return }
+        let shape = hitShape(), point = localPoint(window)
+        // 按在结束提示上：松手关掉这一条。
+        if let index = shape.toast(at: point), index < model.toasts.count {
+            pressedToast = model.toasts[index].id
+            return
+        }
         // 按在把手上：进入缩放，不移动猫，也不算单击（plan D15）。
-        if hitShape().inHandle(localPoint(window)) {
+        if shape.inHandle(point) {
             resize = (mouseLocation(), model.catHeight)
             return
         }
@@ -231,6 +250,7 @@ public final class DesktopCatController {
     }
 
     public func mouseDragged() {
+        guard pressedToast == nil else { return }
         if let current = resize {
             let location = mouseLocation()
             let height = DesktopCatSize.dragged(from: current.height, delta: CGVector(dx: location.x - current.start.x, dy: location.y - current.start.y),
@@ -256,6 +276,14 @@ public final class DesktopCatController {
     }
 
     public func mouseUp() {
+        if let pressed = pressedToast {
+            pressedToast = nil
+            // 松手时还在同一条提示上才关掉；不开面板。
+            guard let window, let index = hitShape().toast(at: localPoint(window)), index < model.toasts.count,
+                  model.toasts[index].id == pressed else { return }
+            state.onDismissAgentSessionToast(model.toasts[index].ids)
+            return
+        }
         if resize != nil {
             resize = nil
             finishResize()

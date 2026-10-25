@@ -19,6 +19,9 @@ public struct DesktopCatLayout: Equatable {
     public static let labelSize: CGFloat = 10, valueSize: CGFloat = 15, minimumValueSize: CGFloat = 12
     /// 缩放把手的直径（plan D15）。
     public static let handleDiameter: CGFloat = 12
+    /// 结束提示（D46，plan D3）：高 24 pt，最宽 220 pt，条间和离气泡（上方的角离猫）6 pt。
+    public static let toastHeight: CGFloat = 24, toastGap: CGFloat = 6, toastMaxWidth: CGFloat = 220
+    public static let maxToasts = 2
 
     public let count: Int
     public let mirrored: Bool
@@ -26,12 +29,20 @@ public struct DesktopCatLayout: Equatable {
     public let catTrim: CGFloat
     /// 猫图格子的尺寸，随猫的高度缩放（D47）。
     public let catSize: CGSize
+    /// 上方的角：提示放在猫下方；下方的角：提示放在气泡上方（plan D3）。
+    public let top: Bool
+    /// 每条结束提示的宽度，第 0 条贴着气泡（上方的角贴着猫）。最多 2 条，每条最宽 220 pt。
+    public let toastWidths: [CGFloat]
 
-    public init(count: Int, corner: DesktopCatCorner, catTrim: CGFloat = 0, catHeight: CGFloat = DesktopCatSize.defaultHeight) {
-        self.count = min(DesktopCatConfig.maxMetrics, max(1, count)); mirrored = corner.isLeft
+    public init(count: Int, corner: DesktopCatCorner, catTrim: CGFloat = 0, catHeight: CGFloat = DesktopCatSize.defaultHeight,
+                toastWidths: [CGFloat] = []) {
+        self.count = min(DesktopCatConfig.maxMetrics, max(1, count)); mirrored = corner.isLeft; top = corner.isTop
         catSize = DesktopCatSize.catSize(height: DesktopCatSize.clamped(catHeight))
         self.catTrim = max(0, min(catTrim, catSize.width))
+        self.toastWidths = toastWidths.prefix(Self.maxToasts).map { min(Self.toastMaxWidth, max(0, $0.isFinite ? $0 : 0)) }
     }
+    /// 提示区的高度：每条 24 pt 加 6 pt 间距。
+    public var toastArea: CGFloat { CGFloat(toastWidths.count) * (Self.toastHeight + Self.toastGap) }
     /// 左边的角时内容左侧多留的透明宽度，容纳猫图格子里猫左边的空白。
     private var leading: CGFloat { mirrored ? catTrim : 0 }
 
@@ -45,7 +56,8 @@ public struct DesktopCatLayout: Equatable {
     }
     /// 猫和气泡的外接区域，不含透明边距。
     public var contentSize: CGSize {
-        CGSize(width: max(catSize.width, bubbleSize.width), height: bubbleSize.height + Self.bubbleGap + catSize.height)
+        CGSize(width: max(catSize.width, bubbleSize.width, toastWidths.max() ?? 0),
+               height: bubbleSize.height + Self.bubbleGap + catSize.height + toastArea)
     }
     public var windowSize: CGSize { CGSize(width: contentSize.width + 2 * Self.inset + leading, height: contentSize.height + 2 * Self.inset) }
     /// 内容在窗口里的位置（y 向下）。
@@ -55,13 +67,22 @@ public struct DesktopCatLayout: Equatable {
     private func aligned(width: CGFloat) -> CGFloat {
         mirrored ? contentRect.minX : contentRect.maxX - width
     }
+    /// 下方的角提示区在气泡上面，气泡往下让出提示区；上方的角提示区在猫下面。窗口贴角，猫和气泡相对屏幕不动（plan D10）。
     public var bubbleRect: CGRect {
-        CGRect(origin: CGPoint(x: aligned(width: bubbleSize.width), y: contentRect.minY), size: bubbleSize)
+        CGRect(origin: CGPoint(x: aligned(width: bubbleSize.width), y: contentRect.minY + (top ? 0 : toastArea)), size: bubbleSize)
     }
     /// 猫图格子。左边的角时左移 `catTrim`，可见的猫左缘与气泡左缘对齐。
     public var catRect: CGRect {
-        CGRect(origin: CGPoint(x: aligned(width: catSize.width) - leading, y: contentRect.maxY - catSize.height), size: catSize)
+        CGRect(origin: CGPoint(x: aligned(width: catSize.width) - leading, y: bubbleRect.maxY + Self.bubbleGap), size: catSize)
     }
+    /// 第 index 条提示的位置，与气泡同侧对齐。第 0 条贴着气泡（上方的角贴着猫），离 6 pt。
+    public func toastRect(_ index: Int) -> CGRect {
+        let width = toastWidths[index], step = Self.toastHeight + Self.toastGap
+        let y = top ? catRect.maxY + Self.toastGap + CGFloat(index) * step
+                    : bubbleRect.minY - Self.toastGap - Self.toastHeight - CGFloat(index) * step
+        return CGRect(x: aligned(width: width), y: y, width: width, height: Self.toastHeight)
+    }
+    public var toastRects: [CGRect] { toastWidths.indices.map(toastRect) }
     /// 缩放把手的圆心：猫朝屏幕内侧的上角（plan D15）。右边的角取猫可见左缘，左边的角取猫图格子右缘。
     public var handleCenter: CGPoint {
         let cat = catRect

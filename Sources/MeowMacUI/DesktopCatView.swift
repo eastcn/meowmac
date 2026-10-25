@@ -14,9 +14,17 @@ public final class DesktopCatViewModel: ObservableObject {
     @Published public var catHeight: CGFloat = DesktopCatSize.defaultHeight
     /// 鼠标停在猫身上时显示缩放把手（plan D15）。
     @Published public var handleVisible = false
+    /// 结束提示（D46），第 0 条贴着气泡（上方的角贴着猫）。只在选了“AI 会话”时有内容。
+    @Published public var toasts: [AgentSessionToast] = [] {
+        didSet { toastMetrics = toasts.prefix(DesktopCatLayout.maxToasts).map(DesktopCatToastText.metrics) }
+    }
+    /// 按真实字体量好的提示宽度和名称宽度，设置提示时算一次。
+    public private(set) var toastMetrics: [DesktopCatToastText.Metrics] = []
     public let frame = DesktopCatFrameModel()
     public init() {}
-    public var layout: DesktopCatLayout { DesktopCatLayout(count: items.count, corner: corner, catTrim: catTrim, catHeight: catHeight) }
+    public var layout: DesktopCatLayout {
+        DesktopCatLayout(count: items.count, corner: corner, catTrim: catTrim, catHeight: catHeight, toastWidths: toastMetrics.map(\.width))
+    }
 }
 
 /// 逐帧更新的猫图。单独发布，换帧不重新计算气泡。
@@ -45,6 +53,12 @@ public struct DesktopCatContentView: View {
             if model.handleVisible {
                 let handle = layout.handleRect
                 DesktopCatHandle().frame(width: handle.width, height: handle.height).offset(x: handle.minX, y: handle.minY)
+            }
+            ForEach(Array(zip(model.toasts.prefix(DesktopCatLayout.maxToasts), model.toastMetrics).enumerated()), id: \.element.0.id) { index, pair in
+                let rect = layout.toastRect(index)
+                DesktopCatToast(toast: pair.0, metrics: pair.1)
+                    .frame(width: rect.width, height: rect.height)
+                    .offset(x: rect.minX, y: rect.minY)
             }
         }
         .frame(width: layout.windowSize.width, height: layout.windowSize.height, alignment: .topLeading)
@@ -138,6 +152,78 @@ struct DesktopCatBubble: View {
     }
 }
 
+/// 结束提示（D46，plan D3）：玻璃胶囊，高 24 pt，最宽 220 pt，11 pt 字。
+/// “✓ 名称 · 渠道 · 已完成 · 耗时”：名称过长只截断名称；合并的那条写“另有 n 个会话完成”。材质同气泡。
+struct DesktopCatToast: View {
+    @Environment(\.previewMaterial) private var previewMaterial
+    @Environment(\.colorScheme) private var colorScheme
+    let toast: AgentSessionToast
+    let metrics: DesktopCatToastText.Metrics
+    var body: some View {
+        let content = HStack(spacing: DesktopCatToastText.spacing) {
+            switch toast {
+            case .single(let notice):
+                Text("✓").font(DesktopCatToastText.checkFont).foregroundStyle(Design.state(.normal)).fixedSize()
+                Text(notice.name).font(DesktopCatToastText.nameFont).foregroundStyle(Design.label)
+                    .lineLimit(1).truncationMode(.tail).frame(width: metrics.nameWidth, alignment: .leading)
+                Text(notice.detail).font(DesktopCatToastText.detailFont).foregroundStyle(Design.secondary).lineLimit(1).fixedSize()
+            case .more:
+                Text(toast.text).font(DesktopCatToastText.detailFont).foregroundStyle(Design.secondary).lineLimit(1).fixedSize()
+            }
+        }
+        .padding(.horizontal, DesktopCatToastText.padding)
+        .frame(width: metrics.width, height: DesktopCatLayout.toastHeight, alignment: .leading)
+        .contentShape(Capsule())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(toast.text)
+        let edge = colorScheme == .dark ? Color.white.opacity(0.14) : Color.white.opacity(0.8)
+        if previewMaterial {
+            content.background {
+                Capsule().fill(colorScheme == .dark ? Color(red: 40 / 255, green: 41 / 255, blue: 46 / 255).opacity(0.7) : Color(red: 250 / 255, green: 251 / 255, blue: 253 / 255).opacity(0.78))
+                    .overlay(Capsule().stroke(edge, lineWidth: 0.5))
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.15), radius: 6, y: 3)
+            }
+        } else if #available(macOS 26, *) {
+            content.glassEffect(.regular, in: Capsule())
+        } else {
+            content.background {
+                DesktopCatMaterial().clipShape(Capsule()).overlay(Capsule().stroke(edge, lineWidth: 0.5))
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.15), radius: 6, y: 3)
+            }
+        }
+    }
+}
+
+/// 结束提示的字体和测量：宽度按内容，最宽 220 pt；名称最宽 96 pt（设计稿），再放不下时只缩名称。
+public enum DesktopCatToastText {
+    public struct Metrics: Equatable {
+        public let width: CGFloat
+        public let nameWidth: CGFloat
+    }
+    static let padding: CGFloat = 10, spacing: CGFloat = 5, nameMaxWidth: CGFloat = 96
+    static let checkFont = Font.system(size: 11, weight: .bold)
+    static let nameFont = Font.system(size: 11, weight: .semibold)
+    static let detailFont = Font.system(size: 11)
+    static func width(_ text: String, weight: NSFont.Weight) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: weight)]).width)
+    }
+    public static func metrics(_ toast: AgentSessionToast) -> Metrics {
+        switch toast {
+        case .single(let notice):
+            let fixed = 2 * padding + width("✓", weight: .bold) + 2 * spacing + width(notice.detail, weight: .regular)
+            let name = min(width(notice.name, weight: .semibold), nameMaxWidth, max(0, DesktopCatLayout.toastMaxWidth - fixed))
+            return Metrics(width: min(DesktopCatLayout.toastMaxWidth, fixed + name), nameWidth: name)
+        case .more:
+            return Metrics(width: min(DesktopCatLayout.toastMaxWidth, 2 * padding + width(toast.text, weight: .regular)), nameWidth: 0)
+        }
+    }
+    /// 名称是否被截断。
+    public static func truncatesName(_ toast: AgentSessionToast) -> Bool {
+        guard case .single(let notice) = toast else { return false }
+        return width(notice.name, weight: .semibold) > metrics(toast).nameWidth
+    }
+}
+
 /// macOS 14～15 的退路：`.hudWindow` 材质。
 struct DesktopCatMaterial: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
@@ -157,7 +243,7 @@ enum DesktopCatText {
         ceil((text as NSString).size(withAttributes: [.font: font]).width)
     }
     static func valueSize(_ item: DesktopCatItem) -> CGFloat {
-        DesktopCatTextFit.valueSize { width(item.value, font: valueFont($0, missing: item.missing)) }
+        DesktopCatTextFit.valueSize { width(item.value, font: valueFont($0, missing: item.missing || item.muted)) }
     }
     static func showsNote(_ item: DesktopCatItem) -> Bool {
         guard let note = item.note, !note.isEmpty else { return false }
@@ -179,8 +265,8 @@ struct DesktopCatMetricView: View {
             .font(.system(size: DesktopCatLayout.labelSize)).monospacedDigit().foregroundStyle(Design.secondary)
             .frame(height: DesktopCatLayout.labelHeight)
             Text(item.value)
-                .font(Font(DesktopCatText.valueFont(valueSize, missing: item.missing)))
-                .foregroundStyle(item.missing ? Design.secondary : item.valueLevel.map { Design.stateText($0) } ?? Design.label)
+                .font(Font(DesktopCatText.valueFont(valueSize, missing: item.missing || item.muted)))
+                .foregroundStyle(item.missing || item.muted ? Design.secondary : item.valueLevel.map { Design.stateText($0) } ?? Design.label)
                 .lineLimit(1).fixedSize()
                 .frame(height: DesktopCatLayout.valueHeight, alignment: .leading)
             ZStack(alignment: .leading) {
@@ -215,7 +301,7 @@ struct DesktopCatMetricView: View {
 public enum DesktopCatTextMetrics {
     public static func valueSize(_ item: DesktopCatItem) -> CGFloat { DesktopCatText.valueSize(item) }
     public static func fits(_ item: DesktopCatItem, size: CGFloat) -> Bool {
-        DesktopCatText.width(item.value, font: DesktopCatText.valueFont(size, missing: item.missing)) <= DesktopCatLayout.itemWidth
+        DesktopCatText.width(item.value, font: DesktopCatText.valueFont(size, missing: item.missing || item.muted)) <= DesktopCatLayout.itemWidth
     }
     public static func showsNote(_ item: DesktopCatItem) -> Bool { DesktopCatText.showsNote(item) }
 }

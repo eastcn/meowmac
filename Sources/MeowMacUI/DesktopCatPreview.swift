@@ -9,6 +9,9 @@ public enum DesktopCatPreview {
         case normal, alert, severe, missing, single, longSpeed, leftCorner
         /// D47：8 项、6 项、左上角 8 项。
         case eight, six, topLeftEight
+        /// D46：设计稿「AI 会话」的五个状态，以及四个角各一张带 2 条提示的图。
+        case sessionsRunning, sessionsIdle, sessionsOne, sessionsMany, sessionsSingle
+        case sessionsTopLeft, sessionsTopRight, sessionsBottomLeft, sessionsBottomRight
         /// 设计稿“提醒 · 深色”“2 项 · 缺数据 · 深色”只出深色；预览两种外观都出。
         public var title: String {
             switch self {
@@ -22,6 +25,15 @@ public enum DesktopCatPreview {
             case .eight: return "8 项"
             case .six: return "6 项"
             case .topLeftEight: return "左上角 8 项"
+            case .sessionsRunning: return "有会话在跑"
+            case .sessionsIdle: return "没有会话在跑"
+            case .sessionsOne: return "一个会话结束"
+            case .sessionsMany: return "连续结束多个"
+            case .sessionsSingle: return "只选 1 项"
+            case .sessionsTopLeft: return "左上角 · 2 条"
+            case .sessionsTopRight: return "右上角 · 2 条"
+            case .sessionsBottomLeft: return "左下角 · 2 条"
+            case .sessionsBottomRight: return "右下角 · 2 条"
             }
         }
     }
@@ -74,10 +86,57 @@ public enum DesktopCatPreview {
         case .six:
             metrics = ["system.cpu", "system.memory", "system.power", "system.disk", "quota.claude.minutes:300", "network.speed"]
             state.catLevelOverride = .normal
+        case .sessionsRunning, .sessionsIdle, .sessionsOne:
+            metrics = ["system.cpu", "system.memory", "quota.claude.minutes:300", AgentSessionCadence.metricID]
+            state.catLevelOverride = .normal
+        case .sessionsMany, .sessionsTopLeft, .sessionsTopRight, .sessionsBottomLeft, .sessionsBottomRight:
+            metrics = ["system.cpu", AgentSessionCadence.metricID]
+            state.catLevelOverride = .normal
+        case .sessionsSingle:
+            metrics = [AgentSessionCadence.metricID]
+            state.catLevelOverride = .normal
         }
-        let corner: DesktopCatCorner = kind == .leftCorner ? .bottomLeft : kind == .topLeftEight ? .topLeft : .bottomRight
+        sessions(kind, state: state)
+        let corner: DesktopCatCorner
+        switch kind {
+        case .leftCorner, .sessionsBottomLeft: corner = .bottomLeft
+        case .topLeftEight, .sessionsTopLeft: corner = .topLeft
+        case .sessionsTopRight: corner = .topRight
+        default: corner = .bottomRight
+        }
         state.desktopCat = DesktopCatConfig(enabled: true, metrics: metrics, placement: DesktopCatPlacement(corner: corner))
         return state
+    }
+
+    /// 设计稿「AI 会话（D46）」的虚构会话：在跑数和结束提示。名称都是虚构的。
+    static func sessions(_ kind: Case, state: PanelState) {
+        let now = state.now()
+        func snapshot(claude: Int, codex: Int) -> AgentSessionSnapshot {
+            let sessions = (0..<claude).map { AgentSessionState(provider: .claude, id: "c\($0)", phase: .running, lastWriteAt: now, now: now) }
+                + (0..<codex).map { AgentSessionState(provider: .codex, id: "x\($0)", phase: .running, lastWriteAt: now, now: now) }
+            return AgentSessionSnapshot(checkedAt: now, roots: [.claude: .ok, .codex: .ok], sessions: sessions)
+        }
+        func notice(_ name: String, _ provider: QuotaProvider, _ minutes: Double) -> AgentSessionToast {
+            .single(AgentSessionNotice(id: name, provider: provider, name: name, duration: minutes * 60, completedAt: now, shownAt: now))
+        }
+        let pair = [notice("示例项目", .codex, 12), notice("notes-app", .claude, 3)]
+        switch kind {
+        case .sessionsRunning: state.agentSessions = snapshot(claude: 2, codex: 1)
+        case .sessionsIdle: state.agentSessions = snapshot(claude: 0, codex: 0)
+        case .sessionsOne:
+            state.agentSessions = snapshot(claude: 0, codex: 1)
+            state.agentSessionToasts = [notice("示例项目", .codex, 12)]
+        case .sessionsMany:
+            state.agentSessions = snapshot(claude: 2, codex: 1)
+            state.agentSessionToasts = [notice("notes-app", .claude, 3), .more(count: 2, ids: ["a", "b"])]
+        case .sessionsSingle:
+            state.agentSessions = snapshot(claude: 1, codex: 0)
+            state.agentSessionToasts = [notice("一个名字很长的示例会话标题", .claude, 65)]
+        case .sessionsTopLeft, .sessionsTopRight, .sessionsBottomLeft, .sessionsBottomRight:
+            state.agentSessions = snapshot(claude: 2, codex: 1)
+            state.agentSessionToasts = pair
+        default: break
+        }
     }
 
     /// 与窗口相同的视图模型路径：目录取值、猫图缓存和内容视图。
@@ -86,6 +145,8 @@ public enum DesktopCatPreview {
         model.items = state.desktopCatItems
         model.corner = state.desktopCat.placement.corner
         model.catHeight = DesktopCatSize.rendered(state.desktopCat.catHeight)
+        // 同 `DesktopCatController.refreshBubble`：只在选了“AI 会话”时显示结束提示。
+        model.toasts = AgentSessionCadence.wanted(state.desktopCat) ? state.agentSessionToasts : []
         model.frame.dark = dark
         let display = state.catDisplay(reducedMotion: false)
         let size = model.layout.catSize

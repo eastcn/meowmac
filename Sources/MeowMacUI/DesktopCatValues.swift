@@ -30,6 +30,7 @@ public extension PanelState {
             inputs.proxyTodayBytes = summary.proxy.total
             inputs.proxyUpdatedAt = now()
         }
+        inputs.agentSessions = agentSessions
         return inputs
     }
     var desktopCatCatalog: [DesktopCatCatalogEntry] { DesktopCatCatalog.entries(desktopCatInputs) }

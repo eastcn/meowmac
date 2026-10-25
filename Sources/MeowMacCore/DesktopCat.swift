@@ -173,12 +173,15 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
 
 public enum DesktopCatCategory: String, CaseIterable, Sendable {
     case system, sensor, quota, network
+    /// D46：只有一项“AI 会话”。
+    case agents
     public var title: String {
         switch self {
         case .system: return "系统"
         case .sensor: return "传感器与电池"
         case .quota: return "额度"
         case .network: return "网络"
+        case .agents: return "AI 会话"
         }
     }
 }
@@ -190,12 +193,15 @@ public enum DesktopCatMetric: Hashable, Sendable {
     case quotaBalance(QuotaProvider)
     case costToday
     case networkSpeed, networkStatus, proxyToday
+    /// Claude 和 Codex 已确认在跑的主会话数（D46）。
+    case agentSessions
 
     private static let fixed: [String: DesktopCatMetric] = [
         "system.cpu": .cpu, "system.memory": .memory, "system.power": .power, "system.disk": .disk,
         "sensor.temperature": .temperature, "sensor.fan": .fan, "battery.level": .battery,
         "quota.cost.today": .costToday,
         "network.speed": .networkSpeed, "network.status": .networkStatus, "network.proxy.today": .proxyToday,
+        AgentSessionCadence.metricID: .agentSessions,
     ]
 
     public init?(id: String) {
@@ -234,6 +240,7 @@ public enum DesktopCatMetric: Hashable, Sendable {
         case .networkSpeed: return "network.speed"
         case .networkStatus: return "network.status"
         case .proxyToday: return "network.proxy.today"
+        case .agentSessions: return AgentSessionCadence.metricID
         }
     }
 
@@ -243,6 +250,7 @@ public enum DesktopCatMetric: Hashable, Sendable {
         case .temperature, .fan, .battery: return .sensor
         case .quotaWindow, .quotaBalance, .costToday: return .quota
         case .networkSpeed, .networkStatus, .proxyToday: return .network
+        case .agentSessions: return .agents
         }
     }
 
@@ -261,6 +269,7 @@ public enum DesktopCatMetric: Hashable, Sendable {
         case .networkSpeed: return 30
         case .networkStatus: return 31
         case .proxyToday: return 32
+        case .agentSessions: return 40
         }
     }
 }
@@ -295,20 +304,27 @@ public struct DesktopCatItem: Equatable {
     /// 提示里的全称，例如“Claude 5 小时窗口剩余”。
     public let fullName: String
     public let updatedAt: Date?
+    /// 数值用灰色，但不是缺数据，例如 AI 会话的“空闲”（D46）。
+    public let muted: Bool
+    /// 悬停提示的正文，代替“全称 值”，例如“Claude 2 个在跑，Codex 1 个”。
+    public let hint: String?
 
     public init(id: String, label: String, note: String? = nil, value: String, bar: Double?, color: DesktopCatColor,
-                valueLevel: HealthLevel? = nil, missing: Bool = false, fullName: String, updatedAt: Date? = nil) {
+                valueLevel: HealthLevel? = nil, missing: Bool = false, fullName: String, updatedAt: Date? = nil,
+                muted: Bool = false, hint: String? = nil) {
         self.id = id; self.label = label; self.note = note; self.value = value; self.bar = bar.map { $0.isFinite ? min(1, max(0, $0)) : 0 }
         self.color = color; self.valueLevel = valueLevel; self.missing = missing; self.fullName = fullName; self.updatedAt = updatedAt
+        self.muted = muted; self.hint = hint
     }
 
     /// 悬停提示：全称和数据时间，例如“Claude 5 小时窗口剩余 72% · 13:57 更新”。
     public func tooltip(timeZone: TimeZone = .current) -> String {
         if missing { return fullName + " · 暂无数据" }
-        guard let updatedAt else { return fullName + " " + value }
+        let body = hint ?? (fullName + " " + value)
+        guard let updatedAt else { return body }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN"); formatter.timeZone = timeZone; formatter.dateFormat = "HH:mm"
-        return fullName + " " + value + " · " + formatter.string(from: updatedAt) + " 更新"
+        return body + " · " + formatter.string(from: updatedAt) + " 更新"
     }
 }
 
@@ -332,6 +348,8 @@ public struct DesktopCatInputs {
     /// 今日经代理的上下行合计；读不到控制接口时为 nil。
     public var proxyTodayBytes: Double?
     public var proxyUpdatedAt: Date?
+    /// 最近一次 AI 会话检查（D46）；协调器没运行时为 nil。
+    public var agentSessions: AgentSessionSnapshot?
     public init() {}
 }
 
@@ -382,6 +400,7 @@ public enum DesktopCatCatalog {
         case .networkSpeed: return "网速"
         case .networkStatus: return "网络状态"
         case .proxyToday: return "今日代理流量"
+        case .agentSessions: return "AI 会话"
         }
     }
 
@@ -507,7 +526,29 @@ public enum DesktopCatCatalog {
             }
             return DesktopCatItem(id: metric.id, label: "代理", note: "今日", value: ProxyTrafficFormat.bytes(bytes), bar: nil, color: .gray,
                                   fullName: "今日代理流量", updatedAt: inputs.proxyUpdatedAt)
+        case .agentSessions:
+            return agentItem(inputs.agentSessions)
         }
+    }
+
+    /// AI 会话（D46，plan D2）：数值是两个渠道已确认在跑的主会话数，写成“3 在跑”；没有在跑写灰色“空闲”；
+    /// 两个渠道的根目录都读不了（或还没检查过）写“—”。不画横线。未确认的不计入数值，只写进悬停提示。
+    static func agentItem(_ snapshot: AgentSessionSnapshot?) -> DesktopCatItem {
+        let metric = DesktopCatMetric.agentSessions
+        guard let snapshot, snapshot.readable else { return missing(metric, label: "AI 会话", fullName: "AI 会话") }
+        var parts: [String] = []
+        for provider in AgentSessionSnapshot.providers {
+            switch snapshot.roots[provider] ?? .missing {
+            case .missing: continue
+            case .unavailable: parts.append(provider.displayName + " 记录读不了")
+            case .ok: parts.append(provider.displayName + " \(snapshot.running(provider)) 个" + (parts.isEmpty ? "在跑" : ""))
+            }
+        }
+        var hint = parts.joined(separator: "，")
+        if snapshot.unknownTotal > 0 { hint += "，另有 \(snapshot.unknownTotal) 个未确认" }
+        let running = snapshot.runningTotal
+        return DesktopCatItem(id: metric.id, label: "AI 会话", value: running > 0 ? "\(running) 在跑" : "空闲", bar: nil, color: .gray,
+                              fullName: "AI 会话", updatedAt: snapshot.checkedAt, muted: running == 0, hint: hint)
     }
 
     static func networkColor(_ tone: NetworkTone) -> DesktopCatColor {

@@ -113,7 +113,7 @@ public struct DesktopCatAlphaMask: Equatable {
     }
 }
 
-/// 点击判断（D11）：只有猫的不透明像素、气泡圆角矩形、尾巴和显示中的缩放把手接收鼠标。坐标以窗口左上角为原点，y 向下。
+/// 点击判断（D11）：只有猫的不透明像素、气泡圆角矩形、尾巴、显示中的缩放把手和结束提示接收鼠标。坐标以窗口左上角为原点，y 向下。
 public struct DesktopCatHitShape {
     public let layout: DesktopCatLayout
     public let catMask: DesktopCatAlphaMask?
@@ -124,7 +124,17 @@ public struct DesktopCatHitShape {
     }
 
     public func contains(_ point: CGPoint) -> Bool {
-        inHandle(point) || inBubble(point) || inTail(point) || inCat(point)
+        inHandle(point) || inBubble(point) || inTail(point) || inCat(point) || toast(at: point) != nil
+    }
+
+    /// 点中的结束提示（胶囊形，圆角 12 pt）；提示之间的 6 pt 空隙和提示外都不算（plan D10）。
+    public func toast(at p: CGPoint) -> Int? {
+        layout.toastRects.firstIndex { rect in
+            guard rect.contains(p) else { return false }
+            let r = rect.height / 2
+            let cx = min(max(p.x, rect.minX + r), rect.maxX - r), cy = rect.midY
+            return hypot(p.x - cx, p.y - cy) <= r
+        }
     }
 
     /// 把手的圆形区域（plan D15、D16）。

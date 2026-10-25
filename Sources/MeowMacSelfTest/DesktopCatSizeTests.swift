@@ -128,14 +128,11 @@ enum DesktopCatSizeTests {
                     guard CGRect(origin: .zero, size: layout.windowSize).contains(layout.handleRect) else { return false }
                 }
                 guard Set(anchors.map { "\($0.x),\($0.y)" }).count == 1 else { print("桌面猫大小锚点移动：\(corner) \(anchors)"); return false }
-                // 104 pt、8 项、2 条结束提示（每条高 24 pt，间距 6 pt，D3）：全部内容在可见区域内。
-                let layout = DesktopCatLayout(count: 8, corner: corner, catHeight: 104)
+                // 104 pt、8 项、2 条最宽（220 pt）的结束提示：按真实提示版式（第 1 轮复审 R6），全部内容在可见区域内。
+                let layout = DesktopCatLayout(count: 8, corner: corner, catHeight: 104, toastWidths: [220, 220])
                 let frame = DesktopCatGeometry.windowFrame(layout: layout, corner: corner, visibleFrame: visible)
-                let content = DesktopCatWindowTests.content(frame, layout)
-                let toasts: CGFloat = 2 * (24 + 6)
-                let all = corner.isTop ? CGRect(x: content.minX, y: content.minY - toasts, width: max(content.width, 220), height: content.height + toasts)
-                                       : CGRect(x: content.minX, y: content.minY, width: max(content.width, 220), height: content.height + toasts)
-                let shifted = corner.isLeft ? all : all.offsetBy(dx: content.width - all.width, dy: 0)
+                let shifted = DesktopCatWindowTests.content(frame, layout)
+                guard layout.toastRects.count == 2, layout.toastRects.allSatisfy({ layout.contentRect.contains($0) }) else { return false }
                 guard visible.contains(shifted) else { print("桌面猫最大尺寸超出可见区域：\(corner)"); return false }
             }
         }
