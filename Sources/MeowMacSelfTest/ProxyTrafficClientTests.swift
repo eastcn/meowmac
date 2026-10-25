@@ -111,8 +111,9 @@ private func proxyClientError(_ response: Data) -> ProxyTrafficClientError? {
 /// 只在 build/ 内创建虚构 socket，服务器自行结束，不操作真实代理服务。
 private func proxySocketFixtureTest(parts: [String], pause: TimeInterval = 0,
                                     expected: Data? = nil, expectedError: ProxyTrafficClientError? = nil) -> Bool {
-    let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build")
-    let path = directory.appendingPathComponent("pt-\(UUID().uuidString.prefix(8)).sock").path
+    // 用相对 cwd 的路径，长度不随仓库所在目录变化；绝对路径在较深的 worktree 里会超过 sun_path 的 104 字节。
+    let directory = URL(fileURLWithPath: "build")
+    let path = "build/pt-\(UUID().uuidString.prefix(8)).sock"
     guard (try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)) != nil else { return false }
     let listener = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
     guard listener >= 0 else { return false }
