@@ -10,9 +10,9 @@
 
 **用户实机验收**：2026-10-26 用户回复“验收通过了”，覆盖 plan 条目 7「用户实机验收」各项，以及第 1 轮 R1～R3、第 2 轮 R3～R6 和结束提示名称宽度这些观感遗留。
 
-**性能**：第 3 步（选“AI 会话”的 CPU 增量）和第 4 步（实机计数取证）未验证，第 3a 步（104 pt、8 项）单次对比未通过但读数波动大于门槛。用户 2026-10-26 决定性能暂缓，后续在新会话里处理；规划者建议在前台会话里亲自测，两组都按 A B A B 交替，门槛不变。本轮复审尚未派发。
+**性能**：第 3 步（选“AI 会话”的 CPU 增量）和第 4 步（实机计数取证）未验证，第 3a 步（104 pt、8 项）单次对比未通过但读数波动大于门槛。用户 2026-10-26 决定性能暂缓，后续在新会话里处理；规划者建议在前台会话里亲自测，两组都按 A B A B 交替，门槛不变。
 
-**提交范围**：`625bfde..（本轮提交：docs: record desktop cat sessions round 3）`。本轮只验证，没有改应用代码。
+**提交范围**：`625bfde..c123e55`（规划者追记提交 `4fcf76b`）。本轮只验证，没有改应用代码。
 
 **开工检查**：无人值守（规划者派发的子 Agent）；plan 复核：不需要（`relay-plan v2`，复核 2026-10-25）。
 
@@ -132,6 +132,22 @@
 **复审**
 
 <!-- 复审者只读，输出由调度者写入：relay-run 启动的由 relay-run 写入，子 Agent 的由规划者写入。执行者留空 -->
+
+复审者：全新 Claude Code 子 Agent（Claude Opus 5.5，只读），2026-10-26。依据 plan、本节、提交 `c123e55` 和 `4fcf76b`，以及 `build/acceptance/desktop-cat-sessions/r3/`、`build/acceptance/self-performance/r3-*/` 的原值。
+
+结论：收工。已核实成立：构建与安装哈希一致（6 份测量 JSON 的 `binarySHA256` 与 `installedBinarySHA256` 相同）；前台用例 DesktopCat 52 项、AgentSessions 17 项 0 失败；6 次测量配置只改 `enabled`、`metrics`、`catHeight`；`625bfde..4fcf76b` 只改 plan 和 result，`Sources`、`Package.swift`、`scripts` 无改动；受保护文件与 `plan-baseline` 一致；result 和提交里没有真实会话名称或内容。`config.json` 逐字节恢复以执行者当时的 `cmp` 记录为准；复审时的 `config.json` 与备份只差 `desktopCat.catHeight` 和 `desktopCat.metrics`，修改时间晚于 `4fcf76b`，推断是用户实机验收后自己改的设置。
+
+| 编号 | 问题 | 证据 | 根因 | 去向 | 用户决定 | 级别 |
+|---|---|---|---|---|---|---|
+| R1 | 性能第 3 步、第 4 步未验证：后台子 Agent 不是“在跑”的会话（父会话已 `end_turn`，子 Agent 按 D6 不单独计数），result 的结论和原因属实 | `r3/r3-g3-on/stream-check.txt`：8 次检查序号连续、状态全 ok、在跑数全 0、最大间隔 60 秒；预检 2 次 `codex=1`；+1.10 只作参考 | 规划 | 用户决定暂缓，新会话处理 | 暂缓（2026-10-26） | 一般 |
+| R2 | 性能第 3a 步未通过：正向 +0.875，反向 +0.478，平均 0.68；默认配置 3 次极差 1.25，单次读数波动大于门槛；门槛没有降低 | `self-performance/r3-g3a-*/live/live-1.json` 复算，与 result 一致 | 规划 | 用户决定暂缓，新会话处理 | 暂缓（2026-10-26） | 一般 |
+| R3 | 最后一次测量（反向组默认配置）的显示器是 1512×982，其余 5 次是 1800×1169，result 没写；反向组的 +0.48 不是同条件对比 | `r3-g3a-default-rev/live/live-1.json` 的 `conditions.display` | 环境 | 用户决定暂缓；重测时固定显示器并记进 result | 暂缓（2026-10-26） | 记录 |
+| R4 | 执行者用 `TaskStop` 停掉了自己启动的预检 `log stream`；只读日志进程，不影响用户进程，已披露，但不符合“不结束任何进程”的条文；plan 没写 `log stream` 怎么结束 | 本节「外部写入」；之后的 `log stream` 都带 `--timeout 9m` | 规划 | 后续 plan 的授权范围写明 `log stream` 必须带 `--timeout` 自行结束；AGENTS.md 是否加例外由用户决定 | | 一般 |
+| R5 | 复审时 `scripts/check.sh` 失败：`UI.Battery/真实容器首屏仍含磁盘` 曲线宽 311 pt，期望 328±2 pt；单独复跑稳定失败。本轮没改 `Sources`，执行者交付时 `check.sh` 通过（`.relay/r3-check-final.log`），不是本轮引入。推断依赖当前显示器或滚动条样式（差 17 pt，与传统滚动条宽度一致），未证实。规划者 2026-10-26 复跑 `scripts/test.sh UI.Battery` 同样 1 项失败，当时接着 2 块显示器 | `BatteryCardTests.swift:221-222` | 环境 | 遗留；新会话开始性能测量前先排查 | | 一般 |
+
+汇总：阻断 0、一般 4（R1、R2、R4、R5）、记录 1（R3）。根因：规划 3（R1、R2、R4），环境 2（R3、R5）。
+
+**任务状态（规划者，2026-10-26）**：用户实机验收通过，用户决定结束本任务。遗留：性能三项（R1～R3，用户决定暂缓，新会话处理）、R4（规则回写）、R5（`UI.Battery` 用例的环境依赖），以及第 1 轮 R4、第 2 轮 R3～R6 的记录项。
 
 
 ### 第 2 轮（2026-10-25，Claude Code 子 Agent · Claude Opus 5.5，高推理档位）
