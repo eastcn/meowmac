@@ -51,17 +51,22 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
     public var pet: String?
     /// 猫的高度（pt），36～104，默认 52（D47）。坏值按 52 运行，不改写文件。
     public var catHeight = Double(DesktopCatSize.defaultHeight)
+    /// 猫（连同投影、速度线）和气泡（连同结束提示）的不透明度，0.2～1.0，默认 1.0（D48）。坏值按 1.0 显示，不改写文件。
+    public var catOpacity = DesktopCatOpacity.defaultValue
+    public var bubbleOpacity = DesktopCatOpacity.defaultValue
     /// 读取时的回退原因，不写回文件。
     public var diagnostics: [String] = []
 
     public init(enabled: Bool = false, metrics: [String] = DesktopCatConfig.defaultMetrics,
                 placement: DesktopCatPlacement = DesktopCatPlacement(), pet: String? = nil,
-                catHeight: Double = Double(DesktopCatSize.defaultHeight), diagnostics: [String] = []) {
+                catHeight: Double = Double(DesktopCatSize.defaultHeight),
+                catOpacity: Double = DesktopCatOpacity.defaultValue, bubbleOpacity: Double = DesktopCatOpacity.defaultValue,
+                diagnostics: [String] = []) {
         self.enabled = enabled; self.metrics = metrics; self.placement = placement; self.pet = pet
-        self.catHeight = catHeight; self.diagnostics = diagnostics
+        self.catHeight = catHeight; self.catOpacity = catOpacity; self.bubbleOpacity = bubbleOpacity; self.diagnostics = diagnostics
     }
 
-    private enum CodingKeys: String, CodingKey { case enabled, metrics, placement, pet, catHeight }
+    private enum CodingKeys: String, CodingKey { case enabled, metrics, placement, pet, catHeight, catOpacity, bubbleOpacity }
     private enum PlacementKeys: String, CodingKey { case display, corner }
 
     /// 字段类型错误时抛错，由 `LocalConfig` 把整个桌面猫配置回退到默认值。
@@ -90,6 +95,12 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
             if let height = try? fields.decode(Double.self, forKey: .catHeight), DesktopCatSize.isValid(height) { catHeight = height }
             else { notes.append("桌面猫的大小无效，已按 52 pt 显示") }
         }
+        // 不透明度同样按字段回退（D48）。
+        for (part, key) in [(DesktopCatOpacityPart.cat, CodingKeys.catOpacity), (.bubble, .bubbleOpacity)] where fields.contains(key) {
+            if let value = try? fields.decode(Double.self, forKey: key), DesktopCatOpacity.isValid(value) {
+                if part == .cat { catOpacity = value } else { bubbleOpacity = value }
+            } else { notes.append(part.invalidNote) }
+        }
         diagnostics = notes
     }
 
@@ -102,11 +113,13 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
         try placementFields.encode(placement.corner.rawValue, forKey: .corner)
         try fields.encodeIfPresent(pet, forKey: .pet)
         try fields.encode(catHeight, forKey: .catHeight)
+        try fields.encode(catOpacity, forKey: .catOpacity)
+        try fields.encode(bubbleOpacity, forKey: .bubbleOpacity)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.enabled == rhs.enabled && lhs.metrics == rhs.metrics && lhs.placement == rhs.placement && lhs.pet == rhs.pet
-            && lhs.catHeight == rhs.catHeight
+            && lhs.catHeight == rhs.catHeight && lhs.catOpacity == rhs.catOpacity && lhs.bubbleOpacity == rhs.bubbleOpacity
     }
 
     /// 未知 id 跳过，重复去重，多出的取前 `maxMetrics` 项；全部无效时回到默认 4 项。
@@ -135,6 +148,9 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
         }
         if let pet { guard CodexPetManifest.isValidDirectoryName(pet) else { throw DesktopCatError.invalid("宠物名无效") } }
         guard DesktopCatSize.isValid(catHeight) else { throw DesktopCatError.invalid("大小必须是 36～104 pt") }
+        guard DesktopCatOpacity.isValid(catOpacity), DesktopCatOpacity.isValid(bubbleOpacity) else {
+            throw DesktopCatError.invalid("不透明度必须是 20%～100%")
+        }
         return self
     }
 
@@ -169,6 +185,12 @@ public struct DesktopCatConfig: Codable, Equatable, Sendable {
     public func with(placement: DesktopCatPlacement) -> Self { var next = self; next.placement = placement; return next }
     public func with(pet: String?) -> Self { var next = self; next.pet = pet; return next }
     public func with(catHeight: Double) -> Self { var next = self; next.catHeight = catHeight; return next }
+    public func with(catOpacity: Double) -> Self { var next = self; next.catOpacity = catOpacity; return next }
+    public func with(bubbleOpacity: Double) -> Self { var next = self; next.bubbleOpacity = bubbleOpacity; return next }
+    public func with(_ part: DesktopCatOpacityPart, opacity: Double) -> Self {
+        part == .cat ? with(catOpacity: opacity) : with(bubbleOpacity: opacity)
+    }
+    public func opacity(_ part: DesktopCatOpacityPart) -> Double { part == .cat ? catOpacity : bubbleOpacity }
 }
 
 public enum DesktopCatCategory: String, CaseIterable, Sendable {
@@ -590,6 +612,22 @@ public extension ConfigStore {
             try updateField("desktopCat", value: object, at: url)
         } else {
             try saveDesktopCat(fallback.with(catHeight: height), to: url)
+        }
+    }
+
+    /// 只写给出的不透明度键（D48）：值先吸附到 5% 再夹到 0.2～1.0，多个键一次写盘；
+    /// `desktopCat` 的其他字段和未知字段原样保留。`desktopCat` 不存在、不是对象或结构无效时，整组写入 `fallback`。
+    static func saveDesktopCatOpacity(_ values: [DesktopCatOpacityPart: Double], fallback: DesktopCatConfig, to url: URL = defaultURL) throws {
+        guard !values.isEmpty else { return }
+        let resolved = values.mapValues(DesktopCatOpacity.resolved)
+        let raw = (try? Data(contentsOf: url)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["desktopCat"]
+        if var object = raw as? [String: Any],
+           let data = try? JSONSerialization.data(withJSONObject: object),
+           (try? JSONDecoder().decode(DesktopCatConfig.self, from: data)) != nil {
+            for (part, value) in resolved { object[part.rawValue] = value }
+            try updateField("desktopCat", value: object, at: url)
+        } else {
+            try saveDesktopCat(resolved.reduce(fallback) { $0.with($1.key, opacity: $1.value) }, to: url)
         }
     }
 }

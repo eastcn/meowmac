@@ -87,3 +87,26 @@ public extension PanelState {
         }
     }
 }
+
+public extension PanelState {
+    /// 桌面猫不透明度的即时写入（D48）：吸附到 5% 后只写给出的键，写入成功后才生效。“恢复默认”一次写两个键。
+    @discardableResult
+    func updateDesktopCatOpacity(_ values: [DesktopCatOpacityPart: Double]) -> Bool {
+        let resolved = values.mapValues(DesktopCatOpacity.resolved)
+        guard resolved.contains(where: { desktopCat.opacity($0.key) != $0.value }) else { desktopCatError = nil; return true }
+        do {
+            try ConfigStore.saveDesktopCatOpacity(resolved, fallback: desktopCat, to: desktopCatConfigURL)
+            desktopCat = resolved.reduce(desktopCat) { $0.with($1.key, opacity: $1.value) }
+            desktopCatError = nil
+            onDesktopCatChanged(desktopCat)
+            return true
+        } catch let error as DesktopCatError {
+            desktopCatError = error.localizedDescription
+            return false
+        } catch {
+            desktopCatError = "保存失败，配置文件未改动"
+            Logger(subsystem: MeowMacCore.AppIdentity.bundleID, category: "desktop-cat").error("桌面猫不透明度保存失败：\(error.localizedDescription, privacy: .private)")
+            return false
+        }
+    }
+}

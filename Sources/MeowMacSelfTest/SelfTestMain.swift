@@ -368,6 +368,7 @@ enum SelfTestMain {
         tests.append(contentsOf: DesktopCatWindowTests.tests)
         tests.append(contentsOf: DesktopCatSettingsTests.tests)
         tests.append(contentsOf: DesktopCatSizeTests.tests)
+        tests.append(contentsOf: DesktopCatOpacityTests.tests)
         tests.append(contentsOf: AgentSessionTests.tests)
         tests.append(contentsOf: AgentSessionReaderTests.tests)
         tests.append(contentsOf: DesktopCatSessionTests.tests)
