@@ -200,6 +200,8 @@ public final class PanelState: ObservableObject {
     @Published public var agentSessionToasts: [AgentSessionToast] = []
     /// 点提示关掉这一条（合并的那条关掉它包含的全部）。
     public var onDismissAgentSessionToast: ([String]) -> Void = { _ in }
+    /// 点单条提示后打开对应渠道的 App（D46）。
+    public var onOpenAgentSessionApp: (QuotaProvider) -> Void = { _ in }
     /// Claude 或 Codex 的记录根目录是否存在（D11）。测试可替换。
     public var agentSessionRootsExist: () -> Bool = { AgentSessionReader.rootsExist() }
     public var onOpenDesktopCatSettings: () -> Void = {}

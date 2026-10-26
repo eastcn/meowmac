@@ -12,7 +12,11 @@ enum DesktopCatSessionTests {
             ("Core.DesktopCatSessions/提示区版式：0～2 条、四个角、1 列和 2 列", { layout() }),
             ("Core.DesktopCatSessions/提示区随猫的大小分角", { sizes() }),
             ("Core.DesktopCatSessions/提示命中：提示内、空隙、提示外", { hits() }),
-            ("UI.DesktopCatSessions/点提示只关这一条，不开面板", { await click() }),
+            ("UI.DesktopCatSessions/点提示关这一条并打开对应 App，不开面板", { await click() }),
+            ("UI.DesktopCatSessions/提示对应的 App", {
+                AgentSessionApp.bundleID(for: .claude) == "com.anthropic.claudefordesktop"
+                    && AgentSessionApp.bundleID(for: .codex) == "com.openai.codex" && AgentSessionApp.bundleID(for: .deepseek) == nil
+            }),
             ("UI.DesktopCatSessions/没选这项时提示变化不触发渲染", { await unselected() }),
             ("UI.DesktopCatSessions/提示宽度上限与名称截断", { widths() }),
             ("UI.DesktopCatSessions/目录分组：没装不列，选中、取消与满 8 项", { catalog() }),
@@ -146,9 +150,10 @@ enum DesktopCatSessionTests {
     static func click() async -> Bool {
         let (state, controller, url) = DesktopCatWindowTests.controller(enabled: true); defer { try? FileManager.default.removeItem(at: url) }
         guard state.updateDesktopCat({ try $0.adding(AgentSessionCadence.metricID) }) else { return false }
-        var opened = 0, dismissed: [[String]] = []
+        var opened = 0, dismissed: [[String]] = [], apps: [QuotaProvider] = []
         controller.onOpenPanel = { opened += 1 }
         state.onDismissAgentSessionToast = { dismissed.append($0) }
+        state.onOpenAgentSessionApp = { apps.append($0) }
         state.agentSessionToasts = [notice("示例项目"), .more(count: 2, ids: ["a", "b"])]
         controller.apply(); defer { controller.hide() }
         guard let window = controller.window, controller.model.toasts.count == 2 else { print("点提示：toasts=\(controller.model.toasts.count) window=\(controller.window != nil)"); return false }
@@ -156,18 +161,20 @@ enum DesktopCatSessionTests {
         func point(_ rect: CGRect) -> CGPoint { CGPoint(x: window.frame.minX + rect.midX, y: window.frame.maxY - rect.midY) }
         var mouse = point(layout.toastRects[0])
         controller.mouseLocation = { mouse }
-        // 点第 0 条：只关它，不开面板，不拖动。
+        // 点第 0 条：关它并打开对应渠道的 App，不开面板，不拖动。
         controller.mouseDown(); controller.mouseUp()
-        guard dismissed == [["claude:示例项目"]], opened == 0, !controller.model.dragging else { print("点提示：\(dismissed) \(opened)"); return false }
-        // 点合并的那条：关掉它包含的全部。
+        guard dismissed == [["claude:示例项目"]], apps == [.claude], opened == 0, !controller.model.dragging else {
+            print("点提示：\(dismissed) \(apps) \(opened)"); return false
+        }
+        // 点合并的那条：关掉它包含的全部，不打开 App。
         mouse = point(layout.toastRects[1])
         controller.mouseDown(); controller.mouseUp()
-        guard dismissed.last == ["a", "b"], opened == 0 else { print("点合并：\(dismissed) \(opened)"); return false }
+        guard dismissed.last == ["a", "b"], apps == [.claude], opened == 0 else { print("点合并：\(dismissed) \(apps) \(opened)"); return false }
         // 在提示上按下、拖到别处松手：不关，不移动窗口。
         let home = window.frame
         mouse = point(layout.toastRects[0])
         controller.mouseDown(); mouse.y -= 120; controller.mouseDragged(); controller.mouseUp()
-        guard dismissed.count == 2, window.frame == home, opened == 0 else { print("拖开：\(dismissed) \(opened) \(window.frame) \(home)"); return false }
+        guard dismissed.count == 2, apps == [.claude], window.frame == home, opened == 0 else { print("拖开：\(dismissed) \(opened) \(window.frame) \(home)"); return false }
         // 点气泡仍然打开面板。
         mouse = point(layout.bubbleRect)
         controller.mouseDown(); controller.mouseUp()

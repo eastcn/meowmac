@@ -49,6 +49,7 @@ public final class AgentSessionCoordinator {
         self.state = state; self.read = read
         wanted = { [weak state] in state.map { AgentSessionCadence.wanted($0.desktopCat) } ?? false }
         state.onDismissAgentSessionToast = { [weak self] ids in self?.dismiss(ids) }
+        state.onOpenAgentSessionApp = { AgentSessionApp.open($0) }
     }
 
     public var paused: Bool { sleeping || screensSleeping }
@@ -202,5 +203,25 @@ public final class AgentSessionCoordinator {
         } else {
             reschedule()
         }
+    }
+}
+
+/// 点结束提示时打开的 App（D46）：只调到前台，不定位到具体会话。
+public enum AgentSessionApp {
+    public static func bundleID(for provider: QuotaProvider) -> String? {
+        switch provider {
+        case .claude: return "com.anthropic.claudefordesktop"
+        case .codex: return "com.openai.codex"
+        default: return nil
+        }
+    }
+
+    /// App 没装时什么也不做，提示已经关掉。
+    @MainActor
+    public static func open(_ provider: QuotaProvider) {
+        guard let id = bundleID(for: provider), let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration)
     }
 }

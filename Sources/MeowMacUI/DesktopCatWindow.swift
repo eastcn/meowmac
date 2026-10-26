@@ -300,10 +300,12 @@ public final class DesktopCatController {
     public func mouseUp() {
         if let pressed = pressedToast {
             pressedToast = nil
-            // 松手时还在同一条提示上才关掉；不开面板。
+            // 松手时还在同一条提示上才关掉；不开面板。单条提示再打开对应渠道的 App（D46）。
             guard let window, let index = hitShape().toast(at: localPoint(window)), index < model.toasts.count,
                   model.toasts[index].id == pressed else { return }
-            state.onDismissAgentSessionToast(model.toasts[index].ids)
+            let toast = model.toasts[index]
+            state.onDismissAgentSessionToast(toast.ids)
+            if case .single(let notice) = toast { state.onOpenAgentSessionApp(notice.provider) }
             return
         }
         if resize != nil {
