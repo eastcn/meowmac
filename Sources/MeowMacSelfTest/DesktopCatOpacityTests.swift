@@ -15,6 +15,10 @@ enum DesktopCatOpacityTests {
             ("Core.DesktopCatOpacity/删除键回到 1.0 且没有诊断", { deleted() }),
             ("Core.DesktopCatOpacity/恢复默认一次写两个键", { restored() }),
             ("Core.DesktopCatOpacity/坏值按 1.0 读取且不改写文件", { broken() }),
+            ("UI.DesktopCatOpacity/悬停变实、0.3 秒回落与拖动缩放保持", { hover() }),
+            ("UI.DesktopCatOpacity/命中与显示透明度无关", { hitIndependent() }),
+            ("UI.DesktopCatOpacity/把手和落点框不随设定变化", { handleAndDrop() }),
+            ("UI.DesktopCatOpacity/不新增监视器和计时器", { noNewTimers() }),
         ]
     }
 
@@ -161,5 +165,161 @@ enum DesktopCatOpacityTests {
         } && DesktopCatConfigTests.load(base + #""catOpacity":0.33,"bubbleOpacity":0.2}}"#) { config, _, _ in
             config.catOpacity == 0.33 && config.bubbleOpacity == 0.2 && config.diagnostics.isEmpty
         }
+    }
+
+    // MARK: - 显示与悬停（条目 2）
+
+    /// 开着桌面猫、设定为 `cat` / `bubble` 的控制器；延迟任务改为手动执行。
+    static func controller(cat: Double, bubble: Double) -> (PanelState, DesktopCatController, URL, () -> [(TimeInterval, DispatchWorkItem)]) {
+        let (state, controller, url) = DesktopCatWindowTests.controller(enabled: true)
+        _ = state.updateDesktopCatOpacity([.cat: cat, .bubble: bubble])
+        var scheduled: [(TimeInterval, DispatchWorkItem)] = []
+        controller.scheduleAfter = { scheduled.append(($0, $1)) }
+        return (state, controller, url, { scheduled })
+    }
+
+    static func shown(_ controller: DesktopCatController) -> [Double] {
+        [controller.model.shownCatOpacity, controller.model.shownBubbleOpacity]
+    }
+
+    static func hover() -> Bool {
+        let (_, controller, url, scheduled) = controller(cat: 0.4, bubble: 0.6); defer { try? FileManager.default.removeItem(at: url) }
+        let far = CGPoint(x: 10, y: 10)
+        var mouse = far
+        controller.mouseLocation = { mouse }
+        controller.apply(); defer { controller.hide() }
+        guard let window = controller.window, let onCat = DesktopCatSizeTests.catPoint(controller, window: window) else { return false }
+        let bubble = controller.model.layout.bubbleRect
+        let onBubble = DesktopCatSizeTests.screenPoint(CGPoint(x: bubble.midX, y: bubble.midY), frame: window.frame)
+        controller.updateMouseThrough()
+        // 不悬停：按设定显示。
+        guard shown(controller) == [0.4, 0.6], !controller.model.solid, scheduled().isEmpty else { print("不悬停：\(shown(controller))"); return false }
+        // 悬停猫：两者都到 1.0；测试开着“减少动态效果”，直接切换。
+        mouse = onCat; controller.updateMouseThrough()
+        guard shown(controller) == [1, 1], !controller.solidAnimated, scheduled().isEmpty else { return false }
+        // 离开：0.3 秒的任务执行前仍是 1.0，执行后回到设定值。
+        mouse = far; controller.updateMouseThrough()
+        guard scheduled().count == 1, scheduled()[0].0 == 0.3, shown(controller) == [1, 1] else { return false }
+        controller.updateMouseThrough()
+        guard scheduled().count == 1 else { return false }
+        scheduled()[0].1.perform()
+        guard shown(controller) == [0.4, 0.6] else { return false }
+        // 悬停气泡同样变实；离开后 0.3 秒内回到猫身上：取消回落。
+        mouse = onBubble; controller.updateMouseThrough()
+        guard shown(controller) == [1, 1] else { return false }
+        mouse = far; controller.updateMouseThrough()
+        guard scheduled().count == 2 else { return false }
+        mouse = onCat; controller.updateMouseThrough()
+        scheduled()[1].1.perform()
+        guard scheduled()[1].1.isCancelled, shown(controller) == [1, 1] else { return false }
+        // 悬停显示中的把手也算。
+        mouse = DesktopCatSizeTests.screenPoint(controller.model.layout.handleCenter, frame: window.frame); controller.updateMouseThrough()
+        guard controller.model.handleVisible, shown(controller) == [1, 1], scheduled().count == 2 else { return false }
+        // 缩放期间保持 1.0：按下把手后，即使之前有待回落的任务也已取消。
+        controller.mouseDown()
+        guard controller.isResizing, shown(controller) == [1, 1] else { return false }
+        let pressed = mouse
+        mouse = CGPoint(x: pressed.x, y: pressed.y + 30); controller.mouseDragged()
+        controller.updateMouseThrough()
+        guard shown(controller) == [1, 1], scheduled().count == 2 else { return false }
+        // 松手后按鼠标位置决定：鼠标仍在把手附近时保持；移开才回落。
+        controller.mouseUp()
+        mouse = far; controller.updateMouseThrough()
+        guard let fade = scheduled().last, scheduled().count == 3, shown(controller) == [1, 1] else { return false }
+        fade.1.perform()
+        guard shown(controller) == [0.4, 0.6] else { return false }
+        // 拖动期间保持 1.0；拖到左上区域松手，猫落到左上角，鼠标不在猫上，0.3 秒后回落。
+        guard let onCatNow = DesktopCatSizeTests.catPoint(controller, window: window) else { return false }
+        mouse = onCatNow; controller.updateMouseThrough()
+        controller.mouseDown()
+        mouse = CGPoint(x: 300, y: 800); controller.mouseDragged()
+        guard controller.model.dragging, shown(controller) == [1, 1] else { return false }
+        controller.updateMouseThrough()
+        guard shown(controller) == [1, 1], scheduled().count == 3 else { return false }
+        controller.mouseUp()
+        guard controller.model.corner == .topLeft, scheduled().count == 4, shown(controller) == [1, 1] else { print("拖动松手：\(scheduled().count)"); return false }
+        scheduled()[3].1.perform()
+        guard shown(controller) == [0.4, 0.6] else { return false }
+        // 关掉“减少动态效果”：变实带 0.15 秒过渡。
+        controller.reduceMotion = { false }
+        guard let window2 = controller.window, let onCat2 = DesktopCatSizeTests.catPoint(controller, window: window2) else { return false }
+        mouse = onCat2; controller.updateMouseThrough()
+        guard controller.solidAnimated, shown(controller) == [1, 1] else { return false }
+        // 关闭桌面猫时清掉变实状态。
+        controller.hide()
+        return !controller.model.solid
+    }
+
+    static func hitIndependent() -> Bool {
+        let (_, controller, url, _) = controller(cat: 1, bubble: 1); defer { try? FileManager.default.removeItem(at: url) }
+        controller.mouseLocation = { CGPoint(x: 10, y: 10) }
+        controller.apply(); defer { controller.hide() }
+        guard let window = controller.window, let onCat = DesktopCatSizeTests.catPoint(controller, window: window) else { return false }
+        let local = CGPoint(x: onCat.x - window.frame.minX, y: window.frame.maxY - onCat.y)
+        let bubble = controller.model.layout.bubbleRect
+        // 猫内、气泡内、透明边距各一点。
+        let points = [local, CGPoint(x: bubble.midX, y: bubble.midY), CGPoint(x: 1, y: 1)]
+        let full = points.map { controller.hitShape().contains($0) }
+        guard full == [true, true, false] else { print("命中：\(full)"); return false }
+        for (cat, bubbleOpacity) in [(0.2, 0.2), (0.2, 1.0), (1.0, 0.2)] {
+            controller.model.catOpacity = cat; controller.model.bubbleOpacity = bubbleOpacity
+            guard points.map({ controller.hitShape().contains($0) }) == full else { return false }
+        }
+        return true
+    }
+
+    /// 像素：(x, y) 为 pt，原点左上。
+    static func pixel(_ data: Data, _ point: CGPoint) -> NSColor? {
+        guard let rep = NSBitmapImageRep(data: data) else { return nil }
+        let scale = CGFloat(rep.pixelsWide) / rep.size.width
+        return rep.colorAt(x: Int(point.x * scale), y: Int(point.y * scale))?.usingColorSpace(.deviceRGB)
+    }
+
+    static func handleAndDrop() -> Bool {
+        // 把手：设定 40% 和 100% 时（合成预览的两个场景），把手中心的像素相同。
+        let cache = DesktopCatImage()
+        var colors: [NSColor] = []
+        for (kind, opacity) in [(DesktopCatPreview.Case.opacity40, 0.4), (.opacityDefault, 1.0)] {
+            let state = DesktopCatPreview.state(kind)
+            let model = DesktopCatPreview.model(state: state, cache: cache, dark: false)
+            model.handleVisible = true
+            guard model.shownCatOpacity == opacity, let data = DesktopCatPreview.render(dark: false, size: model.layout.windowSize, content: { DesktopCatContentView(model: model) }),
+                  let color = pixel(data, model.layout.handleCenter) else { return false }
+            colors.append(color)
+        }
+        guard colors.count == 2, abs(colors[0].redComponent - colors[1].redComponent) < 0.01,
+              abs(colors[0].alphaComponent - colors[1].alphaComponent) < 0.01, colors[0].redComponent > 0.95 else {
+            print("把手像素：\(colors)"); return false
+        }
+        // 落点框在单独的窗口里，拖动时窗口和落点框都不改 alphaValue（不用整窗透明度）。
+        let (_, controller, url, _) = controller(cat: 0.2, bubble: 0.2); defer { try? FileManager.default.removeItem(at: url) }
+        var mouse = CGPoint(x: 1400, y: 150)
+        controller.mouseLocation = { mouse }
+        controller.apply(); defer { controller.hide() }
+        guard let window = controller.window, window.alphaValue == 1, controller.model.catOpacity == 0.2 else { return false }
+        controller.mouseDown(); mouse = CGPoint(x: 300, y: 800); controller.mouseDragged()
+        guard let overlay = controller.dropWindow, overlay.alphaValue == 1, window.alphaValue == 1, controller.dropTargets.count == 4 else { return false }
+        controller.mouseUp()
+        return window.alphaValue == 1
+    }
+
+    static func noNewTimers() -> Bool {
+        var counts: [Int] = []
+        for opacity in [1.0, 0.4] {
+            let (_, controller, url, scheduled) = controller(cat: opacity, bubble: opacity); defer { try? FileManager.default.removeItem(at: url) }
+            var mouse = CGPoint(x: 10, y: 10)
+            controller.mouseLocation = { mouse }
+            controller.apply(); defer { controller.hide() }
+            guard let window = controller.window, let onCat = DesktopCatSizeTests.catPoint(controller, window: window) else { return false }
+            // 不动鼠标时不投递任何延迟任务；进出一次只投递一个一次性任务。
+            controller.updateMouseThrough(); controller.updateMouseThrough()
+            guard scheduled().isEmpty else { return false }
+            mouse = onCat; controller.updateMouseThrough()
+            mouse = CGPoint(x: 10, y: 10); controller.updateMouseThrough(); controller.updateMouseThrough()
+            guard scheduled().count == 1 else { return false }
+            counts.append(controller.monitorCount)
+        }
+        print("桌面猫鼠标监视器：100% 时 \(counts[0]) 个，40% 时 \(counts[1]) 个")
+        return counts.count == 2 && counts[0] == counts[1]
     }
 }

@@ -14,6 +14,11 @@ public final class DesktopCatViewModel: ObservableObject {
     @Published public var catHeight: CGFloat = DesktopCatSize.defaultHeight
     /// 鼠标停在猫身上时显示缩放把手（plan D15）。
     @Published public var handleVisible = false
+    /// 设定的不透明度（D48）：猫连同投影、速度线；气泡连同结束提示。把手和落点框不受影响。
+    @Published public var catOpacity = DesktopCatOpacity.defaultValue
+    @Published public var bubbleOpacity = DesktopCatOpacity.defaultValue
+    /// 鼠标停在猫、气泡、提示或把手上，或正在拖动、缩放、开着右键菜单时“变实”：两者都按 100% 显示。
+    @Published public var solid = false
     /// 结束提示（D46），第 0 条贴着气泡（上方的角贴着猫）。只在选了“AI 会话”时有内容。
     @Published public var toasts: [AgentSessionToast] = [] {
         didSet { toastMetrics = toasts.prefix(DesktopCatLayout.maxToasts).map(DesktopCatToastText.metrics) }
@@ -22,6 +27,9 @@ public final class DesktopCatViewModel: ObservableObject {
     public private(set) var toastMetrics: [DesktopCatToastText.Metrics] = []
     public let frame = DesktopCatFrameModel()
     public init() {}
+    /// 实际显示的不透明度。
+    public var shownCatOpacity: Double { solid ? 1 : catOpacity }
+    public var shownBubbleOpacity: Double { solid ? 1 : bubbleOpacity }
     public var layout: DesktopCatLayout {
         DesktopCatLayout(count: items.count, corner: corner, catTrim: catTrim, catHeight: catHeight, toastWidths: toastMetrics.map(\.width))
     }
@@ -46,9 +54,11 @@ public struct DesktopCatContentView: View {
         ZStack(alignment: .topLeading) {
             DesktopCatBubble(items: model.items, layout: layout)
                 .frame(width: bubble.width, height: bubble.height + DesktopCatLayout.tailHeight, alignment: .topLeading)
+                .opacity(model.shownBubbleOpacity)
                 .offset(x: bubble.minX, y: bubble.minY)
             DesktopCatFigure(model: model.frame, size: cat.size)
                 .frame(width: cat.width, height: cat.height)
+                .opacity(model.shownCatOpacity)
                 .offset(x: cat.minX, y: cat.minY)
             if model.handleVisible {
                 let handle = layout.handleRect
@@ -58,6 +68,7 @@ public struct DesktopCatContentView: View {
                 let rect = layout.toastRect(index)
                 DesktopCatToast(toast: pair.0, metrics: pair.1)
                     .frame(width: rect.width, height: rect.height)
+                    .opacity(model.shownBubbleOpacity)
                     .offset(x: rect.minX, y: rect.minY)
             }
         }

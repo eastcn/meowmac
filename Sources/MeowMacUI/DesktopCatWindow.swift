@@ -56,6 +56,20 @@ public final class DesktopCatController {
     /// 鼠标离开猫和把手后 0.3 秒隐藏把手。一次性的延迟任务，不是计时器；回到猫身上即取消。
     private var handleHide: DispatchWorkItem?
     public static let handleHideDelay: TimeInterval = 0.3
+    /// 鼠标离开后 0.3 秒回到设定的不透明度（D48）。同样是一次性的延迟任务；回来即取消。
+    private var solidFade: DispatchWorkItem?
+    private var solidFadeToken = 0
+    public static let solidFadeDelay: TimeInterval = 0.3
+    /// 延迟任务的投递方式，测试换成手动执行，不用真实等待。
+    public var scheduleAfter: (TimeInterval, DispatchWorkItem) -> Void = { delay, work in
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+    /// 上一次变实或回落是否带过渡，供测试断言“减少动态效果”时直接切换。
+    public private(set) var solidAnimated = false
+    /// 右键菜单开着：保持变实。
+    private var menuOpen = false
+    /// 已装的鼠标监视器数，供测试断言透明度没有新增监视器或计时器。
+    public var monitorCount: Int { monitors.count }
     /// 当前是否换成了缩放光标。
     private var resizeCursorShown = false
     /// 正在拖把手缩放。
@@ -128,6 +142,7 @@ public final class DesktopCatController {
         drag = nil; model.dragging = false; mask = nil; pressedToast = nil
         if !model.toasts.isEmpty { model.toasts = [] }
         resize = nil; handleHide?.cancel(); handleHide = nil; model.handleVisible = false
+        solidFade?.cancel(); solidFade = nil; menuOpen = false; model.solid = false
         if resizeCursorShown { NSCursor.arrow.set(); resizeCursorShown = false }
         hideDropTargets()
         window?.orderOut(nil)
@@ -168,6 +183,11 @@ public final class DesktopCatController {
         }
         if corner != model.corner { model.corner = corner }
         if sized { model.catHeight = height }
+        // 不透明度（D48）：设置里拖滑块时先用草稿，松手写入后跟随配置。坏值按 100%。
+        let catOpacity = DesktopCatOpacity.rendered(state.desktopCatOpacityDraft[.cat] ?? state.desktopCat.catOpacity)
+        let bubbleOpacity = DesktopCatOpacity.rendered(state.desktopCatOpacityDraft[.bubble] ?? state.desktopCat.bubbleOpacity)
+        if catOpacity != model.catOpacity { model.catOpacity = catOpacity }
+        if bubbleOpacity != model.bubbleOpacity { model.bubbleOpacity = bubbleOpacity }
         if resized { position(animated: false) }
         if sized, lastFrame != nil { updateFrame(lastFrame ?? 0, display: state.catDisplay()) }
     }
@@ -244,9 +264,11 @@ public final class DesktopCatController {
         // 按在把手上：进入缩放，不移动猫，也不算单击（plan D15）。
         if shape.inHandle(point) {
             resize = (mouseLocation(), model.catHeight)
+            setSolid(true)
             return
         }
         drag = (mouseLocation(), window.frame.origin, false)
+        setSolid(true)
     }
 
     public func mouseDragged() {
@@ -292,6 +314,8 @@ public final class DesktopCatController {
         }
         guard let window, let current = drag else { return }
         drag = nil
+        // 松手后按鼠标位置决定是否回落（D48）。
+        defer { updateMouseThrough() }
         guard current.moved || !DesktopCatGeometry.isClick(from: current.start, to: mouseLocation()) else {
             onOpenPanel(); return
         }
@@ -354,7 +378,12 @@ public final class DesktopCatController {
 
     func showMenu(event: NSEvent, in view: NSView) {
         guard let menu = makeMenu() else { return }
+        // 菜单开着时保持变实（plan D8）；`popUpContextMenu` 等菜单关闭才返回，之后按鼠标位置决定是否回落。
+        menuOpen = true
+        setSolid(true)
         NSMenu.popUpContextMenu(menu, with: event, for: view)
+        menuOpen = false
+        updateMouseThrough()
     }
 
     private func installMouseMonitors() {
@@ -376,6 +405,7 @@ public final class DesktopCatController {
         if window.ignoresMouseEvents == inside { window.ignoresMouseEvents = !inside }
         let onHandle = shape.inHandle(point)
         updateHandle(hovering: onHandle || shape.inCat(point))
+        updateSolid(hovering: inside || menuOpen)
         if onHandle != resizeCursorShown {
             (onHandle ? Self.resizeCursor(corner: model.corner) : NSCursor.arrow).set()
             resizeCursorShown = onHandle
@@ -398,6 +428,31 @@ public final class DesktopCatController {
         }
         handleHide = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.handleHideDelay, execute: work)
+    }
+
+    /// 鼠标在猫、气泡、提示或显示中的把手上时变实；离开 0.3 秒后回落，期间回来就取消（D48）。
+    private func updateSolid(hovering: Bool) {
+        if hovering { setSolid(true); return }
+        guard model.solid, solidFade == nil else { return }
+        solidFadeToken += 1
+        let token = solidFadeToken
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, token == self.solidFadeToken, self.solidFade != nil else { return }
+            self.solidFade = nil
+            guard self.drag == nil, self.resize == nil, !self.menuOpen else { return }
+            self.setSolid(false)
+        }
+        solidFade = work
+        scheduleAfter(Self.solidFadeDelay, work)
+    }
+
+    /// 变实或回落：0.15 秒 easeInOut，开启“减少动态效果”时直接切换。变实时取消待回落的任务。
+    private func setSolid(_ value: Bool) {
+        if value { solidFade?.cancel(); solidFade = nil; solidFadeToken += 1 }
+        guard model.solid != value else { return }
+        let animated = !reduceMotion()
+        solidAnimated = animated
+        withAnimation(animated ? .easeInOut(duration: 0.15) : nil) { model.solid = value }
     }
 
     /// 斜向缩放光标；系统没有时（macOS 14）用十字光标。

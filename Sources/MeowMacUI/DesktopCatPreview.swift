@@ -12,6 +12,8 @@ public enum DesktopCatPreview {
         /// D46：设计稿「AI 会话」的五个状态，以及四个角各一张带 2 条提示的图。
         case sessionsRunning, sessionsIdle, sessionsOne, sessionsMany, sessionsSingle
         case sessionsTopLeft, sessionsTopRight, sessionsBottomLeft, sessionsBottomRight
+        /// D48：设计稿「透明度」的五个状态。
+        case opacityDefault, opacityBubble60, opacity40, opacity20Toast, opacity40Hover
         /// 设计稿“提醒 · 深色”“2 项 · 缺数据 · 深色”只出深色；预览两种外观都出。
         public var title: String {
             switch self {
@@ -34,6 +36,11 @@ public enum DesktopCatPreview {
             case .sessionsTopRight: return "右上角 · 2 条"
             case .sessionsBottomLeft: return "左下角 · 2 条"
             case .sessionsBottomRight: return "右下角 · 2 条"
+            case .opacityDefault: return "默认 · 猫 100% · 气泡 100%"
+            case .opacityBubble60: return "猫 100% · 气泡 60%"
+            case .opacity40: return "猫 40% · 气泡 40%"
+            case .opacity20Toast: return "最低 20% · 带结束提示"
+            case .opacity40Hover: return "鼠标悬停 → 变实"
             }
         }
     }
@@ -95,6 +102,11 @@ public enum DesktopCatPreview {
         case .sessionsSingle:
             metrics = [AgentSessionCadence.metricID]
             state.catLevelOverride = .normal
+        case .opacityDefault, .opacityBubble60, .opacity40, .opacity40Hover:
+            state.catLevelOverride = .normal
+        case .opacity20Toast:
+            metrics = ["system.cpu", AgentSessionCadence.metricID]
+            state.catLevelOverride = .normal
         }
         sessions(kind, state: state)
         let corner: DesktopCatCorner
@@ -104,7 +116,15 @@ public enum DesktopCatPreview {
         case .sessionsTopRight: corner = .topRight
         default: corner = .bottomRight
         }
-        state.desktopCat = DesktopCatConfig(enabled: true, metrics: metrics, placement: DesktopCatPlacement(corner: corner))
+        let opacity: (cat: Double, bubble: Double)
+        switch kind {
+        case .opacityBubble60: opacity = (1, 0.6)
+        case .opacity40, .opacity40Hover: opacity = (0.4, 0.4)
+        case .opacity20Toast: opacity = (0.2, 0.2)
+        default: opacity = (1, 1)
+        }
+        state.desktopCat = DesktopCatConfig(enabled: true, metrics: metrics, placement: DesktopCatPlacement(corner: corner),
+                                            catOpacity: opacity.cat, bubbleOpacity: opacity.bubble)
         return state
     }
 
@@ -123,7 +143,7 @@ public enum DesktopCatPreview {
         switch kind {
         case .sessionsRunning: state.agentSessions = snapshot(claude: 2, codex: 1)
         case .sessionsIdle: state.agentSessions = snapshot(claude: 0, codex: 0)
-        case .sessionsOne:
+        case .sessionsOne, .opacity20Toast:
             state.agentSessions = snapshot(claude: 0, codex: 1)
             state.agentSessionToasts = [notice("示例项目", .codex, 12)]
         case .sessionsMany:
@@ -145,6 +165,9 @@ public enum DesktopCatPreview {
         model.items = state.desktopCatItems
         model.corner = state.desktopCat.placement.corner
         model.catHeight = DesktopCatSize.rendered(state.desktopCat.catHeight)
+        // 同 `DesktopCatController.refreshBubble`：坏值按 100%。
+        model.catOpacity = DesktopCatOpacity.rendered(state.desktopCat.catOpacity)
+        model.bubbleOpacity = DesktopCatOpacity.rendered(state.desktopCat.bubbleOpacity)
         // 同 `DesktopCatController.refreshBubble`：只在选了“AI 会话”时显示结束提示。
         model.toasts = AgentSessionCadence.wanted(state.desktopCat) ? state.agentSessionToasts : []
         model.frame.dark = dark
@@ -193,10 +216,12 @@ public enum DesktopCatPreview {
         let cache = cache ?? DesktopCatImage()
         let state = state(kind)
         let model = model(state: state, cache: cache, dark: dark)
+        // 悬停态与真实窗口一致：鼠标停在猫身上时变实，同时出现缩放把手。
+        if kind == .opacity40Hover { model.solid = true; model.handleVisible = true }
         return render(dark: dark, size: model.layout.windowSize) { DesktopCatContentView(model: model) }
     }
 
-    private static func render<Content: View>(dark: Bool, size: CGSize, @ViewBuilder content: () -> Content) -> Data? {
+    public static func render<Content: View>(dark: Bool, size: CGSize, @ViewBuilder content: () -> Content) -> Data? {
         let wall = dark
             ? [Color(red: 0x1c / 255, green: 0x2a / 255, blue: 0x44 / 255), Color(red: 0x3a / 255, green: 0x2d / 255, blue: 0x4d / 255), Color(red: 0x5a / 255, green: 0x3b / 255, blue: 0x2c / 255)]
             : [Color(red: 0x9f / 255, green: 0xc3 / 255, blue: 0xe6 / 255), Color(red: 0xd6 / 255, green: 0xc6 / 255, blue: 0xe6 / 255), Color(red: 0xf3 / 255, green: 0xc9 / 255, blue: 0xa8 / 255)]

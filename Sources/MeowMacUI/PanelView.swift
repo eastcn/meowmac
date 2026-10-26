@@ -179,6 +179,8 @@ public final class PanelState: ObservableObject {
     @Published public internal(set) var desktopCat: DesktopCatConfig
     @Published public var desktopCatError: String?
     public var desktopCatConfigURL: URL = ConfigStore.defaultURL
+    /// 设置里正在拖的不透明度滑块（D48）：只改桌面猫的显示，不写配置；松手后清空。
+    @Published public var desktopCatOpacityDraft: [DesktopCatOpacityPart: Double] = [:]
     /// 桌面猫当前用的 Codex 宠物；nil 表示用当前猫（plan P1）。
     @Published public internal(set) var desktopPet: LoadedCodexPet?
     @Published public internal(set) var desktopPetError: String?
