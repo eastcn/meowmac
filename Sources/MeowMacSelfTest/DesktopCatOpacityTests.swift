@@ -390,16 +390,24 @@ enum DesktopCatOpacityTests {
         try? await Task.sleep(nanoseconds: 600_000_000)
         guard let window = settings.window else { return false }
         SettingsControlTestSupport.settle(window)
-        let ids = ["desktop-cat.size", "desktop-cat.catOpacity", "desktop-cat.bubbleOpacity"]
-        let frames = ids.compactMap { SettingsControlTestSupport.element(window, id: $0)?.accessibilityFrame() }
-        guard frames.count == 3 else { print("缺少滑块：\(frames)"); return false }
-        print("设置滑块（屏幕坐标）：\(frames.map { "x \(Int($0.minX)) 宽 \(Int($0.width)) y \(Int($0.minY))" })")
-        guard frames.allSatisfy({ abs($0.width - frames[0].width) < 0.5 && abs($0.minX - frames[0].minX) < 0.5 }),
-              frames[0].minY > frames[1].minY, frames[1].minY > frames[2].minY else { return false }
-        let texts = ["desktop-cat.catOpacity.text", "desktop-cat.bubbleOpacity.text"].compactMap {
-            (SettingsControlTestSupport.element(window, id: $0))?.accessibilityLabel() ?? (SettingsControlTestSupport.element(window, id: $0))?.accessibilityValue() as? String
+        // SwiftUI 滑块在 AppKit 里是 NSSlider；按真实窗口里的视图位置比较（窗口坐标，y 向上）。
+        func sliders(_ view: NSView) -> [NSSlider] { ((view as? NSSlider).map { [$0] } ?? []) + view.subviews.flatMap(sliders) }
+        guard let content = window.contentView else { return false }
+        let frames = sliders(content).map { $0.convert($0.bounds, to: nil) }.filter { abs($0.width - 140) < 1 }.sorted { $0.midY > $1.midY }
+        func buttonFrame(_ id: String) -> CGRect? {
+            (SettingsControlTestSupport.element(window, id: id) as? NSView).map { $0.convert($0.bounds, to: nil) }
         }
-        print("百分比文字：\(texts)")
+        print("设置里宽 140 pt 的滑块（窗口坐标）：\(frames.map { "x \(Int($0.minX)) 宽 \(Int($0.width)) 中线 y \(Int($0.midY))" })")
+        guard frames.count == 3, let resetSize = buttonFrame("desktop-cat.reset-size"), let resetOpacity = buttonFrame("desktop-cat.reset-opacity") else {
+            print("缺少滑块或按钮"); return false
+        }
+        // 自上而下：大小、猫的不透明度、气泡不透明度；三者左缘和宽度一致，右侧按钮列也对齐。
+        guard frames.allSatisfy({ abs($0.minX - frames[0].minX) < 0.5 && abs($0.width - frames[0].width) < 0.5 }),
+              abs(resetSize.midY - frames[0].midY) < 2, abs(resetOpacity.midY - frames[2].midY) < 2,
+              abs(resetSize.minX - resetOpacity.minX) < 0.5, abs(resetSize.width - resetOpacity.width) < 0.5,
+              (SettingsControlTestSupport.element(window, id: "desktop-cat.reset-opacity") as? NSButton)?.isEnabled == true else {
+            print("按钮：大小 \(resetSize)，不透明度 \(resetOpacity)"); return false
+        }
         if let path = ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"], let view = window.contentView {
             let directory = URL(fileURLWithPath: path, isDirectory: true)
             do {
@@ -409,7 +417,18 @@ enum DesktopCatOpacityTests {
                     SettingsControlTestSupport.settle(window)
                     guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return false }
                     view.cacheDisplay(in: view.bounds, to: rep)
-                    try rep.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("settings-opacity-\(dark ? "dark" : "light").png"))
+                    // `cacheDisplay` 不带窗口底色：按当前外观的窗口底色垫底再合成，否则深色的白字落在透明底上看不见。
+                    let output = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh, bitsPerSample: 8,
+                                                  samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+                    guard let output, let context = NSGraphicsContext(bitmapImageRep: output) else { return false }
+                    NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = context
+                    let bounds = NSRect(x: 0, y: 0, width: rep.pixelsWide, height: rep.pixelsHigh)
+                    (window.appearance ?? NSAppearance.currentDrawing()).performAsCurrentDrawingAppearance {
+                        NSColor.windowBackgroundColor.setFill(); bounds.fill()
+                    }
+                    rep.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: false, hints: nil)
+                    NSGraphicsContext.restoreGraphicsState()
+                    try output.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("settings-opacity-\(dark ? "dark" : "light").png"))
                 }
                 window.appearance = nil
             } catch { print("设置截图失败：\(error)"); return false }
