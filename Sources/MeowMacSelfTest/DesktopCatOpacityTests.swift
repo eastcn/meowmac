@@ -19,6 +19,8 @@ enum DesktopCatOpacityTests {
             ("UI.DesktopCatOpacity/命中与显示透明度无关", { hitIndependent() }),
             ("UI.DesktopCatOpacity/把手和落点框不随设定变化", { handleAndDrop() }),
             ("UI.DesktopCatOpacity/不新增监视器和计时器", { noNewTimers() }),
+            ("UI.DesktopCatOpacity/设置滑块拖动只改显示、松手写一次与失败回滚", { settings() }),
+            ("UI.DesktopCatWindow/设置里两行不透明度滑块与大小对齐", { await settingsWindow() }),
         ]
     }
 
@@ -321,5 +323,97 @@ enum DesktopCatOpacityTests {
         }
         print("桌面猫鼠标监视器：100% 时 \(counts[0]) 个，40% 时 \(counts[1]) 个")
         return counts.count == 2 && counts[0] == counts[1]
+    }
+
+    // MARK: - 设置入口（条目 3）
+
+    static func settings() -> Bool {
+        let (state, url) = DesktopCatSettingsTests.state(); defer { try? FileManager.default.removeItem(at: url) }
+        guard state.updateDesktopCat({ $0.with(enabled: true) }) else { return false }
+        var changes = 0
+        let controller = DesktopCatController(state: state, onOpenPanel: {})
+        controller.ordersFront = false
+        controller.screens = { [DesktopCatWindowTests.main] }
+        controller.mouseLocation = { CGPoint(x: 10, y: 10) }
+        state.onDesktopCatChanged = { _ in changes += 1; controller.apply() }
+        controller.apply(); defer { controller.hide() }
+        let actions = DesktopCatSettingsActions(state: state)
+        guard DesktopCatSettingsActions.opacityText(0.2) == "20%", DesktopCatSettingsActions.opacityText(0.33) == "35%",
+              actions.opacity(.cat) == 1, actions.opacity(.bubble) == 1, actions.isDefaultOpacity else { return false }
+        // 拖动中：只改草稿和桌面猫的显示，不写配置。
+        let bytes = try? Data(contentsOf: url)
+        for value in [0.9, 0.62, 0.41] { actions.dragOpacity(.bubble, to: value) }
+        controller.refreshBubble()
+        guard actions.opacity(.bubble) == 0.4, controller.model.bubbleOpacity == 0.4, controller.model.catOpacity == 1,
+              (try? Data(contentsOf: url)) == bytes, changes == 0, state.desktopCat.bubbleOpacity == 1 else { return false }
+        // 松手：只写一次。
+        actions.commitOpacity(.bubble)
+        controller.refreshBubble()
+        guard changes == 1, state.desktopCatOpacityDraft.isEmpty, ConfigStore.load(from: url).config.desktopCat.bubbleOpacity == 0.4,
+              controller.model.bubbleOpacity == 0.4, !actions.isDefaultOpacity, actions.opacity(.bubble) == 0.4 else { return false }
+        // 再次松手（没有拖动）不写。
+        actions.commitOpacity(.bubble)
+        guard changes == 1 else { return false }
+        actions.dragOpacity(.cat, to: 0.2); actions.commitOpacity(.cat)
+        guard changes == 2, ConfigStore.load(from: url).config.desktopCat.catOpacity == 0.2 else { return false }
+        // 合法非步长值（读取路径见 `broken`）：滑块位置和文字按 5% 显示，桌面猫照原值显示。
+        state.desktopCatOpacityDraft[.cat] = 0.33
+        controller.refreshBubble()
+        guard actions.opacity(.cat) == 0.35, DesktopCatSettingsActions.opacityText(0.33) == "35%", controller.model.catOpacity == 0.33 else { return false }
+        state.desktopCatOpacityDraft = [:]
+        // 恢复默认：两项都写成 1.0，界面可用状态随之变灰。
+        let before = changes
+        actions.resetOpacity()
+        let saved = ConfigStore.load(from: url).config.desktopCat
+        guard changes == before + 1, saved.catOpacity == 1, saved.bubbleOpacity == 1, saved.enabled, actions.isDefaultOpacity,
+              DesktopCatConfigTests.json(url).flatMap({ ($0["desktopCat"] as? [String: Any])?["catOpacity"] as? Double }) == 1 else { return false }
+        // 保存失败：显示原因，滑块和桌面猫回到原值，文件不变。
+        try? Data("{broken".utf8).write(to: url)
+        actions.dragOpacity(.cat, to: 0.5)
+        actions.commitOpacity(.cat)
+        controller.refreshBubble()
+        return state.desktopCatError != nil && actions.opacity(.cat) == 1 && state.desktopCatOpacityDraft.isEmpty
+            && controller.model.catOpacity == 1 && (try? Data(contentsOf: url)) == Data("{broken".utf8)
+    }
+
+    /// 前台用例（条目 4 实跑）：真实设置窗口的外观栏，“大小”下面依次是两行不透明度滑块，宽度和左缘与大小滑块一致。
+    /// 设了 `MEOWMAC_RENDER_DIR` 时截浅色和深色两张图。
+    static func settingsWindow() async -> Bool {
+        let (state, url) = DesktopCatSettingsTests.state(); defer { try? FileManager.default.removeItem(at: url) }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("meowmac-desktopcat-opacity-" + UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        CatRuntime.initialize(state: state, store: CatStore(rootURL: root))
+        guard state.updateDesktopCatOpacity([.bubble: 0.6]) else { return false }
+        let settings = SettingsWindowController(state: state)
+        settings.openDesktopCat()
+        defer { settings.closeWithoutConfirmation() }
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        guard let window = settings.window else { return false }
+        SettingsControlTestSupport.settle(window)
+        let ids = ["desktop-cat.size", "desktop-cat.catOpacity", "desktop-cat.bubbleOpacity"]
+        let frames = ids.compactMap { SettingsControlTestSupport.element(window, id: $0)?.accessibilityFrame() }
+        guard frames.count == 3 else { print("缺少滑块：\(frames)"); return false }
+        print("设置滑块（屏幕坐标）：\(frames.map { "x \(Int($0.minX)) 宽 \(Int($0.width)) y \(Int($0.minY))" })")
+        guard frames.allSatisfy({ abs($0.width - frames[0].width) < 0.5 && abs($0.minX - frames[0].minX) < 0.5 }),
+              frames[0].minY > frames[1].minY, frames[1].minY > frames[2].minY else { return false }
+        let texts = ["desktop-cat.catOpacity.text", "desktop-cat.bubbleOpacity.text"].compactMap {
+            (SettingsControlTestSupport.element(window, id: $0))?.accessibilityLabel() ?? (SettingsControlTestSupport.element(window, id: $0))?.accessibilityValue() as? String
+        }
+        print("百分比文字：\(texts)")
+        if let path = ProcessInfo.processInfo.environment["MEOWMAC_RENDER_DIR"], let view = window.contentView {
+            let directory = URL(fileURLWithPath: path, isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                for dark in [false, true] {
+                    window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                    SettingsControlTestSupport.settle(window)
+                    guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return false }
+                    view.cacheDisplay(in: view.bounds, to: rep)
+                    try rep.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("settings-opacity-\(dark ? "dark" : "light").png"))
+                }
+                window.appearance = nil
+            } catch { print("设置截图失败：\(error)"); return false }
+        }
+        return settings.navigation.section == .appearance && settings.navigation.sessions[.appearance]?.isDirty == false
     }
 }

@@ -70,6 +70,31 @@ public struct DesktopCatSettingsActions {
     public func resetSize() { setCatHeight(Double(DesktopCatSize.defaultHeight)) }
     public static func sizeText(_ height: Double) -> String { "\(Int(DesktopCatSize.resolved(CGFloat(height)))) pt" }
 
+    /// 不透明度（D48）：滑块 20%～100%，拖动时只改桌面猫的显示，松手写配置；“恢复默认”一次把两项设回 100%。
+    /// 滑块位置和百分比按四舍五入到 5% 显示；拖动中显示草稿。
+    public func opacity(_ part: DesktopCatOpacityPart) -> Double {
+        DesktopCatOpacity.sliderValue(state.desktopCatOpacityDraft[part] ?? state.desktopCat.opacity(part))
+    }
+    public var isDefaultOpacity: Bool {
+        DesktopCatOpacityPart.allCases.allSatisfy { DesktopCatOpacity.rendered(state.desktopCat.opacity($0)) == DesktopCatOpacity.defaultValue }
+    }
+    /// 拖动中：吸附到 5%，只更新草稿，桌面猫跟着变，不写配置。
+    public func dragOpacity(_ part: DesktopCatOpacityPart, to value: Double) {
+        let next = DesktopCatOpacity.resolved(value)
+        if state.desktopCatOpacityDraft[part] != next { state.desktopCatOpacityDraft[part] = next }
+    }
+    /// 松手：写一次配置并清掉草稿。写入失败时显示原因，滑块和桌面猫回到原值。
+    public func commitOpacity(_ part: DesktopCatOpacityPart) {
+        guard let value = state.desktopCatOpacityDraft[part] else { return }
+        state.updateDesktopCatOpacity([part: value])
+        state.desktopCatOpacityDraft[part] = nil
+    }
+    public func resetOpacity() {
+        state.desktopCatOpacityDraft = [:]
+        state.updateDesktopCatOpacity(Dictionary(uniqueKeysWithValues: DesktopCatOpacityPart.allCases.map { ($0, DesktopCatOpacity.defaultValue) }))
+    }
+    public static func opacityText(_ value: Double) -> String { DesktopCatOpacity.percentText(value) }
+
     public var isDefaultPosition: Bool { state.desktopCat.placement == .default }
     /// 放回主屏右下角。
     public func resetPosition() { state.updateDesktopCat { $0.with(placement: .default) } }
@@ -125,6 +150,10 @@ struct DesktopCatSettingsView: View {
                     Divider()
                     DesktopCatSizeRow(state: state).padding(8)
                     Divider()
+                    DesktopCatOpacityRow(state: state, part: .cat).padding(8)
+                    Divider()
+                    DesktopCatOpacityRow(state: state, part: .bubble).padding(8)
+                    Divider()
                     HStack {
                         Text("位置")
                         Text(actions.positionText).font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("desktop-cat.position")
@@ -175,7 +204,7 @@ struct DesktopCatSettingsView: View {
                     }.padding(8)
                 }
             }
-            Text("“添加指标…”弹出与右键菜单相同的分组目录。只剩 1 项时减号变灰。形象选“跟随当前猫”时，用“猫”栏的当前选择。")
+            Text("“添加指标…”弹出与右键菜单相同的分组目录。只剩 1 项时减号变灰。形象选“跟随当前猫”时，用“猫”栏的当前选择。透明度滑块拖动时只改显示，松手写配置；“恢复默认”把两项都设回 100%。")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if let error = state.desktopPetError {
                 Text(error).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
@@ -224,6 +253,37 @@ private struct DesktopCatSizeRow: View {
             Text(DesktopCatSettingsActions.sizeText(value)).monospacedDigit().frame(width: 52, alignment: .trailing)
             SettingsActionButton(title: "恢复默认大小", id: "desktop-cat.reset-size", enabled: !actions.isDefaultSize) { actions.resetSize() }
                 .frame(width: 112, height: 28)
+        }
+    }
+}
+
+/// 不透明度：拖动时只改显示（桌面猫实时跟着变），松手写配置。滑块宽度和右侧列宽与大小一行一致；
+/// “恢复默认”只在气泡一行，两项都是 100% 时变灰（D48）。不设 `step`，吸附在绑定里做，避免画刻度。
+private struct DesktopCatOpacityRow: View {
+    @ObservedObject var state: PanelState
+    let part: DesktopCatOpacityPart
+    private var actions: DesktopCatSettingsActions { DesktopCatSettingsActions(state: state) }
+    var body: some View {
+        let value = actions.opacity(part)
+        HStack {
+            Text(part.title)
+            Spacer()
+            Slider(value: Binding(get: { value }, set: { actions.dragOpacity(part, to: $0) }),
+                   in: DesktopCatOpacity.range) { editing in
+                guard !editing else { return }
+                actions.commitOpacity(part)
+            }
+            .frame(width: 140)
+            .accessibilityLabel(part.title)
+            .accessibilityIdentifier("desktop-cat." + part.rawValue)
+            Text(DesktopCatSettingsActions.opacityText(value)).monospacedDigit().frame(width: 52, alignment: .trailing)
+                .accessibilityIdentifier("desktop-cat." + part.rawValue + ".text")
+            if part == .bubble {
+                SettingsActionButton(title: "恢复默认", id: "desktop-cat.reset-opacity", enabled: !actions.isDefaultOpacity) { actions.resetOpacity() }
+                    .frame(width: 112, height: 28)
+            } else {
+                Color.clear.frame(width: 112, height: 28)
+            }
         }
     }
 }
