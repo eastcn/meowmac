@@ -223,19 +223,13 @@ struct QuotaTrendView: View {
         VStack(alignment: .leading, spacing: Design.rowGap) {
             SectionHeading(title: "用量趋势", detail: "MeowMac 采样")
             ForEach(state.quotaCycles(provider), id: \.window.identifier) { cycle in
-                    let window = cycle.window, reset = cycle.reset, start = cycle.start
-                    let history = cycle.points
-                    HStack { Text("\(window.displayName) · 从重置到重置，累计已用"); Spacer(minLength: 0); Text("已用 \(Int(window.usedPercent.rounded()))%") }.font(Design.caption).foregroundStyle(Design.secondary)
-                    MiniLineGraph(points: history.map { GraphValue(date: $0.sampledAt, value: $0.usedPercent) }, domain: start...reset, range: 0...100, color: Design.provider(provider, style: state.style), fill: true, fillOpacity: Design.quotaCurveFill, pace: true, now: state.now(), height: Design.cycleHeight)
-                    HStack { Text(DisplayDate.format(start, pattern: "M/d") + " 重置"); Spacer(); Text("现在"); Spacer(); Text(DisplayDate.format(reset, pattern: "M/d") + " 重置") }.font(Design.tiny).foregroundStyle(Design.secondary)
-                    Text("匀速用完的节奏：曲线在虚线上方就是用得偏快").font(Design.tiny).foregroundStyle(Design.secondary)
+                QuotaCycleGraph(cycle: cycle, color: Design.provider(provider, style: state.style), now: state.now())
+                    .id(provider.rawValue + cycle.window.identifier + String(cycle.reset.timeIntervalSince1970))
             }
             if state.quotas[provider]?.windows.contains(where: { $0.effectiveWindowMinutes == 300 }) == true {
                 let peaks = state.quotaPeaks(provider)
-                Text("5 小时窗口 · 每个窗口的最高已用").font(Design.caption).foregroundStyle(Design.secondary)
-                MiniColumns(values: peaks.map(\.usedPercent), colors: peaks.map { Design.provider(provider, style: state.style).opacity(QuotaPalette.peakOpacity(usedPercent: $0.usedPercent, isCurrent: $0.isCurrent)) }, maximum: 100)
-                HStack { Text(DisplayDate.format(state.now().addingTimeInterval(-6 * 86400), pattern: "M/d")); Spacer(); Text(DisplayDate.format(state.now().addingTimeInterval(-3 * 86400), pattern: "M/d")); Spacer(); Text("今天") }.font(Design.tiny).foregroundStyle(Design.secondary)
-                Text("实色：超过 80% · 浅色：进行中").font(Design.tiny).foregroundStyle(Design.secondary)
+                QuotaPeakGraph(peaks: peaks, color: Design.provider(provider, style: state.style), now: state.now())
+                    .id(provider.rawValue)
             }
         }
     }

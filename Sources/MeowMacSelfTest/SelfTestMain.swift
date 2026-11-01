@@ -218,6 +218,7 @@ enum SelfTestMain {
         tests.append(contentsOf: MenuBarCatImageTests.tests)
         tests.append(contentsOf: CodexResetTests.tests)
         tests.append(contentsOf: CodexResetUITests.tests)
+        tests.append(("UI.QuotaHover/原生鼠标移动与移出", { await QuotaTrendHoverTests.nativeHover() }))
         for test in HistoryTests.tests { tests.append((test.0, { test.1() })) }
         for test in NetworkHistoryTests.tests { tests.append((test.0, { test.1() })) }
         for test in NetworkLayoutTests.tests { tests.append((test.0, { test.1() })) }

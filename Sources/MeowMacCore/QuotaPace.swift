@@ -30,6 +30,14 @@ public struct QuotaPeak: Codable {
 public enum QuotaHistorySeries {
     public static let resetTolerance: TimeInterval = 10 * 60
 
+    /// 只吸附到半小时采样周期内的真实记录，缺测和未来不推算用量。
+    public static func hoverSample(_ points: [QuotaHistoryLine], at date: Date, now: Date) -> QuotaHistoryLine? {
+        guard date <= now else { return nil }
+        return points.filter { $0.sampledAt <= now && $0.usedPercent.isFinite
+            && abs($0.sampledAt.timeIntervalSince(date)) <= 30 * 60 }
+            .min { abs($0.sampledAt.timeIntervalSince(date)) < abs($1.sampledAt.timeIntervalSince(date)) }
+    }
+
     public static func peaks(_ history: [QuotaHistoryLine], now: Date) -> [QuotaPeak] {
         let samples = history.filter { $0.effectiveWindowMinutes == 300 && $0.sampledAt >= now.addingTimeInterval(-7 * 86400) && $0.sampledAt <= now && $0.resetsAt != nil }
             .sorted { $0.resetsAt! < $1.resetsAt! }

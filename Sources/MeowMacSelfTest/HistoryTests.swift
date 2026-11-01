@@ -8,6 +8,7 @@ enum HistoryTests {
         ("Core.History/旧行异名与重置容差", currentCycle),
         ("Core.History/峰值容差与七天边界", peaks),
         ("Core.History/损坏单行与旧格式", damagedLine),
+        ("Core.History/悬停真实采样与缺测未来", hover),
     ]
 
     private static let now = ISO8601DateFormatter().date(from: "2030-04-10T12:00:00Z")!
@@ -54,6 +55,19 @@ enum HistoryTests {
         let peaks = QuotaHistorySeries.peaks(rows.reversed(), now: now)
         return peaks.count == 2 && peaks.map(\.usedPercent) == [88, 30]
             && !peaks[0].isCurrent && peaks[1].isCurrent
+    }
+
+    private static func hover() -> Bool {
+        let reset = now.addingTimeInterval(86400)
+        let first = row(time: now.addingTimeInterval(-3600), reset: reset, minutes: 10080, used: 20)
+        let last = row(time: now, reset: reset, minutes: 10080, used: 55)
+        let rows = [first, last]
+        return QuotaHistorySeries.hoverSample(rows, at: first.sampledAt, now: now)?.usedPercent == 20
+            && QuotaHistorySeries.hoverSample(rows, at: now.addingTimeInterval(-600), now: now)?.usedPercent == 55
+            && QuotaHistorySeries.hoverSample(rows, at: first.sampledAt.addingTimeInterval(-1801), now: now) == nil
+            && QuotaHistorySeries.hoverSample(rows, at: now.addingTimeInterval(1), now: now) == nil
+            && QuotaHistorySeries.hoverSample([], at: now, now: now) == nil
+            && QuotaHistorySeries.hoverSample([row(time: now, reset: reset, minutes: 10080, used: .nan)], at: now, now: now) == nil
     }
 
     private static func damagedLine() -> Bool {
