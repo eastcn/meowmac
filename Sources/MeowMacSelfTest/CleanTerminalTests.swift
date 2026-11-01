@@ -66,7 +66,7 @@ enum CleanTerminalTests {
                   !FileManager.default.fileExists(atPath: directory.appendingPathComponent("injected").path),
                   !FileManager.default.fileExists(atPath: directory.appendingPathComponent("injected2").path) else { return false }
             let config = CleanTerminalLauncher.configuration(terminal: .ghostty, script: script)
-            return config.createsNewApplicationInstance && config.arguments == ["-e", "/bin/sh", script.path]
+            return config.createsNewApplicationInstance && config.arguments == ["--window-save-state=never", "-e", "/bin/sh", script.path]
                 && !CleanTerminalLauncher.configuration(terminal: .terminal, script: script).createsNewApplicationInstance
         } catch { print("清理命令转义测试失败：\(error)"); return false }
     }

@@ -36,7 +36,8 @@ public enum TerminalScriptLauncher {
         configuration.activates = true
         if terminal == .ghostty {
             configuration.createsNewApplicationInstance = true
-            configuration.arguments = ["-e", "/bin/sh", script.path]
+            // 独立命令实例不恢复旧窗口，否则用户保存的标签页也会一起打开。
+            configuration.arguments = ["--window-save-state=never", "-e", "/bin/sh", script.path]
         }
         return configuration
     }
