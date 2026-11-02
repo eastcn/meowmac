@@ -27,9 +27,27 @@ enum CostTests {
         guard state.displayedCostDate == "2026-09-30" else { return false }
         state.selectCostDay("2026-09-23")
         let empty = state.costDayDisplay(.claude, date: state.displayedCostDate)
-        guard !empty.hasData, empty.totalCost == 0, empty.detailText == "9/23 · 无花费" else { return false }
+        guard !empty.hasData, empty.totalCost == 0, empty.detailText == "9/23 · 无记录" else { return false }
         state.selectCostDay("2026-08-31")
         return state.displayedCostDate == "2026-09-23"
+    }
+    static func archive() -> Bool {
+        let today = ISO8601DateFormatter().date(from: "2026-09-30T12:00:00Z")!
+        let kept = DailyCost(date: "2026-09-10", totalCost: 5, totalTokens: 50)
+        let shrunk = DailyCost(date: "2026-09-12", totalCost: 8)
+        let old = DailyCost(date: "2026-05-01", totalCost: 1)
+        let merged = CostArchive.merge(
+            archived: [kept, shrunk, old],
+            fresh: [DailyCost(date: "2026-09-12", totalCost: 3), DailyCost(date: "2026-09-30", totalCost: 2)],
+            today: today)
+        guard merged.map(\.date) == ["2026-09-10", "2026-09-12", "2026-09-30"],
+              merged[0].totalCost == 5, merged[1].totalCost == 8, merged[2].totalCost == 2 else { return false }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("meowmac-cost-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = CostArchiveStore(directory: dir)
+        _ = store.merged(.codex, fresh: [kept], today: today)
+        let again = store.merged(.codex, fresh: [DailyCost(date: "2026-09-30", totalCost: 2)], today: today)
+        return again.map(\.date) == ["2026-09-10", "2026-09-30"] && store.load(.claude).isEmpty
     }
     static func snapshot() -> Bool {
         let state = fixture()

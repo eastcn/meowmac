@@ -338,6 +338,7 @@ enum SelfTestMain {
         tests.append(("UI.Cat/同名导入菜单", { CatIntegrationTests.menuDuplicates() }))
         tests.append(("UI.Panel/真实容器的自然高度与切换", { await PanelLayoutTests.heights() }))
         tests.append(("UI.PanelLayout/渲染顺序固定区与快照", { PanelLayoutUITests.renderingAndSnapshot() }))
+        tests.append(("UI.Quota/花费存档合并与保留", { CostTests.archive() }))
         tests.append(("UI.PanelLayout/默认与极端容器尺寸", { await PanelLayoutUITests.sizes() }))
         tests.append(("UI.PanelLayout/隐藏网络检查后点击总览告警", { await PanelLayoutUITests.hiddenNetworkIssueClick() }))
         tests.append(("UI.StyleIntegration/启动切猫包默认与坏文件", { StyleIntegrationTests.lifecycle() }))

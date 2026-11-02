@@ -27,7 +27,7 @@ public struct CostDayDisplay: Codable {
     public var detailText: String {
         let parts = date.split(separator: "-")
         let day = parts.count == 3 ? "\(Int(parts[1]) ?? 0)/\(Int(parts[2]) ?? 0)" : date
-        guard hasData else { return day + " · 无花费" }
+        guard hasData else { return day + " · 无记录" }
         var fields = [day, String(format: "$%.2f", totalCost)]
         if let totalTokens { fields.append(CostTokenFormat.text(totalTokens)) }
         if let mostUsedModel { fields.append(mostUsedModel) }

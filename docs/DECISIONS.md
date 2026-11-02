@@ -30,6 +30,8 @@
 
 2026-10-05 修改：默认仍是这 4 个渠道。用户可以在“额度源设置”里，从 CodexBarCLI 支持的渠道中添加或移除渠道。新增渠道用通用卡片：有 CodexBar 图标就用，没有就用首字母圆形占位；显示窗口、节奏、趋势和历史，参与额度提醒和通知（D13、D41）。花费仍只有 Claude 和 Codex，按会话补刷（D8）仍只管 Claude 和 Codex，其他渠道按 30 分钟周期和手动刷新。渠道清单是本机配置，不进猫包。写 CodexBar 配置的范围见 `AGENTS.md`。
 
+2026-11-02 修改：CodexBar 只扫描现存的会话日志，会话被清理或归档后，那几天会从 `cost` 结果里消失。MeowMac 把读到的每日汇总存档到 `~/Library/Application Support/MeowMac/history/cost/<provider>.json`，保留 90 天，只增不减。同一天取花费较大的一份，存档里有而新数据没有的天原样保留。卡片上没有数据的天显示“无记录”，不写“无花费”，因为无法区分没花钱和日志已被清理。存档只对采集之后生效，不回填已丢失的天。
+
 **D7　额度历史。** MeowMac 自己定时采样，写成 JSONL，放在 `~/Library/Application Support/MeowMac/`，保留 90 天。v0.2 时一次性导入 CodexBar 已有的历史文件。
 
 **D8　刷新策略。**

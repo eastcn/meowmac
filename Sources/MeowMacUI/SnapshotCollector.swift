@@ -49,7 +49,7 @@ public enum SnapshotCollector {
         state.energy = energy
         await collectQuotas(state: state, client: client)
         for provider in [QuotaProvider.codex, .claude] where state.quotaProviders.contains(provider) {
-            do { state.costs[provider] = try await Task.detached { try client.cost(provider) }.value }
+            do { state.costs[provider] = try await Task.detached { CostArchiveStore().merged(provider, fresh: try client.cost(provider)) }.value }
             catch { logger.error("快照花费采集失败：\(provider.rawValue, privacy: .public) \(error.localizedDescription, privacy: .private)") }
             let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".\(provider.rawValue)")
             do { state.localStorage[provider] = try await Task.detached { try LocalStorageCollector.scan(directory: url, provider: provider) }.value }

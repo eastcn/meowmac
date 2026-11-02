@@ -25,6 +25,8 @@ public final class QuotaCoordinator {
     private var sleeping = false
     private var observers: [NSObjectProtocol] = []
     private let proxyCheck: @Sendable () async -> QuotaProxyStatus
+    /// 花费存档放在额度历史旁边（history/cost），测试换历史目录时随之隔离。
+    private let costArchive: CostArchiveStore
     private var proxySubscriptions = Set<AnyCancellable>()
     private var proxyGeneration = 0
 
@@ -34,6 +36,7 @@ public final class QuotaCoordinator {
                 proxyCheck: @escaping @Sendable () async -> QuotaProxyStatus = { await QuotaProxyProtection.check() }) {
         self.state = state; self.config = config; self.history = history; self.importSource = importSource
         self.scanner = scanner
+        self.costArchive = CostArchiveStore(directory: history.directory.deletingLastPathComponent().appendingPathComponent("cost", isDirectory: true))
         self.client = client ?? CodexBarClient(path: config.codexBarCLIPath)
         self.sourceStore = sourceStore
         self.proxyCheck = proxyCheck
@@ -246,7 +249,8 @@ public final class QuotaCoordinator {
             if self.state.quotaProviders.contains(provider), self.generations[provider, default: 0] == generation {
                 self.apply(result, provider: provider)
                 if [.claude, .codex].contains(provider) {
-                    let costs = await Task.detached { Result { try client.cost(provider) } }.value
+                    let archive = self.costArchive
+                    let costs = await Task.detached { Result { archive.merged(provider, fresh: try client.cost(provider)) } }.value
                     if self.state.quotaProviders.contains(provider), self.generations[provider, default: 0] == generation {
                         switch costs {
                         case .success(let days): self.state.costs[provider] = days
