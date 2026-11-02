@@ -51,8 +51,10 @@ public final class DesktopCatController {
     private var drag: (start: CGPoint, origin: CGPoint, moved: Bool)?
     /// 拖把手缩放：按下时的鼠标位置和猫的高度（plan D15）。
     private var resize: (start: CGPoint, height: CGFloat)?
-    /// 按在结束提示上：松手时关掉这一条，不拖动，不开面板（plan D3）。
+    /// 按在结束提示上：松手时处理单条或展开合并项，不拖动、不打开面板。
     private var pressedToast: String?
+    /// 合并提示已在悬浮窗内展开（D46）。
+    public private(set) var noticesExpanded = false
     /// 鼠标离开猫和把手后 0.3 秒隐藏把手。一次性的延迟任务，不是计时器；回到猫身上即取消。
     private var handleHide: DispatchWorkItem?
     public static let handleHideDelay: TimeInterval = 0.3
@@ -135,6 +137,7 @@ public final class DesktopCatController {
     }
 
     public func hide() {
+        noticesExpanded = false
         subscription = nil
         refreshPending = false
         observers.forEach { NotificationCenter.default.removeObserver($0) }; observers.removeAll()
@@ -172,7 +175,11 @@ public final class DesktopCatController {
         let height = DesktopCatSize.rendered(state.desktopCat.catHeight)
         let sized = resize == nil && height != model.catHeight
         // 只在选了“AI 会话”时显示结束提示（D46）。
-        let toasts = AgentSessionCadence.wanted(state.desktopCat) ? state.agentSessionToasts : []
+        let wanted = AgentSessionCadence.wanted(state.desktopCat)
+        // 展开只读取协调器已发布的提示，不删除、不重扫；提示少到不再合并时自动收起。
+        let notices = state.agentSessionNotices
+        if !wanted || notices.count <= AgentSessionNoticeBoard.maxShown { noticesExpanded = false }
+        let toasts = !wanted ? [] : noticesExpanded ? AgentSessionToast.expanded(notices) : state.agentSessionToasts
         let toastsChanged = toasts != model.toasts
         let resized = items.count != model.items.count || corner != model.corner || sized || toastsChanged
         if items != model.items { model.items = items; bubbleUpdates += 1 }
@@ -300,12 +307,21 @@ public final class DesktopCatController {
     public func mouseUp() {
         if let pressed = pressedToast {
             pressedToast = nil
-            // 松手时还在同一条提示上才关掉；不开面板。单条提示再打开对应渠道的 App（D46）。
+            // 松手时还在同一条提示上才操作；单条关闭并打开 App，合并项展开（D46）。
             guard let window, let index = hitShape().toast(at: localPoint(window)), index < model.toasts.count,
                   model.toasts[index].id == pressed else { return }
             let toast = model.toasts[index]
-            state.onDismissAgentSessionToast(toast.ids)
-            if case .single(let notice) = toast { state.onOpenAgentSessionApp(notice.provider) }
+            switch toast {
+            case .single(let notice):
+                state.onDismissAgentSessionToast([notice.id])
+                state.onOpenAgentSessionApp(notice.provider)
+            case .more:
+                noticesExpanded = true
+                refreshBubble()
+            case .collapse:
+                noticesExpanded = false
+                refreshBubble()
+            }
             return
         }
         if resize != nil {

@@ -12,7 +12,11 @@ enum DesktopCatSessionTests {
             ("Core.DesktopCatSessions/提示区版式：0～2 条、四个角、1 列和 2 列", { layout() }),
             ("Core.DesktopCatSessions/提示区随猫的大小分角", { sizes() }),
             ("Core.DesktopCatSessions/提示命中：提示内、空隙、提示外", { hits() }),
-            ("UI.DesktopCatSessions/点提示关这一条并打开对应 App，不开面板", { await click() }),
+            ("UI.DesktopCatSessions/四角展开全部提示滚动及单条点击", {
+                for corner in DesktopCatCorner.allCases { if !(await click(corner: corner)) { return false } }
+                return true
+            }),
+            ("UI.DesktopCatSessions/完整提示随协调器发布关闭和过期", { await noticeLifecycle() }),
             ("UI.DesktopCatSessions/提示对应的 App", {
                 AgentSessionApp.bundleID(for: .claude) == "com.anthropic.claudefordesktop"
                     && AgentSessionApp.bundleID(for: .codex) == "com.openai.codex" && AgentSessionApp.bundleID(for: .deepseek) == nil
@@ -104,7 +108,7 @@ enum DesktopCatSessionTests {
                 let base = DesktopCatLayout(count: count, corner: corner, catTrim: 2)
                 for widths in [[], [180], [150, 220], [300, 90, 90]] as [[CGFloat]] {
                     let layout = DesktopCatLayout(count: count, corner: corner, catTrim: 2, toastWidths: widths)
-                    guard layout.toastRects.count == min(2, widths.count), layout.toastWidths.allSatisfy({ $0 <= 220 }),
+                    guard layout.toastRects.count == widths.count, layout.toastWidths.allSatisfy({ $0 <= 220 }),
                           checkToasts(layout, corner: corner, base: base) else { print("提示版式：\(corner) \(count) 项 \(widths)"); return false }
                     if widths.isEmpty, layout != base { return false }
                     if !widths.isEmpty, layout.contentSize.height != base.contentSize.height + CGFloat(layout.toastRects.count) * 30 { return false }
@@ -147,38 +151,90 @@ enum DesktopCatSessionTests {
         .single(AgentSessionNotice(id: "claude:" + name, provider: .claude, name: name, duration: 180, completedAt: at, shownAt: at))
     }
 
-    static func click() async -> Bool {
+    static func click(corner: DesktopCatCorner) async -> Bool {
         let (state, controller, url) = DesktopCatWindowTests.controller(enabled: true); defer { try? FileManager.default.removeItem(at: url) }
-        guard state.updateDesktopCat({ try $0.adding(AgentSessionCadence.metricID) }) else { return false }
+        guard state.updateDesktopCat({ try $0.adding(AgentSessionCadence.metricID).with(placement: DesktopCatPlacement(display: nil, corner: corner)) }) else { return false }
         var opened = 0, dismissed: [[String]] = [], apps: [QuotaProvider] = []
         controller.onOpenPanel = { opened += 1 }
         state.onDismissAgentSessionToast = { dismissed.append($0) }
         state.onOpenAgentSessionApp = { apps.append($0) }
         state.agentSessionToasts = [notice("示例项目"), .more(count: 2, ids: ["a", "b"])]
+        state.agentSessionNotices = (0..<12).map { AgentSessionNotice(id: "n\($0)", provider: .codex, name: "示例会话 \($0)", duration: 180, completedAt: at, shownAt: at) }
         controller.apply(); defer { controller.hide() }
         guard let window = controller.window, controller.model.toasts.count == 2 else { print("点提示：toasts=\(controller.model.toasts.count) window=\(controller.window != nil)"); return false }
-        let layout = controller.model.layout
         func point(_ rect: CGRect) -> CGPoint { CGPoint(x: window.frame.minX + rect.midX, y: window.frame.maxY - rect.midY) }
-        var mouse = point(layout.toastRects[0])
+        var mouse = point(controller.model.layout.toastRects[0])
         controller.mouseLocation = { mouse }
         // 点第 0 条：关它并打开对应渠道的 App，不开面板，不拖动。
         controller.mouseDown(); controller.mouseUp()
         guard dismissed == [["claude:示例项目"]], apps == [.claude], opened == 0, !controller.model.dragging else {
             print("点提示：\(dismissed) \(apps) \(opened)"); return false
         }
-        // 点合并的那条：关掉它包含的全部，不打开 App。
-        mouse = point(layout.toastRects[1])
+        let collapsedLayout = controller.model.layout
+        // 点合并的那条：在窗口内原地展开全部提示加“收起”，不删除提示、不打开 App。
+        mouse = point(collapsedLayout.toastRects[1])
         controller.mouseDown(); controller.mouseUp()
-        guard dismissed.last == ["a", "b"], apps == [.claude], opened == 0 else { print("点合并：\(dismissed) \(apps) \(opened)"); return false }
+        guard dismissed.count == 1, apps == [.claude], opened == 0, controller.noticesExpanded,
+              controller.model.toasts.count == 13, controller.model.toasts.last == .collapse,
+              controller.model.layout.windowSize.height > collapsedLayout.windowSize.height else {
+            print("点合并：\(dismissed) \(apps) \(opened) \(controller.model.toasts.count)"); return false
+        }
+        // 点“收起”：回到合并状态，提示一条不少。
+        mouse = point(controller.model.layout.toastRects[12])
+        controller.mouseDown(); controller.mouseUp()
+        guard !controller.noticesExpanded, controller.model.toasts.count == 2, state.agentSessionNotices.count == 12, dismissed.count == 1 else { return false }
+        // 再展开，点最后一条单条提示：只关这一条并打开其渠道。
+        mouse = point(controller.model.layout.toastRects[1])
+        controller.mouseDown(); controller.mouseUp()
+        guard controller.model.toasts.count == 13 else { return false }
+        mouse = point(controller.model.layout.toastRects[11])
+        controller.mouseDown(); controller.mouseUp()
+        guard dismissed.last == ["n0"], apps == [.claude, .codex] else { print("展开后点单条：\(dismissed) \(apps)"); return false }
+        // 协调器发布过期后的列表：少到不再合并时自动收起。
+        state.agentSessionNotices.removeLast(10)
+        controller.refreshBubble()
+        guard !controller.noticesExpanded, controller.model.toasts.count == 2 else { return false }
+        state.agentSessionNotices = []
+        controller.refreshBubble()
+        guard !controller.noticesExpanded else { return false }
+        let layout = controller.model.layout
         // 在提示上按下、拖到别处松手：不关，不移动窗口。
         let home = window.frame
         mouse = point(layout.toastRects[0])
         controller.mouseDown(); mouse.y -= 120; controller.mouseDragged(); controller.mouseUp()
-        guard dismissed.count == 2, apps == [.claude], window.frame == home, opened == 0 else { print("拖开：\(dismissed) \(opened) \(window.frame) \(home)"); return false }
+        guard dismissed.count == 2, apps == [.claude, .codex], window.frame == home, opened == 0 else { print("拖开：\(dismissed) \(opened) \(window.frame) \(home)"); return false }
         // 点气泡仍然打开面板。
         mouse = point(layout.bubbleRect)
         controller.mouseDown(); controller.mouseUp()
         return opened == 1
+    }
+
+    static func noticeLifecycle() async -> Bool {
+        let state = PanelPreviewRenderer.syntheticState()
+        let coordinator = AgentSessionCoordinator(state: state, read: { date in
+            let sessions = (0..<4).map { index in
+                AgentSessionState(provider: .codex, id: "example-\(index)", phase: .finished,
+                                  completion: AgentSessionCompletion(id: "done", completedAt: at, startedAt: nil, duration: 60),
+                                  lastWriteAt: at, now: date)
+            }
+            return AgentSessionSnapshot(checkedAt: date, roots: [.codex: .ok], sessions: sessions)
+        })
+        coordinator.wanted = { true }
+        coordinator.installsTimer = false
+        var current = at
+        coordinator.now = { current }
+        coordinator.apply()
+        defer { coordinator.stop() }
+        guard await AgentSessionReaderTests.waitFor({ coordinator.sequence > 0 }),
+              state.agentSessionNotices.count == 4, state.agentSessionToasts.count == 2 else { return false }
+        let id = state.agentSessionNotices[0].id
+        state.onDismissAgentSessionToast([id])
+        guard state.agentSessionNotices.count == 3, !state.agentSessionNotices.contains(where: { $0.id == id }) else { return false }
+        current = at.addingTimeInterval(300)
+        await coordinator.fire()
+        guard state.agentSessionNotices.isEmpty, state.agentSessionToasts.isEmpty else { return false }
+        coordinator.stop()
+        return state.agentSessionNotices.isEmpty
     }
 
     static func unselected() async -> Bool {

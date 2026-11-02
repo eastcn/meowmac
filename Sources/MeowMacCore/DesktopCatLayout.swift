@@ -21,7 +21,8 @@ public struct DesktopCatLayout: Equatable {
     public static let handleDiameter: CGFloat = 12
     /// 结束提示（D46，plan D3）：高 24 pt，最宽 220 pt，条间和离气泡（上方的角离猫）6 pt。
     public static let toastHeight: CGFloat = 24, toastGap: CGFloat = 6, toastMaxWidth: CGFloat = 220
-    public static let maxToasts = 2
+    /// 收起时最多 2 条（多出的合并）；展开时全部未过期提示加“收起”，这里只是兜底上限。
+    public static let maxToasts = 24
 
     public let count: Int
     public let mirrored: Bool
@@ -31,7 +32,7 @@ public struct DesktopCatLayout: Equatable {
     public let catSize: CGSize
     /// 上方的角：提示放在猫下方；下方的角：提示放在气泡上方（plan D3）。
     public let top: Bool
-    /// 每条结束提示的宽度，第 0 条贴着气泡（上方的角贴着猫）。最多 2 条，每条最宽 220 pt。
+    /// 每条结束提示的宽度，第 0 条贴着气泡（上方的角贴着猫）。每条最宽 220 pt。
     public let toastWidths: [CGFloat]
 
     public init(count: Int, corner: DesktopCatCorner, catTrim: CGFloat = 0, catHeight: CGFloat = DesktopCatSize.defaultHeight,

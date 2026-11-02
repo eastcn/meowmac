@@ -178,7 +178,7 @@ struct DesktopCatToast: View {
                 Text(notice.name).font(DesktopCatToastText.nameFont).foregroundStyle(Design.label)
                     .lineLimit(1).truncationMode(.tail).frame(width: metrics.nameWidth, alignment: .leading)
                 Text(notice.detail).font(DesktopCatToastText.detailFont).foregroundStyle(Design.secondary).lineLimit(1).fixedSize()
-            case .more:
+            case .more, .collapse:
                 Text(toast.text).font(DesktopCatToastText.detailFont).foregroundStyle(Design.secondary).lineLimit(1).fixedSize()
             }
         }
@@ -224,7 +224,7 @@ public enum DesktopCatToastText {
             let fixed = 2 * padding + width("✓", weight: .bold) + 2 * spacing + width(notice.detail, weight: .regular)
             let name = min(width(notice.name, weight: .semibold), nameMaxWidth, max(0, DesktopCatLayout.toastMaxWidth - fixed))
             return Metrics(width: min(DesktopCatLayout.toastMaxWidth, fixed + name), nameWidth: name)
-        case .more:
+        case .more, .collapse:
             return Metrics(width: min(DesktopCatLayout.toastMaxWidth, 2 * padding + width(toast.text, weight: .regular)), nameWidth: 0)
         }
     }

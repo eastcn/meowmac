@@ -29,25 +29,37 @@ public struct AgentSessionNotice: Equatable, Identifiable, Sendable {
 /// 桌面猫上显示的一条：单条完成，或合并后的“另有 n 个会话完成”。
 public enum AgentSessionToast: Equatable, Identifiable, Sendable {
     case single(AgentSessionNotice)
-    /// 合并的条数和它们的标识，点一下全部关掉。
+    /// 合并的条数和它们的标识，点击后展开全部未过期提示。
     case more(count: Int, ids: [String])
+    /// 展开后列表末尾的“收起”，只收起，不删除任何提示。
+    case collapse
     public var id: String {
         switch self {
         case .single(let notice): return notice.id
         case .more(_, let ids): return "more:" + ids.joined(separator: ",")
+        case .collapse: return "collapse"
         }
     }
     public var ids: [String] {
         switch self {
         case .single(let notice): return [notice.id]
         case .more(_, let ids): return ids
+        case .collapse: return []
         }
     }
     public var text: String {
         switch self {
         case .single(let notice): return "✓ " + notice.name + " " + notice.detail
         case .more(let count, _): return "另有 \(count) 个会话完成"
+        case .collapse: return "收起"
         }
+    }
+}
+
+extension AgentSessionToast {
+    /// 在悬浮窗内展开：全部未过期提示，最新的在前，末尾是“收起”。
+    public static func expanded(_ notices: [AgentSessionNotice]) -> [AgentSessionToast] {
+        notices.reversed().map(AgentSessionToast.single) + [.collapse]
     }
 }
 
